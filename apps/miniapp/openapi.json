@@ -1,0 +1,1614 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Telegram Bot Manager API",
+    "description": "REST API behind the Telegram Mini App admin panel.\n\nAuthenticate by posting the WebApp `initData` string to `/api/auth/telegram`,\nthen send the returned token as `Authorization: Bearer <token>` on every other\nrequest. Tokens are short-lived; renew them with `/api/auth/refresh` rather than\nre-posting `initData`, which Telegram only lets you use once.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Liveness probe",
+        "description": "Always 200 while the process is up — no dependency is consulted.\n\nA liveness probe that fails when Redis is down would have the orchestrator\nrestart a perfectly healthy API, which does not bring Redis back.",
+        "operationId": "health",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/ready": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Readiness probe",
+        "description": "503 while a dependency the API cannot serve without is unreachable.",
+        "operationId": "ready",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/meta": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Module catalog, plan matrix and shipped locales",
+        "operationId": "getPlatformMeta",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetaResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/telegram": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange Telegram initData for an API session token",
+        "operationId": "authenticateWithTelegram",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/refresh": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Renew a session token that has not expired yet",
+        "operationId": "refreshSession",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "The caller behind the current session token",
+        "operationId": "getCurrentUser",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthUser"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
+    },
+    "/api/chats": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Chats where the caller is an administrator",
+        "operationId": "listChats",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ChatSummary"
+                  },
+                  "type": "array",
+                  "title": "Response Listchats"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
+    },
+    "/api/chats/{chat_id}": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "One chat with its module state and unlocked features",
+        "operationId": "getChat",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Update chat-level settings (language, timezone)",
+        "operationId": "updateChat",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chat_id}/admins/sync": {
+      "post": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Re-read the chat's administrator list from Telegram",
+        "description": "Refresh the mirror the chat list is drawn from, and drop cached verdicts.\n\nTelegram sends no update on a promotion, so this is how a newly promoted\nadmin makes the chat appear in their panel without waiting for the bot to\nhappen to sync it.",
+        "operationId": "syncChatAdmins",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chat_id}/plan": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "The plan actually in force for a chat",
+        "operationId": "getChatPlan",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chat_id}/modules": {
+      "get": {
+        "tags": [
+          "modules"
+        ],
+        "summary": "Every module's settings for one chat",
+        "description": "One payload for the whole settings screen — locked modules included.\n\nLocked modules are returned rather than hidden: the panel renders them\ngreyed out with the plan that unlocks them, which is the paywall.",
+        "operationId": "listModuleConfigs",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ModuleConfigResponse"
+                  },
+                  "title": "Response Listmoduleconfigs"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The chat's plan does not include this feature.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chat_id}/modules/{module}": {
+      "get": {
+        "tags": [
+          "modules"
+        ],
+        "summary": "One module's settings",
+        "operationId": "getModuleConfig",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "module",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleConfigResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The chat's plan does not include this feature.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "modules"
+        ],
+        "summary": "Merge a partial settings update into a module",
+        "operationId": "patchModuleConfig",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "module",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleConfigResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The chat's plan does not include this feature.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "modules"
+        ],
+        "summary": "Replace a module's settings wholesale",
+        "operationId": "replaceModuleConfig",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "module",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModuleConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleConfigResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The chat's plan does not include this feature.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chat_id}/modules/{module}/reset": {
+      "post": {
+        "tags": [
+          "modules"
+        ],
+        "summary": "Restore a module's default settings",
+        "operationId": "resetModuleConfig",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "module",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Module"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModuleConfigResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The chat's plan does not include this feature.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AdminRole": {
+        "type": "string",
+        "enum": [
+          "owner",
+          "admin"
+        ],
+        "title": "AdminRole"
+      },
+      "AuthRequest": {
+        "properties": {
+          "init_data": {
+            "type": "string",
+            "maxLength": 8192,
+            "minLength": 1,
+            "title": "Init Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "init_data"
+        ],
+        "title": "AuthRequest",
+        "description": "Raw `initData` string handed over by the Telegram WebApp SDK."
+      },
+      "AuthResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "expires_in": {
+            "type": "integer",
+            "title": "Expires In"
+          },
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token",
+          "expires_in",
+          "user"
+        ],
+        "title": "AuthResponse"
+      },
+      "AuthUser": {
+        "properties": {
+          "tg_user_id": {
+            "type": "integer",
+            "title": "Tg User Id"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name",
+            "default": ""
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "language_code": {
+            "type": "string",
+            "title": "Language Code",
+            "default": "en"
+          },
+          "is_superadmin": {
+            "type": "boolean",
+            "title": "Is Superadmin",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "tg_user_id"
+        ],
+        "title": "AuthUser"
+      },
+      "ChatDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tg_chat_id": {
+            "type": "integer",
+            "title": "Tg Chat Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ChatType"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "plan_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Expires At"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/AdminRole",
+            "default": "admin"
+          },
+          "members_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Members Count"
+          },
+          "owner_tg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Tg Id"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "ru"
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "default": "UTC"
+          },
+          "modules": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "type": "object",
+            "title": "Modules"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Features"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tg_chat_id",
+          "title",
+          "type",
+          "plan"
+        ],
+        "title": "ChatDetail"
+      },
+      "ChatSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tg_chat_id": {
+            "type": "integer",
+            "title": "Tg Chat Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ChatType"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "plan_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Expires At"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "role": {
+            "$ref": "#/components/schemas/AdminRole",
+            "default": "admin"
+          },
+          "members_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Members Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tg_chat_id",
+          "title",
+          "type",
+          "plan"
+        ],
+        "title": "ChatSummary"
+      },
+      "ChatType": {
+        "type": "string",
+        "enum": [
+          "group",
+          "supergroup",
+          "channel"
+        ],
+        "title": "ChatType"
+      },
+      "ChatUpdate": {
+        "properties": {
+          "language": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(ru|en)$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "timezone": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timezone"
+          }
+        },
+        "type": "object",
+        "title": "ChatUpdate"
+      },
+      "CommandMeta": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "description_key": {
+            "type": "string",
+            "title": "Description Key"
+          },
+          "admin_only": {
+            "type": "boolean",
+            "title": "Admin Only",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "description_key"
+        ],
+        "title": "CommandMeta"
+      },
+      "MetaResponse": {
+        "properties": {
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/ModuleMeta"
+            },
+            "type": "array",
+            "title": "Modules"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/PlanMeta"
+            },
+            "type": "array",
+            "title": "Plans"
+          },
+          "locales": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Locales"
+          }
+        },
+        "type": "object",
+        "title": "MetaResponse"
+      },
+      "ModuleConfigResponse": {
+        "properties": {
+          "module": {
+            "type": "string",
+            "title": "Module"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "required_plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "config": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "required": [
+          "module",
+          "enabled",
+          "required_plan",
+          "available",
+          "config"
+        ],
+        "title": "ModuleConfigResponse"
+      },
+      "ModuleConfigUpdate": {
+        "properties": {
+          "enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enabled"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          }
+        },
+        "type": "object",
+        "title": "ModuleConfigUpdate"
+      },
+      "ModuleMeta": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "title_key": {
+            "type": "string",
+            "title": "Title Key"
+          },
+          "description_key": {
+            "type": "string",
+            "title": "Description Key"
+          },
+          "required_plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "mandatory": {
+            "type": "boolean",
+            "title": "Mandatory",
+            "default": false
+          },
+          "enabled_by_default": {
+            "type": "boolean",
+            "title": "Enabled By Default",
+            "default": false
+          },
+          "section_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Section Key"
+          },
+          "icon": {
+            "type": "string",
+            "title": "Icon",
+            "default": "settings"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "default": 100
+          },
+          "commands": {
+            "items": {
+              "$ref": "#/components/schemas/CommandMeta"
+            },
+            "type": "array",
+            "title": "Commands"
+          },
+          "config_schema": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Config Schema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "title_key",
+          "description_key",
+          "required_plan"
+        ],
+        "title": "ModuleMeta",
+        "description": "One module as the Mini App needs to draw it, before any chat is chosen."
+      },
+      "OperationResult": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "OperationResult"
+      },
+      "Plan": {
+        "type": "string",
+        "enum": [
+          "free",
+          "pro",
+          "business",
+          "white_label"
+        ],
+        "title": "Plan"
+      },
+      "PlanMeta": {
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "stars": {
+            "type": "integer",
+            "title": "Stars",
+            "default": 0
+          },
+          "usd": {
+            "type": "string",
+            "title": "Usd",
+            "default": ""
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Features"
+          },
+          "limits": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Limits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "title": "PlanMeta"
+      },
+      "Problem": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type",
+            "default": "about:blank"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "status": {
+            "type": "integer",
+            "title": "Status"
+          },
+          "detail": {
+            "type": "string",
+            "title": "Detail",
+            "default": ""
+          },
+          "instance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance"
+          },
+          "code": {
+            "type": "string",
+            "title": "Code",
+            "default": "domain-error"
+          },
+          "context": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "status"
+        ],
+        "title": "Problem",
+        "description": "RFC7807-like error body returned by the API exception handler.\n\n`title` is localized for the caller and safe to show; `detail` is the\ndeveloper-facing message. `code` is the stable machine-readable discriminator\nthe Mini App branches on, and `context` carries whatever the error knew (the\nrequired plan for a paywall, the offending field for a validation failure)."
+      }
+    },
+    "securitySchemes": {
+      "TelegramSession": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    }
+  }
+}
