@@ -1,0 +1,381 @@
+"""Request/response DTOs for the Mini App REST API.
+
+These drive the generated TypeScript client, so every field the front-end
+needs must be represented here rather than assembled ad hoc in a router.
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from decimal import Decimal
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from shared.enums import (
+    AdminRole,
+    ChatType,
+    PaymentProvider,
+    PaymentStatus,
+    Plan,
+    PunishmentType,
+    ScheduleKind,
+    TriggerMatch,
+)
+
+
+class ApiModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --------------------------------------------------------------------------
+# auth
+# --------------------------------------------------------------------------
+class AuthRequest(BaseModel):
+    """Raw `initData` string handed over by the Telegram WebApp SDK."""
+
+    init_data: str = Field(min_length=1, max_length=8_192)
+
+
+class AuthUser(ApiModel):
+    tg_user_id: int
+    username: str | None = None
+    first_name: str = ""
+    last_name: str | None = None
+    language_code: str = "en"
+    is_superadmin: bool = False
+
+
+class AuthResponse(ApiModel):
+    access_token: str
+    expires_in: int
+    user: AuthUser
+
+
+# --------------------------------------------------------------------------
+# chats
+# --------------------------------------------------------------------------
+class ChatSummary(ApiModel):
+    id: int
+    tg_chat_id: int
+    title: str
+    type: ChatType
+    plan: Plan
+    plan_expires_at: datetime | None = None
+    is_active: bool = True
+    role: AdminRole = AdminRole.ADMIN
+    members_count: int | None = None
+
+
+class ChatDetail(ChatSummary):
+    owner_tg_id: int | None = None
+    language: str = "ru"
+    timezone: str = "UTC"
+    modules: dict[str, bool] = Field(default_factory=dict)
+    features: list[str] = Field(default_factory=list)
+    created_at: datetime | None = None
+
+
+class ChatUpdate(BaseModel):
+    language: str | None = Field(default=None, pattern="^(ru|en)$")
+    timezone: str | None = None
+
+
+class ModuleConfigResponse(ApiModel):
+    module: str
+    enabled: bool
+    required_plan: Plan
+    available: bool
+    config: dict[str, Any]
+
+
+class ModuleConfigUpdate(BaseModel):
+    enabled: bool | None = None
+    config: dict[str, Any] | None = None
+
+
+# --------------------------------------------------------------------------
+# platform metadata (drives the Mini App's sections and paywall)
+# --------------------------------------------------------------------------
+class CommandMeta(ApiModel):
+    name: str
+    description_key: str
+    admin_only: bool = True
+
+
+class ModuleMeta(ApiModel):
+    """One module as the Mini App needs to draw it, before any chat is chosen."""
+
+    name: str
+    title_key: str
+    description_key: str
+    required_plan: Plan
+    mandatory: bool = False
+    enabled_by_default: bool = False
+    section_key: str | None = None
+    icon: str = "settings"
+    order: int = 100
+    commands: list[CommandMeta] = Field(default_factory=list)
+    # JSON Schema of the module's config model — the settings form is generated
+    # from this, so a new option ships without a front-end change.
+    config_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class PlanMeta(ApiModel):
+    plan: Plan
+    stars: int = 0
+    usd: str = ""
+    features: list[str] = Field(default_factory=list)
+    limits: dict[str, int] = Field(default_factory=dict)
+
+
+class MetaResponse(ApiModel):
+    modules: list[ModuleMeta] = Field(default_factory=list)
+    plans: list[PlanMeta] = Field(default_factory=list)
+    locales: list[str] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------
+# moderation data
+# --------------------------------------------------------------------------
+class WarnEntry(ApiModel):
+    id: int
+    tg_user_id: int
+    moderator_tg_id: int
+    reason: str
+    created_at: datetime
+    expires_at: datetime | None = None
+
+
+class PunishmentEntry(ApiModel):
+    id: int
+    tg_user_id: int
+    moderator_tg_id: int
+    type: PunishmentType
+    reason: str
+    expires_at: datetime | None = None
+    active: bool
+    created_at: datetime
+
+
+# --------------------------------------------------------------------------
+# triggers
+# --------------------------------------------------------------------------
+class TriggerButton(BaseModel):
+    text: str = Field(min_length=1, max_length=64)
+    url: str = Field(min_length=1, max_length=2_048)
+
+
+class TriggerCreate(BaseModel):
+    pattern: str = Field(min_length=1, max_length=256)
+    match: TriggerMatch = TriggerMatch.CONTAINS
+    response: str = Field(min_length=1, max_length=4_000)
+    media_file_id: str | None = None
+    buttons: list[TriggerButton] = Field(default_factory=list, max_length=8)
+    case_sensitive: bool = False
+    delete_trigger: bool = False
+    enabled: bool = True
+
+
+class TriggerUpdate(BaseModel):
+    pattern: str | None = Field(default=None, min_length=1, max_length=256)
+    match: TriggerMatch | None = None
+    response: str | None = Field(default=None, min_length=1, max_length=4_000)
+    media_file_id: str | None = None
+    buttons: list[TriggerButton] | None = None
+    case_sensitive: bool | None = None
+    delete_trigger: bool | None = None
+    enabled: bool | None = None
+
+
+class TriggerEntry(ApiModel):
+    id: int
+    pattern: str
+    match: TriggerMatch
+    response: str
+    media_file_id: str | None = None
+    buttons: list[TriggerButton] = Field(default_factory=list)
+    case_sensitive: bool = False
+    delete_trigger: bool = False
+    enabled: bool = True
+    hits: int = 0
+
+
+# --------------------------------------------------------------------------
+# scheduled posts
+# --------------------------------------------------------------------------
+class PostCreate(BaseModel):
+    title: str = Field(default="", max_length=128)
+    content: str = Field(min_length=1, max_length=4_000)
+    media_file_id: str | None = None
+    buttons: list[TriggerButton] = Field(default_factory=list, max_length=8)
+    schedule_kind: ScheduleKind = ScheduleKind.DAILY
+    schedule_value: str = Field(min_length=1, max_length=64)
+    target_chat_id: int | None = None
+    pin: bool = False
+    delete_previous: bool = False
+    enabled: bool = True
+
+
+class PostUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=128)
+    content: str | None = Field(default=None, min_length=1, max_length=4_000)
+    media_file_id: str | None = None
+    buttons: list[TriggerButton] | None = None
+    schedule_kind: ScheduleKind | None = None
+    schedule_value: str | None = Field(default=None, min_length=1, max_length=64)
+    target_chat_id: int | None = None
+    pin: bool | None = None
+    delete_previous: bool | None = None
+    enabled: bool | None = None
+
+
+class PostEntry(ApiModel):
+    id: int
+    title: str
+    content: str
+    media_file_id: str | None = None
+    buttons: list[TriggerButton] = Field(default_factory=list)
+    schedule_kind: ScheduleKind
+    schedule_value: str
+    target_chat_id: int | None = None
+    next_run_at: datetime | None = None
+    pin: bool = False
+    delete_previous: bool = False
+    enabled: bool = True
+
+
+# --------------------------------------------------------------------------
+# statistics
+# --------------------------------------------------------------------------
+class StatPoint(ApiModel):
+    date: date
+    messages: int = 0
+    active_users: int = 0
+    joins: int = 0
+    leaves: int = 0
+    moderation_actions: int = 0
+
+
+class TopUser(ApiModel):
+    tg_user_id: int
+    messages: int
+    username: str | None = None
+    display_name: str | None = None
+
+
+class StatsOverview(ApiModel):
+    period_days: int
+    total_messages: int
+    total_active_users: int
+    total_joins: int
+    total_leaves: int
+    net_growth: int
+    series: list[StatPoint] = Field(default_factory=list)
+    top_users: list[TopUser] = Field(default_factory=list)
+
+
+# --------------------------------------------------------------------------
+# reputation
+# --------------------------------------------------------------------------
+class ReputationEntry(ApiModel):
+    tg_user_id: int
+    points: int
+    level: int
+    username: str | None = None
+    display_name: str | None = None
+
+
+# --------------------------------------------------------------------------
+# payments / plans
+# --------------------------------------------------------------------------
+class PlanOption(ApiModel):
+    plan: Plan
+    stars: int
+    usd: str
+    features: list[str]
+
+
+class PlanCatalog(ApiModel):
+    current_plan: Plan
+    expires_at: datetime | None = None
+    options: list[PlanOption]
+
+
+class InvoiceRequest(BaseModel):
+    plan: Plan
+    provider: PaymentProvider = PaymentProvider.STARS
+    months: int = Field(default=1, ge=1, le=12)
+
+
+class InvoiceResponse(ApiModel):
+    provider: PaymentProvider
+    invoice_url: str | None = None
+    invoice_payload: str
+    amount: str
+    currency: str
+
+
+class PaymentEntry(ApiModel):
+    id: int
+    provider: PaymentProvider
+    amount: Decimal
+    currency: str
+    status: PaymentStatus
+    plan: Plan
+    months: int
+    created_at: datetime
+
+
+# --------------------------------------------------------------------------
+# platform superadmin
+# --------------------------------------------------------------------------
+class PlatformStats(ApiModel):
+    total_chats: int
+    active_chats: int
+    chats_by_plan: dict[str, int]
+    revenue_stars: int
+    revenue_usd: Decimal
+    global_bans: int
+
+
+class GlobalBanEntry(ApiModel):
+    id: int
+    tg_user_id: int
+    reason: str
+    chat_count: int
+    is_active: bool
+    created_at: datetime
+
+
+class GlobalBanCreate(BaseModel):
+    tg_user_id: int
+    reason: str = Field(default="", max_length=512)
+
+
+class BroadcastRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=4_000)
+    plans: list[Plan] = Field(default_factory=list)
+
+
+class OperationResult(ApiModel):
+    ok: bool = True
+    detail: str = ""
+
+
+class Problem(BaseModel):
+    """RFC7807-like error body returned by the API exception handler.
+
+    `title` is localized for the caller and safe to show; `detail` is the
+    developer-facing message. `code` is the stable machine-readable discriminator
+    the Mini App branches on, and `context` carries whatever the error knew (the
+    required plan for a paywall, the offending field for a validation failure).
+    """
+
+    type: str = "about:blank"
+    title: str
+    status: int
+    detail: str = ""
+    instance: str | None = None
+    code: str = "domain-error"
+    context: dict[str, Any] = Field(default_factory=dict)
