@@ -39,9 +39,9 @@ from api.security import Principal, issue_token
 from core import cache
 from db.models import Chat, Reputation, ScheduledPost, TgUser, TriggerRule
 from shared.config import get_settings
-from shared.enums import ChatType, ScheduleKind, TriggerMatch
+from shared.enums import ChatType, Plan, ScheduleKind, TriggerMatch
 from shared.errors import FeatureLockedError, LimitExceededError
-from shared.plans import PLAN_FEATURES, PLAN_LIMITS, Feature, Plan, PlanLimits, minimum_plan_for
+from shared.plans import PLAN_FEATURES, PLAN_LIMITS, Feature, PlanLimits, minimum_plan_for
 from shared.schemas.api import StatsOverview, TopUser
 
 USER_ID = 7_654_321

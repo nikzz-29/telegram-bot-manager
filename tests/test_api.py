@@ -55,9 +55,9 @@ from core.webapp import (
 )
 from db.models import Chat
 from shared.config import PLACEHOLDER_JWT_SECRET, Settings, get_settings
-from shared.enums import ChatType
+from shared.enums import ChatType, Plan
 from shared.errors import FeatureLockedError, InvalidInitDataError, InvalidSessionError
-from shared.plans import PLAN_FEATURES, Feature, Plan, minimum_plan_for
+from shared.plans import PLAN_FEATURES, Feature, minimum_plan_for
 
 # Structurally valid, never issued: `hmac` does not care and neither does BotFather.
 FAKE_TOKEN = "123456:AAHfake-token-for-tests-only-not-a-real-secret"
@@ -276,7 +276,9 @@ async def test_replay_guard_degrades_when_redis_is_down() -> None:
     """A cache outage must not lock every admin out of their own panel."""
     from redis.exceptions import ConnectionError as RedisConnectionError
 
-    class DeadRedis:
+    # A subclass rather than a stand-in: `set_redis` takes a `Redis`, and the
+    # only call the replay guard makes is the one being broken here.
+    class DeadRedis(FakeRedis):
         async def set(self, *args: Any, **kwargs: Any) -> bool:
             raise RedisConnectionError("connection refused")
 
@@ -1123,6 +1125,6 @@ def test_a_webhook_without_a_secret_cannot_reach_production() -> None:
 
 def test_development_keeps_the_convenient_defaults() -> None:
     """`task api` and `pytest` must work with no setup at all."""
-    settings = Settings(app_env="development", _env_file=None)  # type: ignore[call-arg]
+    settings = Settings(app_env="development", _env_file=None)
     assert settings.jwt_secret == PLACEHOLDER_JWT_SECRET
     assert not settings.is_production

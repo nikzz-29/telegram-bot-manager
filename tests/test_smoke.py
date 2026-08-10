@@ -7,6 +7,7 @@ Stage 7 and runs against testcontainers.
 from datetime import UTC, datetime, timedelta
 
 import pytest
+from sqlalchemy.engine.default import DefaultDialect
 
 from core.anti_flood import FloodPolicy, SlidingWindowRateLimiter
 from core.audit import ACTION_ICONS
@@ -23,6 +24,7 @@ from core.registry import MODULE_SPECS, ModuleRegistry, registry
 from core.stop_words import StopWordMatcher, matcher_for, normalize
 from db import models
 from db.base import Base
+from db.types import StrEnumType
 from i18n.runtime import LOCALES_DIR, localization
 from shared.enums import ModuleName, Plan
 from shared.errors import InvalidDurationError
@@ -137,12 +139,18 @@ def test_initial_schema_contains_required_entities() -> None:
 
 def test_enum_columns_round_trip_as_enum_members() -> None:
     """`Mapped[Plan]` must not hand back a bare `str` — see `db.types`."""
+    # `Column.type` is only `TypeEngine`; the round-trip hooks live on the
+    # decorator, so assert the column really got ours before calling them.
     column_type = models.Chat.__table__.c.plan.type
-    assert column_type.process_result_value("pro", None) is Plan.PRO
-    assert column_type.process_bind_param(Plan.PRO, None) == "pro"
-    assert column_type.process_result_value(None, None) is None
+    assert isinstance(column_type, StrEnumType)
+    # The hooks take a dialect but never read it; a bare `DefaultDialect` keeps
+    # the calls honest instead of sidestepping the signature with `None`.
+    dialect = DefaultDialect()
+    assert column_type.process_result_value("pro", dialect) is Plan.PRO
+    assert column_type.process_bind_param(Plan.PRO, dialect) == "pro"
+    assert column_type.process_result_value(None, dialect) is None
     # An unknown legacy value stays readable instead of breaking the query.
-    assert column_type.process_result_value("legacy_tier", None) == "legacy_tier"
+    assert column_type.process_result_value("legacy_tier", dialect) == "legacy_tier"
 
 
 # --- durations ----------------------------------------------------------------

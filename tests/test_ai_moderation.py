@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 
 from core import ai_moderation as ai_module
+from core import cache
 from core.ai_moderation import ai_moderation, text_hash
 from core.ai_provider import (
     CircuitBreaker,
@@ -182,8 +183,8 @@ def service(monkeypatch: pytest.MonkeyPatch) -> tuple[FakeProvider, FakeCache, F
     verdict_cache = FakeCache()
     redis = FakeRedis()
     ai_moderation.use(provider)
-    monkeypatch.setattr(ai_module.cache, "get_value", verdict_cache.get_value)
-    monkeypatch.setattr(ai_module.cache, "set_value", verdict_cache.set_value)
+    monkeypatch.setattr(cache, "get_value", verdict_cache.get_value)
+    monkeypatch.setattr(cache, "set_value", verdict_cache.set_value)
     monkeypatch.setattr(ai_module, "get_redis", lambda: redis)
     return provider, verdict_cache, redis
 

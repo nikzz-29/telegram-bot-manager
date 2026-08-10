@@ -33,6 +33,7 @@ import pytest
 from api.app import create_app
 from api.routers import billing as billing_router
 from core import billing as billing_module
+from core import cache
 from core.billing import InvoicePayload, billing, price_for, term_end
 from core.cryptobot import PAID_STATUS, SIGNATURE_HEADER, CryptoBotClient
 from core.features import effective_plan, in_grace_period
@@ -127,6 +128,10 @@ class FakeUow:
         self.chats = FakeChatRepo(chats)
         self.payments = payments
         self.commits = 0
+        # The chat ids whose cached plan the service invalidated. It lives here
+        # rather than in a second fixture value because every assertion about it
+        # is an assertion about what this UoW's write did.
+        self.invalidated: list[int] = []
 
     async def __aenter__(self) -> FakeUow:
         return self
@@ -150,13 +155,10 @@ def ledger(monkeypatch: pytest.MonkeyPatch) -> FakeUow:
     uow = FakeUow({CHAT_ID: make_chat()}, payments)
     monkeypatch.setattr(billing_module, "UnitOfWork", lambda: uow)
 
-    invalidated: list[int] = []
-
     async def invalidate(chat_id: int) -> None:
-        invalidated.append(chat_id)
+        uow.invalidated.append(chat_id)
 
-    monkeypatch.setattr(billing_module.cache, "invalidate_chat_plan", invalidate)
-    uow.invalidated = invalidated  # type: ignore[attr-defined]
+    monkeypatch.setattr(cache, "invalidate_chat_plan", invalidate)
     return uow
 
 
@@ -237,7 +239,7 @@ async def test_a_first_payment_moves_the_chat_onto_its_plan(ledger: FakeUow) -> 
     assert chat.plan_expires_at == term_end(NOW, 1)
     assert payment.period_end == chat.plan_expires_at
     # The cached plan is what every gate reads; a stale entry would sell nothing.
-    assert ledger.invalidated == [CHAT_ID]  # type: ignore[attr-defined]
+    assert ledger.invalidated == [CHAT_ID]
 
 
 async def test_the_same_payment_delivered_twice_buys_one_month(ledger: FakeUow) -> None:
@@ -349,7 +351,7 @@ async def test_downgrade_clears_the_window_and_the_cached_plan(ledger: FakeUow) 
     assert chat.plan is Plan.FREE
     assert chat.plan_expires_at is None
     assert chat.grace_until is None
-    assert ledger.invalidated == [CHAT_ID]  # type: ignore[attr-defined]
+    assert ledger.invalidated == [CHAT_ID]
 
 
 # --- the catalog ----------------------------------------------------------------
@@ -417,7 +419,9 @@ async def webhook(monkeypatch: pytest.MonkeyPatch) -> AsyncIterator[httpx.AsyncC
         yield client
 
 
-async def post_update(client: httpx.AsyncClient, body: bytes, *, signature: str | None = None):
+async def post_update(
+    client: httpx.AsyncClient, body: bytes, *, signature: str | None = None
+) -> httpx.Response:
     return await client.post(
         billing_router.CRYPTOBOT_WEBHOOK_PATH,
         content=body,

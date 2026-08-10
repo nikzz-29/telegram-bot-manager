@@ -18,8 +18,10 @@ from typing import Any
 
 import pytest
 
+from core import cache, jobs
 from core import crossban as crossban_module
 from core.crossban import crossban, is_network_reason
+from core.jobs import JobName
 from shared.schemas.module_configs import CrossbanConfig
 
 USER_ID = 555
@@ -88,8 +90,8 @@ def network(monkeypatch: pytest.MonkeyPatch) -> tuple[FakeGlobalBanRepo, list[tu
     async def invalidate_user(tg_user_id: int) -> None:
         return None
 
-    monkeypatch.setattr(crossban_module.jobs, "enqueue", enqueue)
-    monkeypatch.setattr(crossban_module.cache, "invalidate_user", invalidate_user)
+    monkeypatch.setattr(jobs, "enqueue", enqueue)
+    monkeypatch.setattr(cache, "invalidate_user", invalidate_user)
     return repo, enqueued
 
 
@@ -148,9 +150,7 @@ async def test_promotion_hands_the_fan_out_to_the_worker(
     """Spec §5.6: the moderator's `/ban` returns now, the fan-out happens later."""
     _, enqueued = network
     await crossban.promote(tg_user_id=USER_ID, reason="scam: fake giveaway", banned_by=1)
-    assert enqueued == [
-        (crossban_module.JobName.PROPAGATE_GLOBAL_BAN, USER_ID, "scam: fake giveaway")
-    ]
+    assert enqueued == [(JobName.PROPAGATE_GLOBAL_BAN, USER_ID, "scam: fake giveaway")]
 
 
 async def test_a_chat_reporting_twice_cannot_inflate_the_count(

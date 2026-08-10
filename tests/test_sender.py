@@ -77,6 +77,12 @@ def _msg(text: str, chat_id: int = CHAT) -> SendMessage:
     return SendMessage(chat_id=chat_id, text=text)
 
 
+async def _call(sender: MessageSender, text: str) -> object:
+    """`sender.call` typed as `object`: `FakeBot` answers with a marker string
+    where the method's own type says `Message`, and the sender never looks."""
+    return await sender.call(_msg(text), chat_id=CHAT)
+
+
 async def _drain(sender: MessageSender, limit: float = 3.0) -> None:
     """Wait until the sender has nothing queued, parked or in flight."""
     async with asyncio.timeout(limit):
@@ -116,7 +122,7 @@ async def test_call_returns_the_api_result() -> None:
     bot = FakeBot()
     sender = _sender(bot)
     await sender.start()
-    assert await sender.call(_msg("needs-id"), chat_id=CHAT) == "sent::needs-id"
+    assert await _call(sender, "needs-id") == "sent::needs-id"
     await sender.stop()
 
 
@@ -165,7 +171,7 @@ async def test_transient_errors_are_retried_then_succeed(error: Exception) -> No
     sender = _sender(bot)
     await sender.start()
 
-    assert await sender.call(_msg("flaky"), chat_id=CHAT) == "sent::flaky"
+    assert await _call(sender, "flaky") == "sent::flaky"
     await sender.stop()
 
     assert bot.calls == ["flaky"]
@@ -177,7 +183,7 @@ async def test_flood_control_waits_and_then_delivers() -> None:
     sender = _sender(bot)
     await sender.start()
 
-    assert await sender.call(_msg("hot"), chat_id=CHAT) == "sent::hot"
+    assert await _call(sender, "hot") == "sent::hot"
     await sender.stop()
 
     assert bot.calls == ["hot"]

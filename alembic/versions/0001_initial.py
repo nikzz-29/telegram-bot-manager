@@ -8,6 +8,8 @@ Revision ID: 0001_initial
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -20,7 +22,8 @@ depends_on = None
 _NOW = sa.text("now()")
 
 
-def _timestamps() -> tuple[sa.Column[sa.DateTime], sa.Column[sa.DateTime]]:
+def _timestamps() -> tuple[sa.Column[datetime], sa.Column[datetime]]:
+    # `sa.Column` is generic over the *Python* type, not the SQL one.
     return (
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=_NOW, nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), server_default=_NOW, nullable=False),
