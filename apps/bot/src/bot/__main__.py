@@ -22,8 +22,8 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.types import (
     BotCommand,
     BotCommandScopeAllChatAdministrators,
-    MenuButtonWebApp,
-    WebAppInfo,
+    BotCommandScopeAllPrivateChats,
+    MenuButtonCommands,
 )
 
 from bot import middlewares, modules
@@ -55,6 +55,24 @@ LIVE_MODULES: Final[tuple[ModuleName, ...]] = (
     ModuleName.AUTOPOST,
 )
 
+# The DM command menu, in the order it is shown. These are the platform's own
+# commands rather than any module's, so they are written here instead of derived
+# from the registry — `bot.commands.private` is the only file that answers them.
+#
+# DECISION: `/admin` is listed even though almost nobody may use it. Telegram has
+# no per-user command scope short of `BotCommandScopeChat` set per account, and
+# publishing per-account would mean one API call per operator on every start; the
+# gate that matters is in the handler, and a listed command that answers "not for
+# you" is not a leak — the operator list is not a secret, the panel's data is,
+# and that is guarded by `initData` on every API call.
+PRIVATE_COMMANDS: Final[tuple[tuple[str, str], ...]] = (
+    ("profile", "cmd-profile"),
+    ("chats", "cmd-chats"),
+    ("plans", "cmd-plans"),
+    ("help", "cmd-help"),
+    ("admin", "cmd-admin"),
+)
+
 
 def build_dispatcher() -> Dispatcher:
     """The dispatcher, with the spec's middleware chain and every module router."""
@@ -71,34 +89,41 @@ def build_dispatcher() -> Dispatcher:
 
 
 async def _publish_commands(bot: Bot) -> None:
-    """Register the group command menu from the registry. Best-effort.
+    """Register both command menus. Best-effort.
 
-    DECISION: the command list is derived from `ModuleSpec.commands` rather than
+    DECISION: the group list is derived from `ModuleSpec.commands` rather than
     written out here. The registry is already the single source of truth for what
-    a module offers, and the menu is one more consumer of it.
+    a module offers, and the menu is one more consumer of it. The private list is
+    not — those commands belong to no module, and `PRIVATE_COMMANDS` is where
+    they are written down.
 
-    DECISION: only admin-scoped commands are published. `/warns` is open to
-    everyone but putting it in the all-members menu invites a whole chat to poke
-    at the bot; anyone who knows to type it still gets an answer.
+    DECISION: only admin-scoped commands are published to groups. `/warns` is
+    open to everyone but putting it in the all-members menu invites a whole chat
+    to poke at the bot; anyone who knows to type it still gets an answer.
+
+    DECISION: the chat menu button opens the command list, not the Mini App. The
+    panel is an operator surface reached through `/admin`; a Web App button on
+    every user's keyboard advertises it to everyone who ever opened the bot, and
+    they would all land on a panel that has nothing in it for them. Pointing the
+    button at the commands makes it useful to the people who actually see it.
     """
-    settings = get_settings()
     # The menu is global, so it can only be in one language; the per-chat
     # `language` setting still governs every reply the bot actually sends.
     t = translator(DEFAULT_LOCALE)
-    commands = [
+    group_commands = [
         BotCommand(command=command.name, description=t(command.description_key))
         for module in LIVE_MODULES
         for command in registry.get(module).commands
         if command.admin_only
     ]
+    private_commands = [
+        BotCommand(command=name, description=t(description_key))
+        for name, description_key in PRIVATE_COMMANDS
+    ]
     try:
-        await bot.set_my_commands(commands, scope=BotCommandScopeAllChatAdministrators())
-        if settings.webapp_url:
-            await bot.set_chat_menu_button(
-                menu_button=MenuButtonWebApp(
-                    text=t("menu-button"), web_app=WebAppInfo(url=settings.webapp_url)
-                )
-            )
+        await bot.set_my_commands(group_commands, scope=BotCommandScopeAllChatAdministrators())
+        await bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
+        await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
     except TelegramAPIError as exc:
         logger.warning("bot.commands_publish_failed", error=str(exc))
 
