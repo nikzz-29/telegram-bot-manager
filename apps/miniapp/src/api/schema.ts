@@ -418,6 +418,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chats/{chat_id}/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The chat's current plan and what it can move to
+         * @description `current_plan` is the effective one, so a chat in grace sees what it has.
+         */
+        get: operations["getChatPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/invoice": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Open a Stars or CryptoBot invoice for a plan
+         * @description Quote and open an invoice; nothing about the chat changes until it is paid.
+         *
+         *     Opening a second invoice while a first is unpaid is allowed on purpose — a
+         *     payer who abandoned a Stars link and came back for crypto would otherwise be
+         *     stuck behind their own dead invoice. Both carry the same signed payload, and
+         *     settlement is idempotent per provider payment id.
+         */
+        post: operations["createChatInvoice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent payments for a chat
+         * @description Newest first. Pending rows are included: an admin who paid in crypto and
+         *     is waiting for a confirmation should see that the platform knows about it.
+         */
+        get: operations["listChatPayments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -555,6 +621,29 @@ export interface components {
              */
             admin_only: boolean;
         };
+        /** InvoiceRequest */
+        InvoiceRequest: {
+            plan: components["schemas"]["Plan"];
+            /** @default stars */
+            provider: components["schemas"]["PaymentProvider"];
+            /**
+             * Months
+             * @default 1
+             */
+            months: number;
+        };
+        /** InvoiceResponse */
+        InvoiceResponse: {
+            provider: components["schemas"]["PaymentProvider"];
+            /** Invoice Url */
+            invoice_url?: string | null;
+            /** Invoice Payload */
+            invoice_payload: string;
+            /** Amount */
+            amount: string;
+            /** Currency */
+            currency: string;
+        };
         /** MetaResponse */
         MetaResponse: {
             /** Modules */
@@ -641,11 +730,48 @@ export interface components {
              */
             detail: string;
         };
+        /** PaymentEntry */
+        PaymentEntry: {
+            /** Id */
+            id: number;
+            provider: components["schemas"]["PaymentProvider"];
+            /** Amount */
+            amount: string;
+            /** Currency */
+            currency: string;
+            status: components["schemas"]["PaymentStatus"];
+            plan: components["schemas"]["Plan"];
+            /** Months */
+            months: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * PaymentProvider
+         * @enum {string}
+         */
+        PaymentProvider: "stars" | "cryptobot";
+        /**
+         * PaymentStatus
+         * @enum {string}
+         */
+        PaymentStatus: "pending" | "paid" | "failed" | "refunded";
         /**
          * Plan
          * @enum {string}
          */
         Plan: "free" | "pro" | "business" | "white_label";
+        /** PlanCatalog */
+        PlanCatalog: {
+            current_plan: components["schemas"]["Plan"];
+            /** Expires At */
+            expires_at?: string | null;
+            /** Options */
+            options: components["schemas"]["PlanOption"][];
+        };
         /** PlanMeta */
         PlanMeta: {
             plan: components["schemas"]["Plan"];
@@ -665,6 +791,16 @@ export interface components {
             limits?: {
                 [key: string]: number;
             };
+        };
+        /** PlanOption */
+        PlanOption: {
+            plan: components["schemas"]["Plan"];
+            /** Stars */
+            stars: number;
+            /** Usd */
+            usd: string;
+            /** Features */
+            features: string[];
         };
         /** PostCreate */
         PostCreate: {
@@ -2646,6 +2782,211 @@ export interface operations {
             };
             /** @description Request failed validation. */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getChatPlans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanCatalog"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createChatInvoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvoiceRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvoiceResponse"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listChatPayments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentEntry"][];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
