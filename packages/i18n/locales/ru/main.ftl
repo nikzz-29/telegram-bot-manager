@@ -1,0 +1,171 @@
+# Русская локаль. Ключи должны совпадать один-в-один с en/main.ftl.
+#
+# Соглашение: {$user} — уже готовая HTML-ссылка на участника (см. bot.facts.mention),
+# поэтому её нельзя экранировать повторно. Остальные подстановки — простой текст.
+
+## Личные сообщения
+start-welcome = Привет! Я помогаю управлять Telegram-чатами: модерация, капча, статистика и автопостинг. Добавьте меня в чат администратором и откройте панель управления.
+help-text = Добавьте меня в чат и выдайте права администратора, затем откройте панель управления — все настройки живут там. В чате доступны команды модерации: /warn, /mute, /ban, /kick, /del, /ro.
+open-miniapp = Открыть панель управления
+menu-button = Панель
+
+## Предупреждения
+warn-issued = {$user} получил предупреждение: {$count}/{$limit}.
+warn-punishment-ban = Лимит исчерпан — участник заблокирован.
+warn-punishment-mute = Лимит исчерпан — участник замьючен на {$duration}.
+warn-punishment-mute-forever = Лимит исчерпан — участник замьючен бессрочно.
+unwarn-done = С {$user} снято предупреждение. Осталось: {$count}.
+warns-own = Ваши предупреждения: {$count}/{$limit}.
+warns-other = Предупреждения {$user}: {$count}/{$limit}.
+
+## Модерация — ответы на команды
+moderation-forbidden = Эта команда доступна только администраторам чата.
+moderation-reply-required = Ответьте этой командой на сообщение участника.
+mute-success = {$user} замьючен на {$duration}.
+unmute-success = С {$user} снято ограничение на отправку сообщений.
+ban-success = {$user} заблокирован на {$duration}.
+ban-success-forever = {$user} заблокирован бессрочно.
+unban-success = {$user} разблокирован.
+kick-success = {$user} исключён из чата.
+read-only-on = Чат переведён в режим «только чтение».
+read-only-on-timed = Чат переведён в режим «только чтение» на {$duration}.
+read-only-off = Режим «только чтение» выключен, можно писать.
+read-only-usage = Использование: /ro on, /ro off или /ro 30m.
+
+## Автоматические уведомления в чат
+notice-filter = Сообщение {$user} удалено: запрещённый контент ({$filter}).
+notice-stop-word = Сообщение {$user} удалено: стоп-слово.
+notice-flood = {$user}, слишком много сообщений подряд.
+notice-warned = Предупреждение: {$count}/{$limit}.
+notice-muted = Ограничение на отправку сообщений: {$duration}.
+notice-muted-forever = Ограничение на отправку сообщений: бессрочно.
+notice-banned = Участник заблокирован.
+
+## Гейт модулей
+module-locked = Этот раздел доступен на тарифе {$plan}.
+module-locked-command = Команда недоступна: раздел «{$module}» требует тариф {$plan}.
+
+## Лог-канал
+log-action-warn = Предупреждение
+log-action-unwarn = Снятие предупреждения
+log-action-mute = Мут
+log-action-unmute = Снятие мута
+log-action-ban = Блокировка
+log-action-unban = Разблокировка
+log-action-kick = Исключение
+log-action-delete = Удаление сообщения
+log-action-auto-delete = Автоудаление
+log-action-stop-word = Стоп-слово
+log-action-content-filter = Контент-фильтр
+log-action-anti-flood = Антифлуд
+log-action-read-only = Режим «только чтение»
+log-action-alert-admins = Оповещение администраторов
+log-action-captcha-passed = Капча пройдена
+log-action-captcha-failed = Капча не пройдена
+log-action-captcha-timeout = Капча просрочена
+log-action-autoban = Автобан на входе
+log-action-raid = Рейд
+log-action-lockdown = Чат закрыт для новых
+log-action-lockdown-off = Чат открыт для новых
+log-field-target = Участник: {$value}
+log-field-moderator = Модератор: {$value}
+log-field-duration = Срок: {$value}
+log-field-reason = Причина: {$value}
+log-field-note = Детали: {$value}
+log-field-when = Время: {$value}
+
+## Вход в чат — капча
+captcha-greeting = {$user}, добро пожаловать! Подтвердите, что вы не бот — у вас есть {$timeout}.
+captcha-prompt-button = Нажмите кнопку ниже.
+captcha-prompt-emoji = Нажмите на эмодзи: {$emoji}
+captcha-prompt-math = Сколько будет {$left} + {$right}?
+captcha-button-confirm = Я не бот
+captcha-solved = Готово, добро пожаловать!
+captcha-wrong = Неверно. Осталось попыток: {$remaining}.
+captcha-failed = Попытки закончились.
+captcha-failed-attempts = неверных ответов: {$attempts}
+captcha-expired = Проверка уже завершена.
+captcha-not-yours = Эта проверка не для вас.
+
+## Вход в чат — автобан свежерегов
+entry-autoban = {$user} не прошёл проверку при входе: {$reason}.
+entry-reason-no-username = нет username
+entry-reason-no-photo = нет аватара
+entry-reason-fresh-account = слишком новый аккаунт
+
+## Вход в чат — анти-рейд
+raid-detected = Обнаружен рейд: {$joins} входов за {$seconds} с. Новые участники переведены в режим только чтения на {$duration}.
+raid-log-note = входов: {$joins} за {$seconds} с
+lockdown-on = Чат закрыт для новых участников на {$duration}.
+lockdown-off = Чат снова открыт для новых участников.
+lockdown-over = Ограничение для новых участников снято.
+
+## Ошибки
+error-generic = Не удалось выполнить действие. Попробуйте позже.
+error-invalid-duration = Неверный срок. Используйте формат 30m, 2h, 7d или 1w.
+error-invalid-config = Настройки не прошли проверку.
+error-warn-not-found = У участника нет активных предупреждений.
+error-chat-not-found = Чат не найден.
+error-not-admin = Нужны права администратора чата.
+error-feature-locked = Функция доступна на более высоком тарифе.
+error-limit-exceeded = Достигнут лимит тарифа.
+error-invalid-init-data = Не удалось подтвердить данные Telegram. Откройте панель заново.
+error-invalid-session = Сессия истекла. Откройте панель заново.
+error-invalid-timezone = Неизвестный часовой пояс. Пример: Europe/Moscow.
+error-invalid-request = Запрос не прошёл проверку.
+error-not-found = Не найдено.
+error-server = Внутренняя ошибка сервера.
+error-invalid-pattern = Неверное регулярное выражение.
+error-invalid-schedule = Неверное расписание.
+error-target-not-found = Не удалось определить участника. Ответьте на его сообщение или укажите @username — я знаю только тех, кто уже писал в чате.
+error-self-action = Это действие нельзя применить к себе или к боту.
+error-provider-unavailable = Платёжный провайдер недоступен. Попробуйте позже.
+error-payment = Платёж не прошёл.
+
+## Описания команд для меню Telegram (ключи из core.registry)
+cmd-warn = выдать предупреждение
+cmd-unwarn = снять предупреждение
+cmd-warns = показать предупреждения
+cmd-mute = ограничить отправку сообщений
+cmd-unmute = снять ограничение
+cmd-ban = заблокировать участника
+cmd-unban = разблокировать участника
+cmd-kick = исключить участника
+cmd-del = удалить сообщение
+cmd-ro = режим «только чтение»
+cmd-lockdown = закрыть чат для новых участников
+cmd-stats = статистика чата
+cmd-addtrigger = добавить триггер
+cmd-deltrigger = удалить триггер
+cmd-triggers = список триггеров
+cmd-rep = репутация участника
+cmd-top = топ участников
+cmd-posts = запланированные публикации
+cmd-gban = глобальная блокировка
+
+## Модули — заголовки и описания для Mini App
+module-moderation-title = Модерация
+module-moderation-description = Предупреждения, муты, баны, стоп-слова и антифлуд.
+module-entry-title = Вход в чат
+module-entry-description = Капча, приветствие и защита от рейдов.
+module-stats-title = Статистика
+module-stats-description = Активность чата, топ участников и ежедневные отчёты.
+module-engagement-title = Вовлечение
+module-engagement-description = Триггеры, репутация и уровни участников.
+module-autopost-title = Автопостинг
+module-autopost-description = Отложенные и регулярные публикации по расписанию.
+module-ai-title = AI-модерация
+module-ai-description = Распознавание спама и токсичности нейросетью.
+module-crossban-title = Кросс-бан
+module-crossban-description = Общий чёрный список нарушителей для всех ваших чатов.
+
+## Разделы Mini App
+section-moderation = Модерация
+section-entry = Вход
+section-stats = Статистика
+section-engagement = Вовлечение
+section-autopost = Автопостинг
+section-ai = AI
+section-crossban = Кросс-бан
+
+api-status = API работает
