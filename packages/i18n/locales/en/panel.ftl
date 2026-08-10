@@ -180,6 +180,7 @@ setting-alert-only = Alert instead of banning
 setting-contribute-bans = Report bans to the network
 
 ## Statistics
+stats-screen-title = Statistics
 stats-range = Period
 stats-range-7 = 7 days
 stats-range-30 = 30 days

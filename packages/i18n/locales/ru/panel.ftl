@@ -182,6 +182,7 @@ setting-alert-only = Только оповещать, не банить
 setting-contribute-bans = Передавать баны в сеть
 
 ## Статистика
+stats-screen-title = Статистика
 stats-range = Период
 stats-range-7 = 7 дней
 stats-range-30 = 30 дней

@@ -71,10 +71,11 @@ def test_locales_agree_on_placeholders(catalogue: str) -> None:
 
 
 def test_panel_keys_do_not_collide_with_the_bot_catalogue() -> None:
-    """The Mini App merges both files into one bundle, last definition winning.
+    """The Mini App merges both files into one bundle, first definition winning.
 
-    A key defined in both would resolve to whichever file Fluent parsed second —
-    an ambiguity that is invisible until the two texts drift apart.
+    `addResource` reports a duplicate id as an error and keeps the entry already
+    in the bundle, so a key defined in both resolves to `main.ftl` — the bot's
+    wording, in a panel that asked for its own. Invisible until the two drift.
     """
     for locale in SUPPORTED_LOCALES:
         shared = set(_messages(locale, "main.ftl")) & set(_messages(locale, "panel.ftl"))
