@@ -2657,6 +2657,342 @@
           }
         }
       }
+    },
+    "/api/platform/stats": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Platform-wide totals for the operator dashboard",
+        "operationId": "getPlatformStats",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformStats"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
+    },
+    "/api/platform/bans": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "The cross-ban blacklist",
+        "operationId": "listGlobalBans",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "active_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Active Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 200,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GlobalBanEntry"
+                  },
+                  "title": "Response Listglobalbans"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Blacklist a user platform-wide",
+        "description": "Promote immediately — an operator pressing this button *is* the decision.",
+        "operationId": "createGlobalBan",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GlobalBanCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GlobalBanEntry"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform/bans/{tg_user_id}": {
+      "delete": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Lift a global ban on appeal",
+        "operationId": "revokeGlobalBan",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tg_user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tg User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform/broadcast": {
+      "post": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Announce something to every chat on the selected plans",
+        "operationId": "sendBroadcast",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BroadcastRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -2756,6 +3092,28 @@
           "tg_user_id"
         ],
         "title": "AuthUser"
+      },
+      "BroadcastRequest": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "plans": {
+            "items": {
+              "$ref": "#/components/schemas/Plan"
+            },
+            "type": "array",
+            "title": "Plans"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "title": "BroadcastRequest"
       },
       "ChatDetail": {
         "properties": {
@@ -2990,6 +3348,64 @@
           "description_key"
         ],
         "title": "CommandMeta"
+      },
+      "GlobalBanCreate": {
+        "properties": {
+          "tg_user_id": {
+            "type": "integer",
+            "title": "Tg User Id"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 512,
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "tg_user_id"
+        ],
+        "title": "GlobalBanCreate"
+      },
+      "GlobalBanEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tg_user_id": {
+            "type": "integer",
+            "title": "Tg User Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "chat_count": {
+            "type": "integer",
+            "title": "Chat Count"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tg_user_id",
+          "reason",
+          "chat_count",
+          "is_active",
+          "created_at"
+        ],
+        "title": "GlobalBanEntry"
       },
       "InvoiceRequest": {
         "properties": {
@@ -3400,6 +3816,48 @@
           "features"
         ],
         "title": "PlanOption"
+      },
+      "PlatformStats": {
+        "properties": {
+          "total_chats": {
+            "type": "integer",
+            "title": "Total Chats"
+          },
+          "active_chats": {
+            "type": "integer",
+            "title": "Active Chats"
+          },
+          "chats_by_plan": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Chats By Plan"
+          },
+          "revenue_stars": {
+            "type": "integer",
+            "title": "Revenue Stars"
+          },
+          "revenue_usd": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Revenue Usd"
+          },
+          "global_bans": {
+            "type": "integer",
+            "title": "Global Bans"
+          }
+        },
+        "type": "object",
+        "required": [
+          "total_chats",
+          "active_chats",
+          "chats_by_plan",
+          "revenue_stars",
+          "revenue_usd",
+          "global_bans"
+        ],
+        "title": "PlatformStats"
       },
       "PostCreate": {
         "properties": {
