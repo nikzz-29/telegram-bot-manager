@@ -49,6 +49,9 @@ ACTION_ICONS: dict[str, str] = {
     "raid": "🚨",
     "lockdown": "🔐",
     "lockdown_off": "🔓",
+    "forced_subscription": "📢",
+    "trigger": "💬",
+    "autopost": "📨",
 }
 DEFAULT_ICON = "📝"
 

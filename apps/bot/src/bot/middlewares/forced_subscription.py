@@ -25,10 +25,11 @@ from aiogram.types import (
     TelegramObject,
 )
 
-from bot.facts import mention
+from bot.facts import display_name, mention
 from bot.replies import send
 from core import actions, cache
 from core.admins import admins
+from core.audit import audit
 from core.context import ChatContext
 from core.sender import SendPriority, sender
 from core.subscription import subscription
@@ -90,6 +91,16 @@ class ForcedSubscriptionMiddleware(BaseMiddleware):
             priority=SendPriority.MODERATION,
         )
         await self._prompt(ctx, user_id=user.id, mention_html=mention(user))
+        # A deleted message is a moderation action, so it belongs in the log
+        # channel like any other — an admin looking at a quiet chat needs to see
+        # that the gate, not a stop-word rule, is what removed the messages.
+        await audit.report(
+            log_channel_id=ctx.moderation.log_channel_id,
+            locale=ctx.language,
+            action="forced_subscription",
+            target_name=display_name(user),
+            target_id=user.id,
+        )
         logger.info("forced_sub.blocked", chat_id=ctx.chat_id, user_id=user.id)
         return None
 
