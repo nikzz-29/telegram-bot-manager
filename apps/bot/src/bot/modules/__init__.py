@@ -13,7 +13,7 @@ from __future__ import annotations
 from aiogram import Dispatcher, Router
 
 from bot.middlewares.module_gate import ModuleGateMiddleware
-from bot.modules import autopost, engagement, entry, moderation, stats
+from bot.modules import autopost, crossban, engagement, entry, moderation, stats
 from core.registry import registry
 from shared.enums import ModuleName
 from shared.logging import get_logger
@@ -45,7 +45,12 @@ def setup(dispatcher: Dispatcher) -> None:
     _attach(dispatcher, ModuleName.AUTOPOST, autopost.build_router())
     _attach(dispatcher, ModuleName.STATS, stats.build_router())
     _attach(dispatcher, ModuleName.ENGAGEMENT, engagement.build_router())
-    # SLOT: ai_moderation (Stage 6), crossban (Stage 6).
+    # Ungated on purpose: /gban is a platform-operator command, and an operator
+    # must be able to blacklist a scammer from a chat that never enabled the
+    # network. Its gate is the superadmin list, not the plan.
+    dispatcher.include_router(crossban.build_router())
+    # AI moderation has no commands of its own — it lives entirely in the
+    # middleware chain (`bot.middlewares.ai_moderation`).
 
 
 __all__ = ["setup"]
