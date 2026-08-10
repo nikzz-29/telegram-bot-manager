@@ -159,6 +159,10 @@ async def require_superadmin(principal: PrincipalDep) -> Principal:
 
 SuperadminDep = Annotated[Principal, Depends(require_superadmin)]
 
+# Invoice copy is addressed to the person holding the panel, so it follows their
+# session language rather than the chat's.
+TranslatorDep = Annotated[Translator, Depends(get_translator)]
+
 __all__ = [
     "AdminsDep",
     "ChatAccess",
@@ -169,6 +173,7 @@ __all__ = [
     "SessionDep",
     "SettingsDep",
     "SuperadminDep",
+    "TranslatorDep",
     "UowDep",
     "bearer_scheme",
     "get_admin_service",

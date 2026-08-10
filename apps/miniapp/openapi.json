@@ -2376,6 +2376,287 @@
           }
         }
       }
+    },
+    "/api/chats/{chat_id}/plans": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "The chat's current plan and what it can move to",
+        "description": "`current_plan` is the effective one, so a chat in grace sees what it has.",
+        "operationId": "getChatPlans",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanCatalog"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The chat's plan does not include this feature.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chat_id}/invoice": {
+      "post": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Open a Stars or CryptoBot invoice for a plan",
+        "description": "Quote and open an invoice; nothing about the chat changes until it is paid.\n\nOpening a second invoice while a first is unpaid is allowed on purpose — a\npayer who abandoned a Stars link and came back for crypto would otherwise be\nstuck behind their own dead invoice. Both carry the same signed payload, and\nsettlement is idempotent per provider payment id.",
+        "operationId": "createChatInvoice",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvoiceRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvoiceResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The chat's plan does not include this feature.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chat_id}/payments": {
+      "get": {
+        "tags": [
+          "billing"
+        ],
+        "summary": "Recent payments for a chat",
+        "description": "Newest first. Pending rows are included: an admin who paid in crypto and\nis waiting for a confirmation should see that the platform knows about it.",
+        "operationId": "listChatPayments",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PaymentEntry"
+                  },
+                  "title": "Response Listchatpayments"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "The chat's plan does not include this feature.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2710,6 +2991,67 @@
         ],
         "title": "CommandMeta"
       },
+      "InvoiceRequest": {
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/PaymentProvider",
+            "default": "stars"
+          },
+          "months": {
+            "type": "integer",
+            "maximum": 12.0,
+            "minimum": 1.0,
+            "title": "Months",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "title": "InvoiceRequest"
+      },
+      "InvoiceResponse": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/PaymentProvider"
+          },
+          "invoice_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoice Url"
+          },
+          "invoice_payload": {
+            "type": "string",
+            "title": "Invoice Payload"
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "invoice_payload",
+          "amount",
+          "currency"
+        ],
+        "title": "InvoiceResponse"
+      },
       "MetaResponse": {
         "properties": {
           "modules": {
@@ -2886,6 +3228,71 @@
         "type": "object",
         "title": "OperationResult"
       },
+      "PaymentEntry": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/PaymentProvider"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "months": {
+            "type": "integer",
+            "title": "Months"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "provider",
+          "amount",
+          "currency",
+          "status",
+          "plan",
+          "months",
+          "created_at"
+        ],
+        "title": "PaymentEntry"
+      },
+      "PaymentProvider": {
+        "type": "string",
+        "enum": [
+          "stars",
+          "cryptobot"
+        ],
+        "title": "PaymentProvider"
+      },
+      "PaymentStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "paid",
+          "failed",
+          "refunded"
+        ],
+        "title": "PaymentStatus"
+      },
       "Plan": {
         "type": "string",
         "enum": [
@@ -2895,6 +3302,38 @@
           "white_label"
         ],
         "title": "Plan"
+      },
+      "PlanCatalog": {
+        "properties": {
+          "current_plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/PlanOption"
+            },
+            "type": "array",
+            "title": "Options"
+          }
+        },
+        "type": "object",
+        "required": [
+          "current_plan",
+          "options"
+        ],
+        "title": "PlanCatalog"
       },
       "PlanMeta": {
         "properties": {
@@ -2931,6 +3370,36 @@
           "plan"
         ],
         "title": "PlanMeta"
+      },
+      "PlanOption": {
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "stars": {
+            "type": "integer",
+            "title": "Stars"
+          },
+          "usd": {
+            "type": "string",
+            "title": "Usd"
+          },
+          "features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan",
+          "stars",
+          "usd",
+          "features"
+        ],
+        "title": "PlanOption"
       },
       "PostCreate": {
         "properties": {

@@ -26,7 +26,7 @@ import hashlib
 import hmac
 from typing import TYPE_CHECKING, Any, Final
 
-from aiogram.types import LabeledPrice
+from aiogram.types import LabeledPrice, SuccessfulPayment
 
 from core import cache
 from core.cryptobot import cryptobot
@@ -301,6 +301,46 @@ class BillingService:
             provider=provider.value,
         )
         return payment
+
+    # --- provider adapters ----------------------------------------------------
+    async def settle_stars_payment(
+        self, payment: SuccessfulPayment, *, payer_tg_id: int | None
+    ) -> Payment:
+        """Settle a Telegram Stars purchase from the update that announced it."""
+        return await self.apply_payment(
+            payload=payment.invoice_payload,
+            provider=PaymentProvider.STARS,
+            provider_payment_id=payment.telegram_payment_charge_id,
+            amount=Decimal(payment.total_amount),
+            currency=payment.currency,
+            payer_tg_id=payer_tg_id,
+            raw=payment.model_dump(mode="json", exclude_none=True),
+        )
+
+    async def settle_crypto_invoice(self, invoice: dict[str, Any]) -> Payment:
+        """Settle a paid Crypto Pay invoice from the webhook body.
+
+        The quoted fiat amount is recorded, not the asset the payer happened to
+        send: revenue reporting compares plans, and a mix of TON and USDT rows
+        would not add up to anything.
+        """
+        payload = str(invoice.get("payload") or "")
+        invoice_id = str(invoice.get("invoice_id") or "")
+        if not payload or not invoice_id:
+            raise PaymentError("Crypto Pay invoice arrived without a payload.")
+        amount = Decimal(str(invoice.get("amount") or "0"))
+        currency = str(invoice.get("fiat") or invoice.get("asset") or CRYPTO_CURRENCY)
+        return await self.apply_payment(
+            payload=payload,
+            provider=PaymentProvider.CRYPTOBOT,
+            provider_payment_id=invoice_id,
+            amount=amount,
+            currency=currency,
+            # Crypto Pay never names the payer, and an invoice may be settled by
+            # someone other than the admin who opened it.
+            payer_tg_id=None,
+            raw=invoice,
+        )
 
     def _term_start(self, chat: Chat, *, plan: Plan, now: datetime) -> datetime:
         """Where the new term begins.

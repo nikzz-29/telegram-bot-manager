@@ -23,9 +23,21 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.errors import register_exception_handlers, use_problem_media_type
 from api.middleware import RequestContextMiddleware
-from api.routers import auth, chats, modules, posts, reputation, stats, system, triggers
+from api.routers import (
+    auth,
+    billing,
+    chats,
+    modules,
+    posts,
+    reputation,
+    stats,
+    system,
+    triggers,
+)
 from core.admins import admins
+from core.billing import billing as billing_service
 from core.cache import close_cache, setup_cache
+from core.cryptobot import cryptobot
 from core.redis_client import close_redis
 from db.base import dispose_engine
 from shared.config import get_settings
@@ -55,6 +67,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     if settings.bot_token:
         bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
         admins.bind(bot)
+        # Stars invoice links are minted by the Bot API, so the panel's "buy"
+        # button needs the same Bot the admin check already required.
+        billing_service.bind(bot)
     else:
         # Not fatal: `/health`, `/meta` and the OpenAPI schema still serve, which
         # is what CI and the front-end build need. Any chat route will fail loudly.
@@ -66,6 +81,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     finally:
         if bot is not None:
             await bot.session.close()
+        await cryptobot.close()
         await close_cache()
         await close_redis()
         await dispose_engine()
@@ -106,6 +122,11 @@ def create_app() -> FastAPI:
     app.include_router(posts.router, prefix=API_PREFIX)
     app.include_router(stats.router, prefix=API_PREFIX)
     app.include_router(reputation.router, prefix=API_PREFIX)
+    app.include_router(billing.router, prefix=API_PREFIX)
+
+    # Not under `API_PREFIX` and not in the schema: Crypto Pay is configured with
+    # this URL directly, and it authenticates by body signature, not by token.
+    app.include_router(billing.webhook_router)
 
     # The container probe and the old smoke test both call bare `/health`.
     app.include_router(system.router, include_in_schema=False)
