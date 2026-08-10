@@ -1,1 +1,23 @@
-<div id="root"></div><script type="module" src="/src/main.tsx"></script>
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <!--
+      Without this, a mobile webview lays the panel out at ~980px and scales the
+      result down: every font, row and tap target renders shrunken and slightly
+      blurred, which reads as "unstyled" no matter what the stylesheet says.
+      `viewport-fit=cover` lets the safe-area insets in `index.css` reach under
+      the notch instead of leaving a band of background there.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- Telegram paints the webview's surround before the SDK answers; matching
+         it to our own background stops the white flash on a dark theme. -->
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#17212b" media="(prefers-color-scheme: dark)" />
+    <title>Панель управления</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
