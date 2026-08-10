@@ -232,10 +232,42 @@ def describe(kind: ScheduleKind, value: str) -> str:
     return f"{kind.value} {value}"
 
 
+async def arm(post_id: int, when: datetime | None) -> None:
+    """Queue a post's next fire, replacing whatever was queued before.
+
+    DECISION: the job id is derived from the post id alone, so re-arming a post
+    whose schedule changed replaces the pending job instead of stacking a second
+    one that would fire at the old time. `when=None` retires the post — nothing
+    is queued, and `sweep_due_posts` will not see it because a retired post is
+    disabled.
+    """
+    from core import jobs
+    from core.jobs import JobName, job_id
+
+    if when is None:
+        return
+    await jobs.schedule_at(
+        JobName.RUN_SCHEDULED_POST,
+        when,
+        post_id,
+        _id=job_id(JobName.RUN_SCHEDULED_POST, post_id),
+    )
+
+
+async def disarm(post_id: int) -> bool:
+    """Drop a post's pending fire — it was paused or deleted."""
+    from core import jobs
+    from core.jobs import JobName, job_id
+
+    return await jobs.cancel(job_id(JobName.RUN_SCHEDULED_POST, post_id))
+
+
 __all__ = [
     "MAX_LOOKAHEAD_DAYS",
     "CronSchedule",
+    "arm",
     "describe",
+    "disarm",
     "next_run",
     "parse_once",
     "resolve_timezone",

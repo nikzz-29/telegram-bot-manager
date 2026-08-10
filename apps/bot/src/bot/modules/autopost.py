@@ -23,7 +23,7 @@ from aiogram.types import Message
 
 from bot.filters import IsChatAdmin
 from bot.replies import answer
-from core.autopost import describe, next_run
+from core.autopost import arm, describe, disarm, next_run
 from core.context import ChatContext, chat_context
 from db.models import ScheduledPost
 from db.uow import UnitOfWork
@@ -44,7 +44,7 @@ _is_admin = IsChatAdmin()
 
 
 def _when(post: ScheduledPost, *, timezone: str, t: Translator) -> str:
-    """"in 3h20m" for the next fire, or a dash when it will not fire again."""
+    """ "in 3h20m" for the next fire, or a dash when it will not fire again."""
     if not post.enabled:
         return t("post-paused")
     upcoming = next_run(post.schedule_kind, post.schedule_value, timezone=timezone)
@@ -83,9 +83,7 @@ def build_router() -> Router:
             return
 
         lines = [t("post-list-title", count=len(posts), limit=ctx.limits.scheduled_posts)]
-        lines.extend(
-            format_post(post, timezone=timezone, t=t) for post in posts[:LIST_LIMIT]
-        )
+        lines.extend(format_post(post, timezone=timezone, t=t) for post in posts[:LIST_LIMIT])
         if len(posts) > LIST_LIMIT:
             lines.append(t("post-list-more", count=len(posts) - LIST_LIMIT))
         if not config.enabled:
@@ -93,16 +91,12 @@ def build_router() -> Router:
         await answer(message, "\n".join(lines), ttl=LIST_TTL)
 
     @router.message(Command("postpause"), _is_admin)
-    async def pause_command(
-        message: Message, command: CommandObject, ctx: ChatContext
-    ) -> None:
+    async def pause_command(message: Message, command: CommandObject, ctx: ChatContext) -> None:
         """`/postpause <id>` — stop one post without deleting what it says."""
         await _toggle(message, command, ctx, enabled=False)
 
     @router.message(Command("postresume"), _is_admin)
-    async def resume_command(
-        message: Message, command: CommandObject, ctx: ChatContext
-    ) -> None:
+    async def resume_command(message: Message, command: CommandObject, ctx: ChatContext) -> None:
         """`/postresume <id>` — put a paused post back on its schedule."""
         await _toggle(message, command, ctx, enabled=True)
 
@@ -135,6 +129,14 @@ async def _toggle(
         )
         await uow.posts.update(ctx.chat_id, post_id, enabled=enabled, next_run_at=upcoming)
         await uow.commit()
+
+    # The row and the queue have to agree: a paused post whose job is still armed
+    # would fire once more, and a resumed post with no job would wait for the
+    # fifteen-minute sweep instead of its own time.
+    if enabled:
+        await arm(post_id, upcoming)
+    else:
+        await disarm(post_id)
 
     await answer(
         message,
