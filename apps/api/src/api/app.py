@@ -28,6 +28,7 @@ from api.routers import (
     billing,
     chats,
     modules,
+    platform,
     posts,
     reputation,
     stats,
@@ -123,6 +124,7 @@ def create_app() -> FastAPI:
     app.include_router(stats.router, prefix=API_PREFIX)
     app.include_router(reputation.router, prefix=API_PREFIX)
     app.include_router(billing.router, prefix=API_PREFIX)
+    app.include_router(platform.router, prefix=API_PREFIX)
 
     # Not under `API_PREFIX` and not in the schema: Crypto Pay is configured with
     # this URL directly, and it authenticates by body signature, not by token.
