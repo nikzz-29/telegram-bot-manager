@@ -38,12 +38,14 @@ from aiogram.types import (
 from bot.facts import display_name, mention
 from bot.filters import IsChatAdmin
 from bot.middlewares.forced_subscription import CALLBACK_DATA as SUB_CALLBACK
+from bot.middlewares.global_ban import is_globally_banned
 from bot.replies import answer, notify, send
 from core import actions, jobs
 from core.audit import audit
 from core.captcha import CaptchaOption, Challenge, captcha
 from core.captcha import build as build_challenge
-from core.context import ChatContext
+from core.context import ChatContext, chat_context
+from core.crossban import crossban
 from core.durations import format_duration, parse_duration
 from core.entry import RaidVerdict, anti_raid, screen_account
 from core.greeting import Html, render_greeting
@@ -52,9 +54,10 @@ from core.sender import SendPriority, sender
 from core.subscription import subscription
 from db.uow import UnitOfWork
 from i18n.runtime import Translator, translator
-from shared.enums import AutobanAction, StatEventType
+from shared.enums import AutobanAction, ModuleName, StatEventType
 from shared.errors import InvalidDurationError
 from shared.logging import get_logger
+from shared.schemas.module_configs import CrossbanConfig
 from shared.time_utils import utc_now
 
 logger = get_logger(__name__)
@@ -306,6 +309,52 @@ async def _announce_raid(ctx: ChatContext, verdict: RaidVerdict) -> None:
     )
 
 
+async def _crossban_join(ctx: ChatContext, user: User) -> None:
+    """A blacklisted user just joined: bounce them, or say so and stand down.
+
+    DECISION: `alert_only` exists because the network is fed by other tenants.
+    A chat that wants the intelligence without delegating its bans to strangers
+    gets the warning and keeps the decision.
+
+    DECISION: the crossban config is read here rather than carried on
+    `ChatContext`. It is consulted only when a blacklisted user actually joins —
+    rare, and Business-only — and putting it in the context would buy a config
+    lookup on every update in every chat to save one on almost none.
+    """
+    t = translator(ctx.language)
+    config = await chat_context.config(ctx, ModuleName.CROSSBAN, CrossbanConfig)
+    _, chats = await crossban.status(user.id)
+    reason = t("crossban-reason", chats=chats)
+
+    if not config.alert_only:
+        sender.enqueue(
+            actions.ban(ctx.tg_chat_id, user.id),
+            chat_id=ctx.tg_chat_id,
+            priority=SendPriority.MODERATION,
+        )
+        await notify(ctx, t("crossban-banned", user=mention(user), chats=chats))
+
+    logged = await audit.report(
+        log_channel_id=ctx.moderation.log_channel_id,
+        locale=ctx.language,
+        action="crossban_alert" if config.alert_only else "crossban",
+        target_name=display_name(user),
+        target_id=user.id,
+        reason=reason,
+    )
+    if config.alert_only and not logged:
+        # Alert mode with no log channel would otherwise warn nobody, which is
+        # the one outcome this mode cannot have. Fall back to the chat.
+        await notify(ctx, t("crossban-alert", user=mention(user), chats=chats))
+    logger.info(
+        "entry.crossban_join",
+        chat_id=ctx.chat_id,
+        user_id=user.id,
+        chats=chats,
+        alert_only=config.alert_only,
+    )
+
+
 async def _autoban(ctx: ChatContext, user: User, reasons: tuple[str, ...]) -> None:
     """Bounce a flagged account and say why, once."""
     t = translator(ctx.language)
@@ -361,6 +410,14 @@ def build_router() -> Router:
             return
 
         await _record(ctx, StatEventType.JOIN, user.id)
+
+        # --- cross-ban network -------------------------------------------------
+        # First, and before anything that costs a round-trip: a user the network
+        # already knows as a scammer should not be greeted, challenged, or
+        # counted as raid pressure.
+        if ctx.module_enabled(ModuleName.CROSSBAN) and await is_globally_banned(user.id):
+            await _crossban_join(ctx, user)
+            return
 
         # --- anti-raid --------------------------------------------------------
         if ctx.entry.anti_raid_enabled:
