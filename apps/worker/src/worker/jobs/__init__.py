@@ -7,6 +7,6 @@ its own registration.
 
 from __future__ import annotations
 
-from worker.jobs import autopost, entry, moderation, stats
+from worker.jobs import autopost, billing, entry, moderation, stats
 
-__all__ = ["autopost", "entry", "moderation", "stats"]
+__all__ = ["autopost", "billing", "entry", "moderation", "stats"]
