@@ -13,9 +13,12 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  Header,
+  Icon,
   Row,
   Screen,
   SectionTitle,
+  SkeletonRows,
   Spinner,
   Toggle,
 } from "../components/ui";
@@ -31,10 +34,40 @@ import { hapticResult } from "../telegram/sdk";
 
 const PLANS: readonly Plan[] = ["free", "pro", "business", "white_label"];
 
+/**
+ * One figure and what it counts.
+ *
+ * DECISION: a local component, not a new shared primitive. This is the only
+ * screen in the panel that reports platform-wide numbers, and a stat tile
+ * promoted into `ui.tsx` on a sample size of one would be a guess at what the
+ * next caller needs rather than a contract.
+ */
+function Stat({
+  value,
+  label,
+  className = "",
+}: {
+  value: string | number;
+  label: string;
+  className?: string;
+}): React.JSX.Element {
+  return (
+    <Card className={`px-4 py-3 ${className}`}>
+      {/* Tabular figures so the numbers line up column to column as they change. */}
+      <div className="text-display font-semibold tabular-nums">{value}</div>
+      <div className="mt-0.5 text-label text-hint">{label}</div>
+    </Card>
+  );
+}
+
 function Totals(): React.JSX.Element {
   const t = useT();
   const stats = usePlatformStats();
 
+  // DECISION: a spinner here, not a skeleton. What is loading is five numbers
+  // and a four-row breakdown, and a skeleton's whole point is to hold the shape
+  // of a list of unknown length — this block's shape is fixed and short enough
+  // that the placeholder would be more furniture than the content.
   if (stats.isPending) {
     return <Spinner />;
   }
@@ -42,23 +75,27 @@ function Totals(): React.JSX.Element {
     return <ErrorState message={stats.error.message} onRetry={() => void stats.refetch()} />;
   }
 
-  const cells: [string, string | number][] = [
+  const figures: [string, string | number][] = [
     ["platform-chats", stats.data.total_chats],
     ["platform-active-chats", stats.data.active_chats],
     ["platform-revenue-stars", stats.data.revenue_stars],
     ["platform-revenue-usd", stats.data.revenue_usd],
-    ["platform-bans", stats.data.global_bans],
   ];
 
   return (
     <>
-      <div className="grid grid-cols-2 gap-2">
-        {cells.map(([key, value]) => (
-          <div key={key} className="tg-card px-4 py-3">
-            <div className="text-[22px] font-semibold tabular-nums">{value}</div>
-            <div className="text-[13px] text-hint">{t(key)}</div>
-          </div>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {figures.map(([key, value]) => (
+          <Stat key={key} value={value} label={t(key)} />
         ))}
+        {/* The blacklist total spans the pair: it belongs to the section below,
+            not to the chat-and-revenue grid, and a fifth half-width tile would
+            just look like a sixth had failed to load. */}
+        <Stat
+          value={stats.data.global_bans}
+          label={t("platform-bans")}
+          className="col-span-2"
+        />
       </div>
       <Card className="mt-2">
         {PLANS.map((plan) => (
@@ -91,7 +128,7 @@ function Blacklist(): React.JSX.Element {
   const rowRight = (ban: GlobalBanEntry): React.JSX.Element => (
     <button
       type="button"
-      className="text-[13px] text-destructive"
+      className="flex items-center gap-1 text-label text-destructive disabled:opacity-50"
       disabled={revoke.isPending}
       onClick={() =>
         revoke.mutate(ban.tg_user_id, {
@@ -100,6 +137,7 @@ function Blacklist(): React.JSX.Element {
         })
       }
     >
+      <Icon name="trash" size={16} />
       {t("platform-ban-revoke")}
     </button>
   );
@@ -107,19 +145,25 @@ function Blacklist(): React.JSX.Element {
   return (
     <>
       <SectionTitle>{t("platform-bans-title")}</SectionTitle>
-      {bans.isPending && <Spinner />}
+      {bans.isPending && <SkeletonRows />}
       {bans.isError && (
         <ErrorState message={bans.error.message} onRetry={() => void bans.refetch()} />
       )}
       {bans.isSuccess && (
         <Card>
           {bans.data.length === 0 ? (
-            <EmptyState text={t("platform-bans-empty")} />
+            <EmptyState text={t("platform-bans-empty")} icon="shield" />
           ) : (
             bans.data.map((ban) => (
               <Row
                 key={ban.id}
                 title={String(ban.tg_user_id)}
+                // DECISION: the tile is destructive but the title is not. Every
+                // row in this list is a ban, so `destructive` on the row itself
+                // would turn the whole card red and stop distinguishing
+                // anything — the tone belongs on the mark, not on the ID.
+                icon="shield"
+                iconTone="destructive"
                 subtitle={
                   ban.reason ||
                   t("platform-ban-chats", { count: ban.chat_count })
@@ -132,8 +176,8 @@ function Blacklist(): React.JSX.Element {
       )}
 
       <Card className="mt-3">
-        <div className="px-4 py-3">
-          <div className="text-[15px]">{t("platform-ban-user-id")}</div>
+        <div className="border-b border-separator px-4 py-3">
+          <div className="text-row">{t("platform-ban-user-id")}</div>
           <input
             className="tg-input mt-2 w-full tabular-nums"
             inputMode="numeric"
@@ -142,7 +186,7 @@ function Blacklist(): React.JSX.Element {
           />
         </div>
         <div className="px-4 py-3">
-          <div className="text-[15px]">{t("platform-ban-reason")}</div>
+          <div className="text-row">{t("platform-ban-reason")}</div>
           <input
             className="tg-input mt-2 w-full"
             value={reason}
@@ -172,7 +216,7 @@ function Blacklist(): React.JSX.Element {
           {t("platform-ban-add")}
         </Button>
         {create.isError && (
-          <p className="mt-2 text-center text-[13px] text-destructive">
+          <p className="mt-2 text-center text-label text-destructive">
             {create.error.message}
           </p>
         )}
@@ -197,7 +241,7 @@ function Broadcast(): React.JSX.Element {
       <SectionTitle>{t("platform-broadcast-title")}</SectionTitle>
       <Card>
         <div className="px-4 py-3">
-          <div className="text-[15px]">{t("platform-broadcast-text")}</div>
+          <div className="text-row">{t("platform-broadcast-text")}</div>
           <textarea
             className="tg-input mt-2 h-32 w-full resize-y"
             value={text}
@@ -245,10 +289,10 @@ function Broadcast(): React.JSX.Element {
           {broadcast.isPending ? t("panel-saving") : t("platform-broadcast-send")}
         </Button>
         {broadcast.isSuccess && (
-          <p className="text-center text-[13px] text-hint">{broadcast.data.detail}</p>
+          <p className="text-center text-label text-hint">{broadcast.data.detail}</p>
         )}
         {broadcast.isError && (
-          <p className="text-center text-[13px] text-destructive">
+          <p className="text-center text-label text-destructive">
             {broadcast.error.message}
           </p>
         )}
@@ -261,7 +305,7 @@ export function PlatformScreen(): React.JSX.Element {
   const t = useT();
   return (
     <Screen>
-      <SectionTitle>{t("platform-title")}</SectionTitle>
+      <Header title={t("platform-title")} icon="globe" />
       <Totals />
       <Blacklist />
       <Broadcast />
