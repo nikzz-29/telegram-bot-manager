@@ -41,6 +41,9 @@ notice-warned = Warning: {$count}/{$limit}.
 notice-muted = Posting restricted for {$duration}.
 notice-muted-forever = Posting restricted indefinitely.
 notice-banned = The member has been banned.
+notice-ai-toxic = Removed a message from {$user}: abusive language.
+notice-ai-hidden-ad = Removed a message from {$user}: undisclosed advertising.
+notice-ai-scam = Removed a message from {$user}: looks like a scam.
 
 ## Module gate
 module-locked = This section is available on the {$plan} plan.
@@ -71,6 +74,12 @@ log-action-lockdown-off = Chat reopened
 log-action-forced-subscription = Message without subscription
 log-action-trigger = Trigger fired
 log-action-autopost = Scheduled post to new members
+log-action-ai-moderation = AI moderation
+log-action-ai-alert = AI: suspicious message
+log-action-crossban = Network ban
+log-action-crossban-alert = Network: member is blacklisted
+log-action-global-ban = Global ban
+log-action-global-unban = Global unban
 log-field-target = Member: {$value}
 log-field-moderator = Moderator: {$value}
 log-field-duration = Duration: {$value}
@@ -268,3 +277,29 @@ billing-grace-body = The {$plan} plan for "{$chat}" has ended. Paid modules keep
     }, until {$until}. After that the chat moves to Free.
 billing-downgraded-title = Chat moved to Free
 billing-downgraded-body = The subscription for "{$chat}" was not renewed, so the paid modules are off. Your settings are kept and come back the moment you pay.
+
+## Cross-ban — the network blacklist
+crossban-reason = network blacklist: {$chats ->
+        [one] {$chats} chat
+       *[other] {$chats} chats
+    }
+crossban-banned = {$user} was banned: the member is on the network blacklist ({$chats ->
+        [one] {$chats} chat
+       *[other] {$chats} chats
+    }).
+crossban-alert = Heads up: {$user} is on the network blacklist ({$chats ->
+        [one] {$chats} chat
+       *[other] {$chats} chats
+    }). The call is yours — this chat is in alert-only mode.
+
+## Cross-ban — operator commands
+gban-forbidden = This command is for platform operators only.
+gban-usage = Usage: /gban <id, or reply to a message> reason
+gban-reason-required = Give a reason — it goes on the network blacklist with the ban.
+gban-done = {$user} has been added to the network blacklist. Reason: {$reason}
+gban-already = {$user} is already on the network blacklist.
+gban-ungban-usage = Usage: /ungban <id, or reply to a message>
+gban-ungban-done = {$user} has been taken off the network blacklist.
+gban-ungban-missing = That member is not on the network blacklist.
+gban-status-listed = {$user} is blacklisted. Reported by {$chats} chats.
+gban-status-clean = {$user} is not blacklisted. Reported by {$chats} chats.

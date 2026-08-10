@@ -40,6 +40,9 @@ notice-warned = Предупреждение: {$count}/{$limit}.
 notice-muted = Ограничение на отправку сообщений: {$duration}.
 notice-muted-forever = Ограничение на отправку сообщений: бессрочно.
 notice-banned = Участник заблокирован.
+notice-ai-toxic = Сообщение {$user} удалено: оскорбления.
+notice-ai-hidden-ad = Сообщение {$user} удалено: скрытая реклама.
+notice-ai-scam = Сообщение {$user} удалено: похоже на мошенничество.
 
 ## Гейт модулей
 module-locked = Этот раздел доступен на тарифе {$plan}.
@@ -70,6 +73,12 @@ log-action-lockdown-off = Чат открыт для новых
 log-action-forced-subscription = Сообщение без подписки
 log-action-trigger = Сработал триггер
 log-action-autopost = Публикация по расписанию
+log-action-ai-moderation = ИИ-модерация
+log-action-ai-alert = ИИ: подозрительное сообщение
+log-action-crossban = Сетевой бан
+log-action-crossban-alert = Сеть: участник в чёрном списке
+log-action-global-ban = Глобальная блокировка
+log-action-global-unban = Глобальная разблокировка
 log-field-target = Участник: {$value}
 log-field-moderator = Модератор: {$value}
 log-field-duration = Срок: {$value}
@@ -270,3 +279,32 @@ billing-grace-body = Тариф {$plan} в чате «{$chat}» закончил
     } — до {$until}. После этого чат перейдёт на Free.
 billing-downgraded-title = Чат переведён на Free
 billing-downgraded-body = Подписка в чате «{$chat}» не была продлена, поэтому платные модули отключены. Настройки сохранены и вернутся сразу после оплаты.
+
+## Кросс-бан — сетевой чёрный список
+crossban-reason = чёрный список сети: {$chats ->
+        [one] {$chats} чат
+        [few] {$chats} чата
+       *[other] {$chats} чатов
+    }
+crossban-banned = {$user} заблокирован: участник в чёрном списке сети ({$chats ->
+        [one] {$chats} чат
+        [few] {$chats} чата
+       *[other] {$chats} чатов
+    }).
+crossban-alert = Внимание: {$user} есть в чёрном списке сети ({$chats ->
+        [one] {$chats} чат
+        [few] {$chats} чата
+       *[other] {$chats} чатов
+    }). Решение за вами — включён режим оповещения.
+
+## Кросс-бан — команды оператора
+gban-forbidden = Эта команда доступна только операторам платформы.
+gban-usage = Использование: /gban <id или ответом на сообщение> причина
+gban-reason-required = Укажите причину — она попадёт в сетевой чёрный список.
+gban-done = {$user} добавлен в сетевой чёрный список. Причина: {$reason}
+gban-already = {$user} уже в сетевом чёрном списке.
+gban-ungban-usage = Использование: /ungban <id или ответом на сообщение>
+gban-ungban-done = {$user} убран из сетевого чёрного списка.
+gban-ungban-missing = Этого участника нет в сетевом чёрном списке.
+gban-status-listed = {$user} в чёрном списке сети. Жалоб из чатов: {$chats}.
+gban-status-clean = {$user} не в чёрном списке. Жалоб из чатов: {$chats}.

@@ -52,6 +52,12 @@ ACTION_ICONS: dict[str, str] = {
     "forced_subscription": "📢",
     "trigger": "💬",
     "autopost": "📨",
+    "ai_moderation": "🤖",
+    "ai_alert": "🤖",
+    "crossban": "🌐",
+    "crossban_alert": "🌐",
+    "global_ban": "🌐",
+    "global_unban": "♻️",
 }
 DEFAULT_ICON = "📝"
 
