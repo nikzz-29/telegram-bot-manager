@@ -7,27 +7,33 @@
  */
 import React from "react";
 import type { ChatSummary } from "../api/client";
-import { Card, EmptyState, ErrorState, Row, Screen, SectionTitle, Spinner } from "../components/ui";
+import {
+  Badge,
+  Card,
+  EmptyState,
+  ErrorState,
+  Header,
+  Icon,
+  Row,
+  Screen,
+  SectionTitle,
+  SkeletonRows,
+} from "../components/ui";
 import { useI18n, useT } from "../i18n/I18nProvider";
 import type { Args } from "../i18n/bundles";
 import { useChats } from "../hooks/queries";
 import { useNavigation } from "../navigation";
 import { useUser } from "../session";
 
-function PlanBadge({ plan }: { plan: ChatSummary["plan"] }): React.JSX.Element {
-  const t = useT();
-  const paid = plan !== "free";
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-[12px] font-medium ${
-        paid ? "bg-accent text-accent-text" : "bg-hint/15 text-hint"
-      }`}
-    >
-      {t(`plan-${plan}`)}
-    </span>
-  );
-}
-
+/**
+ * Role, size and liveness, in one line under the chat's name.
+ *
+ * DECISION: "bot removed" stays a clause of this sentence rather than becoming a
+ * warning badge. The right-hand slot already carries the plan, and a second pill
+ * beside it turns the one column an admin scans down — which chats are paid —
+ * into two competing ones. Here it reads as what it is: one more fact about the
+ * chat, in the same breath as the role and the member count.
+ */
 function subtitleFor(chat: ChatSummary, t: (key: string, args?: Args) => string): string {
   const parts = [t(chat.role === "owner" ? "chats-role-owner" : "chats-role-admin")];
   if (chat.members_count != null) {
@@ -48,15 +54,15 @@ export function ChatListScreen(): React.JSX.Element {
 
   return (
     <Screen>
-      <SectionTitle>{t("chats-title")}</SectionTitle>
-      {chats.isPending && <Spinner />}
+      <Header title={t("chats-title")} icon="chat" />
+      {chats.isPending && <SkeletonRows />}
       {chats.isError && (
         <ErrorState message={chats.error.message} onRetry={() => void chats.refetch()} />
       )}
       {chats.isSuccess &&
         (chats.data.length === 0 ? (
           <Card>
-            <EmptyState text={t("chats-empty")} />
+            <EmptyState text={t("chats-empty")} icon="plus" />
           </Card>
         ) : (
           <Card>
@@ -65,7 +71,21 @@ export function ChatListScreen(): React.JSX.Element {
                 key={chat.id}
                 title={chat.title}
                 subtitle={subtitleFor(chat, t)}
-                right={<PlanBadge plan={chat.plan} />}
+                // DECISION: the chevron is drawn by hand here because filling
+                // `right` suppresses the automatic one, and on this screen every
+                // row opens a chat. The plan is a status, not an affordance — it
+                // says what the chat costs, never that tapping does something —
+                // so without this the panel's most important list is the one
+                // list that looks inert. Telegram's own rows pair a trailing
+                // value with a chevron for exactly this reason.
+                right={
+                  <span className="flex items-center gap-1.5">
+                    <Badge tone={chat.plan !== "free" ? "accent" : "neutral"}>
+                      {t(`plan-${chat.plan}`)}
+                    </Badge>
+                    <Icon name="chevron" size={18} className="text-hint opacity-60" />
+                  </span>
+                }
                 onClick={() => navigation.push({ name: "chat", chatId: chat.id })}
               />
             ))}
@@ -80,6 +100,7 @@ export function ChatListScreen(): React.JSX.Element {
                 endpoint re-checks the flag server-side. */}
             <Row
               title={t("platform-title")}
+              icon="globe"
               onClick={() => navigation.push({ name: "platform" })}
             />
           </Card>
@@ -92,7 +113,18 @@ export function ChatListScreen(): React.JSX.Element {
           <Row
             key={code}
             title={t(`locale-${code}`)}
-            right={code === locale ? <span className="text-accent">✓</span> : undefined}
+            // DECISION: the unselected rows keep an invisible checkmark instead
+            // of an empty `right`. An empty one earns the automatic chevron,
+            // which would promise a screen that does not exist — picking a
+            // language happens in place — and reserving the space stops the
+            // labels shifting sideways as the selection moves.
+            right={
+              <Icon
+                name="check"
+                size={18}
+                className={code === locale ? "text-accent" : "invisible"}
+              />
+            }
             onClick={() => setLocale(code)}
           />
         ))}

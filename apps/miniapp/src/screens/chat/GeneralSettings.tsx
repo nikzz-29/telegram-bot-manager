@@ -53,7 +53,7 @@ export function GeneralSettings({
         title={t("chat-language")}
         right={
           <select
-            className="bg-transparent text-[15px] text-link outline-none"
+            className="bg-transparent text-row text-link outline-none disabled:opacity-50"
             value={chat.language ?? "ru"}
             disabled={update.isPending}
             onChange={(event) => update.mutate({ language: event.target.value })}
@@ -71,7 +71,7 @@ export function GeneralSettings({
         subtitle={t("chat-timezone-hint")}
         right={
           <input
-            className="w-32 bg-transparent text-right text-[15px] text-link outline-none"
+            className="w-32 bg-transparent text-right text-row text-link outline-none disabled:opacity-50"
             value={timezone}
             spellCheck={false}
             autoCapitalize="off"

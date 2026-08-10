@@ -11,10 +11,11 @@ import type { ModuleConfigResponse } from "../api/client";
 import {
   Card,
   ErrorState,
+  Header,
   Row,
   Screen,
   SectionTitle,
-  Spinner,
+  SkeletonRows,
   Toggle,
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
@@ -30,14 +31,25 @@ import { GeneralSettings } from "./chat/GeneralSettings";
  * `available` already folds the plan in, and the chat's own answer is the one
  * that stays right when a payment lands while the panel is open. Triggers and
  * reputation share `engagement` because one module owns both tables.
+ *
+ * DECISION: the icon is named here rather than inherited from the owning
+ * module's `meta.icon`. Two of these tools are backed by the same module, so
+ * inheriting would draw triggers and reputation with one glyph and make them
+ * look like the same destination — the icon has to say which tool, not which
+ * module.
  */
 type ToolRoute = Extract<Route, { name: "triggers" | "posts" | "stats" | "reputation" }>;
 
-const TOOLS: readonly { module: string; titleKey: string; route: ToolRoute["name"] }[] = [
-  { module: "engagement", titleKey: "triggers-title", route: "triggers" },
-  { module: "autopost", titleKey: "posts-title", route: "posts" },
-  { module: "stats", titleKey: "module-stats-title", route: "stats" },
-  { module: "engagement", titleKey: "reputation-title", route: "reputation" },
+const TOOLS: readonly {
+  module: string;
+  titleKey: string;
+  route: ToolRoute["name"];
+  icon: string;
+}[] = [
+  { module: "engagement", titleKey: "triggers-title", route: "triggers", icon: "chat" },
+  { module: "autopost", titleKey: "posts-title", route: "posts", icon: "clock" },
+  { module: "stats", titleKey: "module-stats-title", route: "stats", icon: "chart" },
+  { module: "engagement", titleKey: "reputation-title", route: "reputation", icon: "spark" },
 ];
 
 export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
@@ -52,7 +64,7 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
   if (chat.isPending || meta.isPending || modules.isPending) {
     return (
       <Screen>
-        <Spinner />
+        <SkeletonRows count={5} />
       </Screen>
     );
   }
@@ -80,6 +92,11 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
 
   return (
     <Screen>
+      {/* The title is the chat's own name rather than a key: Telegram's header
+          names the bot, so without this nothing on screen says which chat these
+          settings belong to. */}
+      <Header title={chat.data.title} subtitle={t(`plan-${chat.data.plan}`)} icon="settings" />
+
       <SectionTitle>{t("chat-general")}</SectionTitle>
       <GeneralSettings chat={chat.data} locales={meta.data.locales ?? []} />
 
@@ -92,6 +109,14 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
             <Row
               key={module.name}
               title={t(module.title_key)}
+              // The registry names the glyph server-side, so a module added
+              // after this build ships still draws with its own icon.
+              icon={module.icon}
+              // DECISION: a locked module's tile goes grey. It says the same
+              // thing as the "needs plan X" subtitle, but it survives the
+              // glance — the column of tiles is what the eye runs down, and an
+              // accent tile on a row you cannot use reads as available.
+              iconTone={available ? "accent" : "hint"}
               subtitle={
                 available
                   ? t(module.description_key)
@@ -100,6 +125,11 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
               onClick={() =>
                 navigation.push({ name: "module", chatId, module: module.name })
               }
+              // DECISION: no hand-drawn chevron beside the toggle, even though
+              // the row does navigate. A switch is already the loudest thing on
+              // the row, and pairing it with a chevron gives one cell two
+              // competing affordances; Telegram's own toggle rows carry neither.
+              // The icon tile is what marks this as a destination.
               right={
                 <Toggle
                   checked={entry?.enabled ?? false}
@@ -131,6 +161,8 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
             <Row
               key={tool.route}
               title={t(tool.titleKey)}
+              icon={tool.icon}
+              iconTone={available ? "accent" : "hint"}
               subtitle={
                 available || spec === undefined
                   ? undefined
@@ -152,6 +184,7 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
       <Card>
         <Row
           title={t("billing-title")}
+          icon="star"
           subtitle={t(`plan-${chat.data.plan}`)}
           onClick={() => navigation.push({ name: "billing", chatId })}
         />
@@ -160,6 +193,7 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
       <Card className="mt-4">
         <Row
           title={t("chat-sync-admins")}
+          icon="refresh"
           subtitle={syncAdmins.isSuccess ? t("chat-sync-done") : t("chat-sync-admins-hint")}
           onClick={() => {
             syncAdmins.mutate(undefined, {
