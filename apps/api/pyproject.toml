@@ -1,0 +1,32 @@
+[project]
+name = "tg-manager-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.112.0",
+  "uvicorn[standard]>=0.30.5",
+  "gunicorn>=22.0.0",
+  "pyjwt>=2.9.0",
+  "aiogram>=3.13.1",
+  "arq>=0.26.1",
+  "cashews>=7.1.0",
+  "aiocryptopay>=0.3.4",
+  "structlog>=24.4.0",
+  "tg-manager-shared",
+  "tg-manager-db",
+  "tg-manager-core",
+  "tg-manager-i18n",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+tg-manager-shared = { workspace = true }
+tg-manager-db = { workspace = true }
+tg-manager-core = { workspace = true }
+tg-manager-i18n = { workspace = true }
