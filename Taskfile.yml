@@ -1,0 +1,61 @@
+version: '3'
+
+tasks:
+  api:
+    desc: Run the API with autoreload
+    cmds:
+      - uv run uvicorn api.app:app --reload --host 0.0.0.0 --port 8000
+  bot:
+    desc: Run the bot (long polling by default)
+    cmds:
+      - uv run python -m bot
+  worker:
+    desc: Run the ARQ worker
+    cmds:
+      - uv run arq worker.settings.WorkerSettings
+  lint:
+    desc: Ruff + mypy over the whole workspace
+    cmds:
+      - uv run ruff check .
+      - uv run ruff format --check .
+      - uv run mypy
+  format:
+    cmds:
+      - uv run ruff format .
+      - uv run ruff check --fix .
+  test:
+    cmds:
+      - uv run pytest
+  migrate:
+    desc: Apply migrations
+    cmds:
+      - uv run alembic upgrade head
+  revision:
+    desc: 'Autogenerate a migration: task revision -- "message"'
+    cmds:
+      - uv run alembic revision --autogenerate -m "{{.CLI_ARGS}}"
+  openapi:
+    desc: Dump the API schema to apps/miniapp/openapi.json
+    cmds:
+      - uv run python scripts/export_openapi.py
+  client:
+    desc: Regenerate the Mini App's typed API client from the live schema
+    deps: [openapi]
+    dir: apps/miniapp
+    cmds:
+      - pnpm run generate
+  miniapp:
+    desc: Run the Mini App dev server
+    dir: apps/miniapp
+    cmds:
+      - pnpm run dev
+  miniapp:build:
+    desc: Typecheck and build the Mini App
+    dir: apps/miniapp
+    cmds:
+      - pnpm run build
+  check:
+    desc: Everything CI runs
+    cmds:
+      - task: lint
+      - task: test

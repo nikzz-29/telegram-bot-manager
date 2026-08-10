@@ -1,0 +1,21 @@
+# Secrets: `.env` holds a live BOT_TOKEN. `.env.example` is the tracked template.
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node / Mini App
+node_modules/
+dist/
+*.tsbuildinfo
+
+# OS
+.DS_Store
