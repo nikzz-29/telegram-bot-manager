@@ -10,7 +10,7 @@
  */
 import React, { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Card, EmptyState, ErrorState, Screen, Spinner } from "./components/ui";
+import { Card, EmptyState, ErrorState, Screen, SkeletonRows } from "./components/ui";
 import { I18nProvider, useT } from "./i18n/I18nProvider";
 import { useSession } from "./hooks/useSession";
 import { type Route, NavigationProvider, useNavigation } from "./navigation";
@@ -77,9 +77,12 @@ function Shell(): React.JSX.Element {
   const session = useSession();
 
   if (session.status === "loading") {
+    // Skeleton rows rather than a spinner: what is loading is the chat list, and
+    // this is the panel's first paint — the shape of what is coming is a better
+    // first impression than a shrug, and the page does not jump when it lands.
     return (
       <Screen>
-        <Spinner />
+        <SkeletonRows count={4} />
       </Screen>
     );
   }
@@ -94,7 +97,7 @@ function Shell(): React.JSX.Element {
     return (
       <Screen>
         <Card>
-          <EmptyState text={t("panel-outside-telegram")} />
+          <EmptyState text={t("panel-outside-telegram")} icon="globe" />
         </Card>
       </Screen>
     );
@@ -110,9 +113,11 @@ function Shell(): React.JSX.Element {
 }
 
 export function App(): React.JSX.Element {
-  useEffect(() => {
-    bindTheme();
-  }, []);
+  // `bindTheme` returns its unsubscribe, and returning it from the effect is what
+  // detaches the `themeParams` subscription. Discarding it left the listener
+  // attached across a remount — harmless while this component owns the app's
+  // whole lifetime, and a leak the moment it does not.
+  useEffect(() => bindTheme(), []);
 
   return (
     <I18nProvider>
