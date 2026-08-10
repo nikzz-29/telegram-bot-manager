@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from aiogram import Dispatcher
 
+from bot.middlewares.ai_moderation import AiModerationMiddleware
 from bot.middlewares.captcha_gate import CaptchaGateMiddleware
 from bot.middlewares.chat_context import ChatContextMiddleware
 from bot.middlewares.content_filters import ContentFilterMiddleware
@@ -29,6 +30,7 @@ from bot.middlewares.stop_words import StopWordFloodMiddleware
 from bot.middlewares.throttle import ThrottleMiddleware
 
 __all__ = [
+    "AiModerationMiddleware",
     "CaptchaGateMiddleware",
     "ChatContextMiddleware",
     "ContentFilterMiddleware",
@@ -58,9 +60,9 @@ def setup(dispatcher: Dispatcher) -> None:
         observer.outer_middleware(ForcedSubscriptionMiddleware())
         observer.outer_middleware(ContentFilterMiddleware())
         observer.outer_middleware(StopWordFloodMiddleware())
-        # SLOT: AI moderation (Stage 6) — last, because it is the only step that
-        # costs a network call, and every cheap rule above may already have
-        # deleted the message.
+        # Last, because it is the only step that costs a network call, and every
+        # cheap rule above may already have deleted the message.
+        observer.outer_middleware(AiModerationMiddleware())
 
     # Callback queries carry no content to filter, but a globally banned user
     # must not be able to drive inline flows either.
