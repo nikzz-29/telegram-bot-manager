@@ -27,11 +27,11 @@ from bot.facts import facts_from
 from bot.filters import IsChatAdmin
 from bot.replies import answer
 from core.context import ChatContext, chat_context
+from core.reports import format_overview
 from core.stats import DEFAULT_PERIOD_DAYS, MAX_PERIOD_DAYS, stats
-from i18n.runtime import Translator, translator
+from i18n.runtime import translator
 from shared.enums import ModuleName, StatEventType
 from shared.logging import get_logger
-from shared.schemas.api import StatsOverview
 from shared.schemas.module_configs import StatsConfig
 
 logger = get_logger(__name__)
@@ -40,67 +40,7 @@ logger = get_logger(__name__)
 # week of numbers, short enough that a busy chat is not paved with old reports.
 REPORT_TTL: Final = timedelta(minutes=5)
 
-# Bars for the activity sparkline, lightest to heaviest.
-_BLOCKS: Final = "▁▂▃▄▅▆▇█"
-
-# Sparkline width: one column per day of the default window, and never so wide
-# that a phone wraps the line.
-MAX_COLUMNS: Final = 14
-
 _is_admin = IsChatAdmin()
-
-
-def sparkline(values: list[int]) -> str:
-    """A one-line activity chart, no image and no dependency.
-
-    DECISION: a text sparkline rather than a rendered PNG. It costs nothing to
-    produce, survives being forwarded, and the Mini App is where the real chart
-    lives — this is the glanceable version.
-    """
-    if not values:
-        return ""
-    trimmed = values[-MAX_COLUMNS:]
-    peak = max(trimmed)
-    if peak <= 0:
-        return _BLOCKS[0] * len(trimmed)
-    span = len(_BLOCKS) - 1
-    return "".join(_BLOCKS[round(value / peak * span)] for value in trimmed)
-
-
-def _format_top(overview: StatsOverview, t: Translator) -> list[str]:
-    if not overview.top_users:
-        return []
-    lines = [t("stats-top-title")]
-    for place, entry in enumerate(overview.top_users[:10], start=1):
-        name = entry.display_name or (f"@{entry.username}" if entry.username else "")
-        lines.append(
-            t(
-                "stats-top-row",
-                place=place,
-                user=name or str(entry.tg_user_id),
-                messages=entry.messages,
-            )
-        )
-    return lines
-
-
-def format_overview(overview: StatsOverview, *, title: str, t: Translator) -> str:
-    """Render an overview as the chat-facing report."""
-    lines = [
-        t("stats-title", chat=title, days=overview.period_days),
-        t("stats-messages", count=overview.total_messages),
-        t("stats-active", count=overview.total_active_users),
-        t("stats-joins", count=overview.total_joins),
-        t("stats-leaves", count=overview.total_leaves),
-        t("stats-growth", count=overview.net_growth),
-    ]
-    chart = sparkline([point.messages for point in overview.series])
-    if chart:
-        lines.append(t("stats-chart", chart=chart))
-    lines.extend(_format_top(overview, t))
-    if not overview.series:
-        lines.append(t("stats-empty"))
-    return "\n".join(lines)
 
 
 def _requested_days(command: CommandObject) -> int:
@@ -116,9 +56,7 @@ def build_router() -> Router:
     router = Router(name="stats")
 
     @router.message(Command("stats"), _is_admin)
-    async def stats_command(
-        message: Message, command: CommandObject, ctx: ChatContext
-    ) -> None:
+    async def stats_command(message: Message, command: CommandObject, ctx: ChatContext) -> None:
         days = _requested_days(command)
         retention = ctx.limits.stats_retention_days
         if retention:
@@ -162,4 +100,4 @@ def build_router() -> Router:
     return router
 
 
-__all__ = ["MAX_COLUMNS", "REPORT_TTL", "build_router", "format_overview", "sparkline"]
+__all__ = ["REPORT_TTL", "build_router"]
