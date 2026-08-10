@@ -117,9 +117,7 @@ class TriggerMatcher:
                 self._groups.append((compiled, tuple(items)))
 
     @staticmethod
-    def _compile(
-        items: Sequence[TriggerDef], *, case_sensitive: bool
-    ) -> re.Pattern[str] | None:
+    def _compile(items: Sequence[TriggerDef], *, case_sensitive: bool) -> re.Pattern[str] | None:
         """Join rules into one alternation with a named group per rule id."""
         flags = re.MULTILINE if case_sensitive else re.MULTILINE | re.IGNORECASE
         parts: list[str] = []
@@ -212,7 +210,7 @@ class TriggerService:
             TriggerDef(
                 id=int(item["id"]),
                 pattern=str(item["pattern"]),
-                match=TriggerMatch(item["match"]),
+                match=TriggerMatch(str(item["match"])),
                 case_sensitive=bool(item["case_sensitive"]),
             )
             for item in payload

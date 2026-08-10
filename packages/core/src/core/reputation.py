@@ -18,7 +18,6 @@ not land, and an answer would also confirm the cooldown's length to a farmer.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import timedelta
 from enum import StrEnum
 from functools import lru_cache
 import re
@@ -187,9 +186,7 @@ class ReputationService:
             chat_id, giver_id, receiver_id, seconds=config.reputation_cooldown_seconds
         ):
             return RepResult(RepOutcome.COOLDOWN)
-        if await self._over_daily_limit(
-            chat_id, giver_id, limit=config.reputation_daily_limit
-        ):
+        if await self._over_daily_limit(chat_id, giver_id, limit=config.reputation_daily_limit):
             return RepResult(RepOutcome.DAILY_LIMIT)
 
         # DECISION: a point does not move the level. Levels are bought with
@@ -197,14 +194,10 @@ class ReputationService:
         # a popular member cannot skip the activity requirement and a quiet one
         # cannot be levelled up by friends.
         async with UnitOfWork() as uow:
-            row = await uow.reputation.add_points(
-                chat_id=chat_id, tg_user_id=receiver_id, delta=1
-            )
+            row = await uow.reputation.add_points(chat_id=chat_id, tg_user_id=receiver_id, delta=1)
             await uow.commit()
 
-        logger.debug(
-            "reputation.granted", chat_id=chat_id, giver=giver_id, receiver=receiver_id
-        )
+        logger.debug("reputation.granted", chat_id=chat_id, giver=giver_id, receiver=receiver_id)
         return RepResult(RepOutcome.GRANTED, points=row.points, level=row.level)
 
     async def add_activity(

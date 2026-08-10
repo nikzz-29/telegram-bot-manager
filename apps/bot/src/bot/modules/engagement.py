@@ -120,9 +120,7 @@ async def _fire_trigger(ctx: ChatContext, message: Message, definition: TriggerD
     logger.debug("triggers.fired", chat_id=ctx.chat_id, trigger_id=definition.id)
 
 
-async def _handle_thanks(
-    ctx: ChatContext, message: Message, config: EngagementConfig
-) -> None:
+async def _handle_thanks(ctx: ChatContext, message: Message, config: EngagementConfig) -> None:
     """A `+` in reply to somebody: one reputation point, if the guards allow."""
     reply = message.reply_to_message
     giver = message.from_user
@@ -150,16 +148,12 @@ async def _handle_thanks(
     )
 
 
-async def _award_activity(
-    ctx: ChatContext, message: Message, config: EngagementConfig
-) -> None:
+async def _award_activity(ctx: ChatContext, message: Message, config: EngagementConfig) -> None:
     """Experience for a message, and a congratulation when it buys a level."""
     author = message.from_user
     if author is None:
         return
-    result = await reputation.add_activity(
-        chat_id=ctx.chat_id, tg_user_id=author.id, config=config
-    )
+    result = await reputation.add_activity(chat_id=ctx.chat_id, tg_user_id=author.id, config=config)
     if result is None or not result.level_up:
         return
 
@@ -396,9 +390,12 @@ def build_router() -> Router:
 
         config = await chat_context.config(ctx, ModuleName.ENGAGEMENT, EngagementConfig)
 
-        if config.reputation_enabled and ctx.has(Feature.REPUTATION):
-            if is_thanks(facts.text, config):
-                await _handle_thanks(ctx, message, config)
+        if (
+            config.reputation_enabled
+            and ctx.has(Feature.REPUTATION)
+            and is_thanks(facts.text, config)
+        ):
+            await _handle_thanks(ctx, message, config)
 
         if config.levels_enabled and ctx.has(Feature.LEVELS):
             await _award_activity(ctx, message, config)

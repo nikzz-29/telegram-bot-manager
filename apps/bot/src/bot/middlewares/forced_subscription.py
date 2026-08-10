@@ -99,9 +99,7 @@ class ForcedSubscriptionMiddleware(BaseMiddleware):
         key = _prompt_key(ctx.chat_id, user_id)
         if await cache.get_value(key) is not None:
             return
-        await cache.set_value(
-            key, True, ttl=PROMPT_COOLDOWN, tags=(cache.chat_tag(ctx.chat_id),)
-        )
+        await cache.set_value(key, True, ttl=PROMPT_COOLDOWN, tags=(cache.chat_tag(ctx.chat_id),))
 
         t = translator(ctx.language)
         await send(

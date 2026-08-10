@@ -492,7 +492,7 @@ def build_router() -> Router:
 
     @router.callback_query(F.data == SUB_CALLBACK)
     async def subscription_checked(query: CallbackQuery, ctx: ChatContext | None) -> None:
-        """"I joined" on the forced-subscription prompt — re-check immediately.
+        """ "I joined" on the forced-subscription prompt — re-check immediately.
 
         DECISION: the cached verdict is dropped before the re-check. It is a "no"
         by construction (nobody sees this button otherwise) and it lives for a
