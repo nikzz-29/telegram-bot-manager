@@ -159,16 +159,19 @@ class StatsRepository:
         )
         return [(int(uid), int(messages)) for uid, messages in result.all()]
 
-    async def totals_since(self, *, chat_id: int, start: date) -> dict[str, int]:
-        result = await self._session.execute(
-            select(
-                func.coalesce(func.sum(StatDaily.messages), 0),
-                func.coalesce(func.sum(StatDaily.joins), 0),
-                func.coalesce(func.sum(StatDaily.leaves), 0),
-                func.coalesce(func.sum(StatDaily.moderation_actions), 0),
-                func.coalesce(func.max(StatDaily.active_users), 0),
-            ).where(StatDaily.chat_id == chat_id, StatDaily.date >= start)
-        )
+    async def totals_since(
+        self, *, chat_id: int, start: date, end: date | None = None
+    ) -> dict[str, int]:
+        stmt = select(
+            func.coalesce(func.sum(StatDaily.messages), 0),
+            func.coalesce(func.sum(StatDaily.joins), 0),
+            func.coalesce(func.sum(StatDaily.leaves), 0),
+            func.coalesce(func.sum(StatDaily.moderation_actions), 0),
+            func.coalesce(func.max(StatDaily.active_users), 0),
+        ).where(StatDaily.chat_id == chat_id, StatDaily.date >= start)
+        if end is not None:
+            stmt = stmt.where(StatDaily.date <= end)
+        result = await self._session.execute(stmt)
         messages, joins, leaves, actions, peak_active = result.one()
         return {
             "messages": int(messages),
@@ -178,16 +181,30 @@ class StatsRepository:
             "peak_active_users": int(peak_active),
         }
 
-    async def prune_events(self, *, before: datetime) -> int:
-        return await execute_dml(
-            self._session, delete(StatEvent).where(StatEvent.created_at < before)
-        )
+    async def prune_events(self, *, before: datetime, chat_ids: Sequence[int] | None = None) -> int:
+        """Drop raw events older than `before`, optionally for one set of chats.
 
-    async def prune_daily(self, *, before: date) -> int:
-        daily = await execute_dml(self._session, delete(StatDaily).where(StatDaily.date < before))
-        per_user = await execute_dml(
-            self._session, delete(StatUserDaily).where(StatUserDaily.date < before)
-        )
+        Retention is a plan quota, so the prune job passes the chats that share a
+        retention window and issues one statement per window instead of one per
+        chat. `chat_ids=None` means every chat — the platform-wide floor sweep.
+        """
+        if chat_ids is not None and not chat_ids:
+            return 0
+        stmt = delete(StatEvent).where(StatEvent.created_at < before)
+        if chat_ids is not None:
+            stmt = stmt.where(StatEvent.chat_id.in_(chat_ids))
+        return await execute_dml(self._session, stmt)
+
+    async def prune_daily(self, *, before: date, chat_ids: Sequence[int] | None = None) -> int:
+        if chat_ids is not None and not chat_ids:
+            return 0
+        daily_stmt = delete(StatDaily).where(StatDaily.date < before)
+        user_stmt = delete(StatUserDaily).where(StatUserDaily.date < before)
+        if chat_ids is not None:
+            daily_stmt = daily_stmt.where(StatDaily.chat_id.in_(chat_ids))
+            user_stmt = user_stmt.where(StatUserDaily.chat_id.in_(chat_ids))
+        daily = await execute_dml(self._session, daily_stmt)
+        per_user = await execute_dml(self._session, user_stmt)
         return daily + per_user
 
     async def reset_period(self, *, chat_id: int) -> None:

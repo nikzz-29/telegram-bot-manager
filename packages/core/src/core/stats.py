@@ -82,7 +82,7 @@ class StatsBuffer:
             client = self._client()
             await client.rpush(BUFFER_KEY, json.dumps(event.to_row()))  # type: ignore[misc]
             await client.ltrim(BUFFER_KEY, -MAX_BUFFER, -1)  # type: ignore[misc]
-        except Exception as error:  # noqa: BLE001 - analytics are best-effort
+        except Exception as error:
             logger.debug("stats.buffer_push_failed", error=str(error))
 
     async def drain(self, limit: int) -> list[dict[str, Any]]:
@@ -107,7 +107,7 @@ class StatsBuffer:
         """Events waiting to be flushed — the number to alert on."""
         try:
             return int(await self._client().llen(BUFFER_KEY))  # type: ignore[misc]
-        except Exception:  # noqa: BLE001 - diagnostics only
+        except Exception:
             return 0
 
 
@@ -151,22 +151,29 @@ class StatsService:
         return await self._buffer.depth()
 
     # --- reads ----------------------------------------------------------------
-    async def overview(self, chat_id: int, *, days: int = DEFAULT_PERIOD_DAYS) -> StatsOverview:
+    async def overview(
+        self,
+        chat_id: int,
+        *,
+        days: int = DEFAULT_PERIOD_DAYS,
+        end: date | None = None,
+    ) -> StatsOverview:
         """The chart payload behind `/stats` and the Mini App's Statistics tab.
 
         Reads only the daily rollups, never the raw events: the rollup table has
         one row per chat per day, so the query stays flat no matter how busy the
         chat is. Today's row exists as soon as the aggregation job has run once
-        today, which it does hourly.
+        today, which it does hourly. `end` moves the window off today — the
+        daily digest asks for yesterday, whose rollup is already final.
         """
         window = max(1, min(days, MAX_PERIOD_DAYS))
-        end = utc_now().date()
-        start = end - timedelta(days=window - 1)
+        last = end or utc_now().date()
+        start = last - timedelta(days=window - 1)
 
         async with UnitOfWork() as uow:
-            daily = await uow.stats.daily_range(chat_id=chat_id, start=start, end=end)
-            totals = await uow.stats.totals_since(chat_id=chat_id, start=start)
-            leaders = await uow.stats.top_users(chat_id=chat_id, start=start, end=end, limit=10)
+            daily = await uow.stats.daily_range(chat_id=chat_id, start=start, end=last)
+            totals = await uow.stats.totals_since(chat_id=chat_id, start=start, end=last)
+            leaders = await uow.stats.top_users(chat_id=chat_id, start=start, end=last, limit=10)
 
         series = [
             StatPoint(
@@ -197,12 +204,17 @@ class StatsService:
             await uow.stats.aggregate_day(chat_id=chat_id, day=target)
             await uow.commit()
 
-    async def prune(self, *, retention_days: int) -> int:
-        """Drop events and rollups older than the retention window."""
+    async def prune(self, *, retention_days: int, chat_ids: Sequence[int] | None = None) -> int:
+        """Drop events and rollups older than the retention window.
+
+        `chat_ids` restricts the sweep to chats that share one window, which is
+        how the prune job applies a per-plan retention without a statement per
+        chat; omitting it prunes every chat against the platform floor.
+        """
         cutoff_at = utc_now() - timedelta(days=max(retention_days, 1))
         async with UnitOfWork() as uow:
-            events = await uow.stats.prune_events(before=cutoff_at)
-            daily = await uow.stats.prune_daily(before=cutoff_at.date())
+            events = await uow.stats.prune_events(before=cutoff_at, chat_ids=chat_ids)
+            daily = await uow.stats.prune_daily(before=cutoff_at.date(), chat_ids=chat_ids)
             await uow.commit()
         return events + daily
 
