@@ -12,6 +12,7 @@ Mini App is where a chart with axes belongs.
 
 from __future__ import annotations
 
+from html import escape
 from typing import Final
 
 from i18n.runtime import Translator
@@ -49,7 +50,7 @@ def _top_lines(overview: StatsOverview, t: Translator) -> list[str]:
             t(
                 "stats-top-row",
                 place=place,
-                user=name or str(entry.tg_user_id),
+                user=escape(name or str(entry.tg_user_id)),
                 messages=entry.messages,
             )
         )
@@ -57,9 +58,13 @@ def _top_lines(overview: StatsOverview, t: Translator) -> list[str]:
 
 
 def format_overview(overview: StatsOverview, *, title: str, t: Translator) -> str:
-    """Render an overview as the message the chat receives."""
+    """Render an overview as the message the chat receives.
+
+    Every substitution is escaped here: the report is sent as HTML, and a chat
+    title or a display name is whatever its owner typed.
+    """
     lines = [
-        t("stats-title", chat=title, days=overview.period_days),
+        t("stats-title", chat=escape(title), days=overview.period_days),
         t("stats-messages", count=overview.total_messages),
         t("stats-active", count=overview.total_active_users),
         t("stats-joins", count=overview.total_joins),
