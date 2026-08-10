@@ -23,7 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.errors import register_exception_handlers, use_problem_media_type
 from api.middleware import RequestContextMiddleware
-from api.routers import auth, chats, modules, system
+from api.routers import auth, chats, modules, posts, reputation, stats, system, triggers
 from core.admins import admins
 from core.cache import close_cache, setup_cache
 from core.redis_client import close_redis
@@ -102,6 +102,10 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix=API_PREFIX)
     app.include_router(chats.router, prefix=API_PREFIX)
     app.include_router(modules.router, prefix=API_PREFIX)
+    app.include_router(triggers.router, prefix=API_PREFIX)
+    app.include_router(posts.router, prefix=API_PREFIX)
+    app.include_router(stats.router, prefix=API_PREFIX)
+    app.include_router(reputation.router, prefix=API_PREFIX)
 
     # The container probe and the old smoke test both call bare `/health`.
     app.include_router(system.router, include_in_schema=False)
