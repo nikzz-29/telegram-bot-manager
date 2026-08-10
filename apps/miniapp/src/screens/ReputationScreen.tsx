@@ -13,10 +13,11 @@ import {
   Card,
   EmptyState,
   ErrorState,
+  Header,
   Row,
   Screen,
   SectionTitle,
-  Spinner,
+  SkeletonRows,
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
 import { useAdjustReputation, useReputation } from "../hooks/queries";
@@ -50,20 +51,35 @@ function Adjuster({
         <Row
           title={nameOf(entry)}
           subtitle={t("reputation-level", { level: entry.level })}
-          right={<span className="tabular-nums text-hint">{entry.points}</span>}
         />
+        {/*
+         * DECISION: the score gets its own labelled row here, where on the list
+         * it sits unlabelled at the end of the member's row. Unlabelled is right
+         * while you are scanning a leaderboard and wrong the moment you are about
+         * to change the number — this is the value the delta below applies to,
+         * and it should say so.
+         */}
+        <Row
+          title={t("reputation-score")}
+          right={<span className="text-row tabular-nums">{entry.points}</span>}
+        />
+      </Card>
+
+      <SectionTitle>{t("reputation-adjust")}</SectionTitle>
+      <Card>
         <div className="px-4 py-3">
-          <div className="text-[15px]">{t("reputation-adjust")}</div>
           <input
-            className="tg-input mt-2 w-full tabular-nums"
+            className="tg-input tabular-nums"
             inputMode="numeric"
             value={delta}
             placeholder="-10"
             onChange={(event) => setDelta(event.target.value)}
           />
-          <p className="mt-2 text-[13px] text-hint">{t("reputation-adjust-hint")}</p>
         </div>
       </Card>
+      {/* Telegram puts the sentence that qualifies a field under the group, not
+          inside it — the field is the control, this is the caveat about it. */}
+      <p className="px-1 pt-2 text-label text-hint">{t("reputation-adjust-hint")}</p>
 
       <div className="mt-6 space-y-3">
         <Button
@@ -84,7 +100,7 @@ function Adjuster({
           {adjust.isPending ? t("panel-saving") : t("panel-save")}
         </Button>
         {adjust.isError && (
-          <p className="text-center text-[13px] text-destructive">{adjust.error.message}</p>
+          <p className="text-center text-label text-destructive">{adjust.error.message}</p>
         )}
         <Button variant="secondary" disabled={adjust.isPending} onClick={onDone}>
           {t("panel-cancel")}
@@ -102,7 +118,9 @@ export function ReputationScreen({ chatId }: { chatId: number }): React.JSX.Elem
   if (editing !== null) {
     return (
       <Screen>
-        <SectionTitle>{t("reputation-adjust")}</SectionTitle>
+        {/* The same title as the list it came from: this is still reputation,
+            one member deep. The group heading below says what is being done. */}
+        <Header title={t("reputation-title")} icon="star" />
         <Adjuster chatId={chatId} entry={editing} onDone={() => setEditing(null)} />
       </Screen>
     );
@@ -110,8 +128,8 @@ export function ReputationScreen({ chatId }: { chatId: number }): React.JSX.Elem
 
   return (
     <Screen>
-      <SectionTitle>{t("reputation-title")}</SectionTitle>
-      {reputation.isPending && <Spinner />}
+      <Header title={t("reputation-title")} icon="star" />
+      {reputation.isPending && <SkeletonRows />}
       {reputation.isError && (
         <ErrorState
           message={reputation.error.message}
@@ -121,7 +139,7 @@ export function ReputationScreen({ chatId }: { chatId: number }): React.JSX.Elem
       {reputation.isSuccess && (
         <Card>
           {reputation.data.length === 0 ? (
-            <EmptyState text={t("reputation-empty")} />
+            <EmptyState text={t("reputation-empty")} icon="star" />
           ) : (
             reputation.data.map((entry) => (
               <Row
@@ -129,9 +147,11 @@ export function ReputationScreen({ chatId }: { chatId: number }): React.JSX.Elem
                 title={nameOf(entry)}
                 subtitle={t("reputation-level", { level: entry.level })}
                 onClick={() => setEditing(entry)}
-                right={
-                  <span className="tabular-nums text-[15px]">{entry.points}</span>
-                }
+                // The score fills `right`, which would otherwise drop the
+                // automatic chevron — every row here opens the adjuster, and a
+                // score is a value, never a promise that tapping does something.
+                chevron
+                right={<span className="text-row tabular-nums">{entry.points}</span>}
               />
             ))
           )}

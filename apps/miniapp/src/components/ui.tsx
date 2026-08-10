@@ -90,6 +90,7 @@ export function Row({
   title,
   subtitle,
   right,
+  chevron,
   icon,
   iconTone,
   onClick,
@@ -99,6 +100,18 @@ export function Row({
   title: React.ReactNode;
   subtitle?: React.ReactNode;
   right?: React.ReactNode;
+  /**
+   * Force the chevron on or off. Left unset it is automatic: shown when the row
+   * navigates and has no `right`.
+   *
+   * DECISION: a row that both navigates and carries a trailing value has to ask.
+   * Automatic-when-empty is wrong for a list of chats — a plan pill is status,
+   * not an affordance, and suppressing the chevron made the panel's most
+   * important list the one list that looked inert. It is equally wrong to force
+   * it on, because a row whose `right` is a `Toggle` navigates too, and a switch
+   * beside a chevron is two competing affordances in one cell.
+   */
+  chevron?: boolean;
   icon?: string;
   iconTone?: "accent" | "hint" | "destructive";
   onClick?: () => void;
@@ -106,6 +119,7 @@ export function Row({
   destructive?: boolean;
 }): React.JSX.Element {
   const navigates = onClick !== undefined && !disabled;
+  const showChevron = navigates && (chevron ?? right === undefined);
   const content = (
     <>
       {icon !== undefined && (
@@ -119,10 +133,11 @@ export function Row({
           <div className="mt-0.5 text-label leading-snug text-hint">{subtitle}</div>
         )}
       </div>
-      {right !== undefined ? (
-        <div className="shrink-0">{right}</div>
-      ) : (
-        navigates && <Icon name="chevron" size={18} className="shrink-0 text-hint opacity-60" />
+      {(right !== undefined || showChevron) && (
+        <div className="flex shrink-0 items-center gap-1.5">
+          {right}
+          {showChevron && <Icon name="chevron" size={18} className="text-hint opacity-60" />}
+        </div>
       )}
     </>
   );

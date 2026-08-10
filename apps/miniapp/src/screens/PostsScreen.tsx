@@ -12,14 +12,17 @@
 import React, { useState } from "react";
 import type { PostCreate, PostEntry, ScheduleKind } from "../api/client";
 import {
+  Badge,
   Button,
   Card,
   EmptyState,
   ErrorState,
+  Header,
+  Icon,
   Row,
   Screen,
   SectionTitle,
-  Spinner,
+  SkeletonRows,
   Toggle,
 } from "../components/ui";
 import { useI18n, useT } from "../i18n/I18nProvider";
@@ -62,6 +65,48 @@ function toInput(kind: ScheduleKind, stored: string): string {
   return Number.isNaN(parsed.getTime()) ? "" : toLocalInput(stored);
 }
 
+/**
+ * The three kinds, as one choice.
+ *
+ * DECISION: a column of rows with a checkmark, not a horizontal segmented
+ * control. The kinds are a single either/or and must read as one control, but
+ * the triggers editor makes the same choice over labels like "Регулярное
+ * выражение", which cannot fit three across a phone — and a mode picker that
+ * changes shape depending on how long the words happen to be is worse than one
+ * that does not. Telegram's own single-choice lists are vertical for this reason.
+ */
+function KindPicker({
+  kind,
+  onPick,
+}: {
+  kind: ScheduleKind;
+  onPick: (next: ScheduleKind) => void;
+}): React.JSX.Element {
+  const t = useT();
+  return (
+    <>
+      {KINDS.map((option) => (
+        <Row
+          key={option}
+          title={t(`posts-schedule-${option}`)}
+          onClick={() => onPick(option)}
+          // The check is always rendered and merely hidden when unselected: it
+          // holds the column width steady as the choice moves, and giving `Row` a
+          // `right` is what stops it drawing a chevron on a row that picks rather
+          // than navigates.
+          right={
+            <Icon
+              name="check"
+              size={18}
+              className={option === kind ? "text-accent" : "invisible"}
+            />
+          }
+        />
+      ))}
+    </>
+  );
+}
+
 function ScheduleInput({
   kind,
   value,
@@ -75,14 +120,14 @@ function ScheduleInput({
   if (kind === "cron") {
     return (
       <div className="px-4 py-3">
-        <div className="text-[15px]">{t("posts-cron")}</div>
+        <div className="text-row">{t("posts-cron")}</div>
         <input
           className="tg-input mt-2 w-full font-mono"
           value={value}
           spellCheck={false}
           onChange={(event) => onChange(event.target.value)}
         />
-        <p className="mt-2 text-[13px] text-hint">{t("posts-cron-hint")}</p>
+        <p className="mt-2 text-label text-hint">{t("posts-cron-hint")}</p>
       </div>
     );
   }
@@ -93,7 +138,9 @@ function ScheduleInput({
       right={
         <input
           type={kind === "once" ? "datetime-local" : "time"}
-          className="bg-transparent text-right text-[15px] text-link outline-none"
+          // Seated on the ground colour, so the value reads as something you can
+          // tap and edit rather than as a stated fact like the rows above it.
+          className="rounded-control bg-ground px-2.5 py-1.5 text-right text-row text-link outline-none"
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />
@@ -101,6 +148,7 @@ function ScheduleInput({
     />
   );
 }
+
 function Editor({
   chatId,
   post,
@@ -163,7 +211,7 @@ function Editor({
     <>
       <Card>
         <div className="px-4 py-3">
-          <div className="text-[15px]">{t("posts-name")}</div>
+          <div className="text-row">{t("posts-name")}</div>
           <input
             className="tg-input mt-2 w-full"
             value={title}
@@ -172,7 +220,7 @@ function Editor({
           />
         </div>
         <div className="px-4 py-3">
-          <div className="text-[15px]">{t("posts-text")}</div>
+          <div className="text-row">{t("posts-text")}</div>
           <textarea
             className="tg-input mt-2 h-40 w-full resize-y"
             value={content}
@@ -183,22 +231,14 @@ function Editor({
       </Card>
 
       <SectionTitle>{t("posts-schedule")}</SectionTitle>
-      <div className="mb-2 flex gap-2">
-        {KINDS.map((option) => (
-          <button
-            key={option}
-            type="button"
-            onClick={() => switchKind(option)}
-            className={`flex-1 rounded-lg px-3 py-2 text-[14px] ${
-              option === kind ? "bg-accent text-accent-text" : "bg-surface text-link"
-            }`}
-          >
-            {t(`posts-schedule-${option}`)}
-          </button>
-        ))}
-      </div>
+      {/* The kind and the value it takes are one decision, so they share a card:
+          picking a row above changes the field directly below it. */}
       <Card>
+        <KindPicker kind={kind} onPick={switchKind} />
         <ScheduleInput kind={kind} value={value} onChange={setValue} />
+      </Card>
+
+      <Card className="mt-2">
         <Row title={t("posts-pin")} right={<Toggle checked={pin} onChange={setPin} />} />
         <Row
           title={t("posts-delete-previous")}
@@ -214,7 +254,7 @@ function Editor({
         <Button disabled={!valid || pending} onClick={submit}>
           {pending ? t("panel-saving") : t("panel-save")}
         </Button>
-        {failure && <p className="text-center text-[13px] text-destructive">{failure.message}</p>}
+        {failure && <p className="text-center text-label text-destructive">{failure.message}</p>}
         {post !== null && (
           <Button
             variant="destructive"
@@ -260,7 +300,10 @@ export function PostsScreen({ chatId }: { chatId: number }): React.JSX.Element {
   if (editing !== undefined) {
     return (
       <Screen>
-        <SectionTitle>{editing === null ? t("posts-add") : t("panel-edit")}</SectionTitle>
+        <Header
+          title={editing === null ? t("posts-add") : t("panel-edit")}
+          icon={editing === null ? "plus" : "clock"}
+        />
         <Editor chatId={chatId} post={editing} onDone={() => setEditing(undefined)} />
       </Screen>
     );
@@ -268,15 +311,15 @@ export function PostsScreen({ chatId }: { chatId: number }): React.JSX.Element {
 
   return (
     <Screen>
-      <SectionTitle>{t("posts-title")}</SectionTitle>
-      {posts.isPending && <Spinner />}
+      <Header title={t("posts-title")} icon="clock" />
+      {posts.isPending && <SkeletonRows />}
       {posts.isError && (
         <ErrorState message={posts.error.message} onRetry={() => void posts.refetch()} />
       )}
       {posts.isSuccess && (
         <Card>
           {posts.data.length === 0 ? (
-            <EmptyState text={t("posts-empty")} />
+            <EmptyState text={t("posts-empty")} icon="clock" />
           ) : (
             posts.data.map((post) => (
               <Row
@@ -286,10 +329,13 @@ export function PostsScreen({ chatId }: { chatId: number }): React.JSX.Element {
                   when: describe(post, locale, t("field-unset")),
                 })}
                 onClick={() => setEditing(post)}
+                // The badge fills `right`, which would otherwise drop the
+                // automatic chevron — a post still opens an editor.
+                chevron
                 right={
-                  post.enabled ? undefined : (
-                    <span className="text-[13px] text-hint">{t("posts-paused")}</span>
-                  )
+                  <Badge tone={post.enabled ? "success" : "neutral"}>
+                    {post.enabled ? t("posts-enabled") : t("posts-paused")}
+                  </Badge>
                 }
               />
             ))

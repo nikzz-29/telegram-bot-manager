@@ -8,14 +8,17 @@
 import React, { useState } from "react";
 import type { TriggerCreate, TriggerEntry } from "../api/client";
 import {
+  Badge,
   Button,
   Card,
   EmptyState,
   ErrorState,
+  Header,
+  Icon,
   Row,
   Screen,
   SectionTitle,
-  Spinner,
+  SkeletonRows,
   Toggle,
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
@@ -37,6 +40,48 @@ const BLANK: TriggerCreate = {
   delete_trigger: false,
   enabled: true,
 };
+
+/**
+ * The three match modes, as one choice.
+ *
+ * DECISION: a column of rows with a checkmark, replacing the native `<select>`.
+ * A dropdown hides two of the three modes behind a tap and renders as whatever
+ * the OS feels like, which is the one control on the screen that could not be
+ * themed; spelling the modes out costs two rows and makes the choice legible at
+ * rest. Horizontal segments were the other option and do not survive
+ * "Регулярное выражение" three across a phone.
+ */
+function MatchPicker({
+  match,
+  onPick,
+}: {
+  match: TriggerCreate["match"];
+  onPick: (next: TriggerCreate["match"]) => void;
+}): React.JSX.Element {
+  const t = useT();
+  return (
+    <>
+      {MATCHES.map((option) => (
+        <Row
+          key={option}
+          title={t(`triggers-match-${option}`)}
+          onClick={() => onPick(option)}
+          // The check is always rendered and merely hidden when unselected: it
+          // holds the column width steady as the choice moves, and giving `Row` a
+          // `right` is what stops it drawing a chevron on a row that picks rather
+          // than navigates.
+          right={
+            <Icon
+              name="check"
+              size={18}
+              className={option === match ? "text-accent" : "invisible"}
+            />
+          }
+        />
+      ))}
+    </>
+  );
+}
 
 function Editor({
   chatId,
@@ -87,7 +132,7 @@ function Editor({
     <>
       <Card>
         <div className="px-4 py-3">
-          <div className="text-[15px]">{t("triggers-pattern")}</div>
+          <div className="text-row">{t("triggers-pattern")}</div>
           <input
             className="tg-input mt-2 w-full"
             value={draft.pattern}
@@ -96,24 +141,17 @@ function Editor({
             onChange={(event) => setDraft({ ...draft, pattern: event.target.value })}
           />
         </div>
-        <Row
-          title={t("triggers-match")}
-          right={
-            <select
-              className="bg-transparent text-right text-[15px] text-link outline-none"
-              value={draft.match ?? "contains"}
-              onChange={(event) =>
-                setDraft({ ...draft, match: event.target.value as TriggerCreate["match"] })
-              }
-            >
-              {MATCHES.map((match) => (
-                <option key={match} value={match}>
-                  {t(`triggers-match-${match}`)}
-                </option>
-              ))}
-            </select>
-          }
+      </Card>
+
+      <SectionTitle>{t("triggers-match")}</SectionTitle>
+      <Card>
+        <MatchPicker
+          match={draft.match ?? "contains"}
+          onPick={(next) => setDraft({ ...draft, match: next })}
         />
+      </Card>
+
+      <Card className="mt-2">
         <Row
           title={t("triggers-case-sensitive")}
           right={
@@ -132,8 +170,11 @@ function Editor({
             />
           }
         />
+      </Card>
+
+      <Card className="mt-2">
         <div className="px-4 py-3">
-          <div className="text-[15px]">{t("triggers-response")}</div>
+          <div className="text-row">{t("triggers-response")}</div>
           <textarea
             className="tg-input mt-2 h-32 w-full resize-y"
             value={draft.response}
@@ -147,9 +188,7 @@ function Editor({
         <Button disabled={!valid || pending} onClick={submit}>
           {pending ? t("panel-saving") : t("panel-save")}
         </Button>
-        {failure && (
-          <p className="text-center text-[13px] text-destructive">{failure.message}</p>
-        )}
+        {failure && <p className="text-center text-label text-destructive">{failure.message}</p>}
         {trigger !== null && (
           <Button
             variant="destructive"
@@ -187,7 +226,10 @@ export function TriggersScreen({ chatId }: { chatId: number }): React.JSX.Elemen
   if (editing !== undefined) {
     return (
       <Screen>
-        <SectionTitle>{editing === null ? t("triggers-add") : t("panel-edit")}</SectionTitle>
+        <Header
+          title={editing === null ? t("triggers-add") : t("panel-edit")}
+          icon={editing === null ? "plus" : "spark"}
+        />
         <Editor chatId={chatId} trigger={editing} onDone={() => setEditing(undefined)} />
       </Screen>
     );
@@ -195,15 +237,15 @@ export function TriggersScreen({ chatId }: { chatId: number }): React.JSX.Elemen
 
   return (
     <Screen>
-      <SectionTitle>{t("triggers-title")}</SectionTitle>
-      {triggers.isPending && <Spinner />}
+      <Header title={t("triggers-title")} icon="spark" />
+      {triggers.isPending && <SkeletonRows />}
       {triggers.isError && (
         <ErrorState message={triggers.error.message} onRetry={() => void triggers.refetch()} />
       )}
       {triggers.isSuccess && (
         <Card>
           {triggers.data.length === 0 ? (
-            <EmptyState text={t("triggers-empty")} />
+            <EmptyState text={t("triggers-empty")} icon="spark" />
           ) : (
             triggers.data.map((trigger) => (
               <Row
@@ -211,8 +253,13 @@ export function TriggersScreen({ chatId }: { chatId: number }): React.JSX.Elemen
                 title={trigger.pattern}
                 subtitle={trigger.response}
                 onClick={() => setEditing(trigger)}
+                // The hit count fills `right`, which would otherwise drop the
+                // automatic chevron — a trigger still opens an editor.
+                chevron
                 right={
-                  <span className="tabular-nums text-[13px] text-hint">{trigger.hits ?? 0}</span>
+                  <Badge>
+                    <span className="tabular-nums">{trigger.hits ?? 0}</span>
+                  </Badge>
                 }
               />
             ))

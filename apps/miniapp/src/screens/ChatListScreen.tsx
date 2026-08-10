@@ -71,20 +71,17 @@ export function ChatListScreen(): React.JSX.Element {
                 key={chat.id}
                 title={chat.title}
                 subtitle={subtitleFor(chat, t)}
-                // DECISION: the chevron is drawn by hand here because filling
-                // `right` suppresses the automatic one, and on this screen every
-                // row opens a chat. The plan is a status, not an affordance — it
-                // says what the chat costs, never that tapping does something —
-                // so without this the panel's most important list is the one
-                // list that looks inert. Telegram's own rows pair a trailing
-                // value with a chevron for exactly this reason.
+                // DECISION: the chevron is forced on. Every row here opens a
+                // chat, but the plan pill fills `right` and would suppress the
+                // automatic one — and a plan is status, never a promise that
+                // tapping does something. Without this the panel's most
+                // important list is the one list that looks inert. Telegram's
+                // own rows pair a trailing value with a chevron for this reason.
+                chevron
                 right={
-                  <span className="flex items-center gap-1.5">
-                    <Badge tone={chat.plan !== "free" ? "accent" : "neutral"}>
-                      {t(`plan-${chat.plan}`)}
-                    </Badge>
-                    <Icon name="chevron" size={18} className="text-hint opacity-60" />
-                  </span>
+                  <Badge tone={chat.plan !== "free" ? "accent" : "neutral"}>
+                    {t(`plan-${chat.plan}`)}
+                  </Badge>
                 }
                 onClick={() => navigation.push({ name: "chat", chatId: chat.id })}
               />
