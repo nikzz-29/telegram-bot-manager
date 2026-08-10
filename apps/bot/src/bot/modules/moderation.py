@@ -30,15 +30,17 @@ from bot.replies import answer, notify
 from bot.targets import ResolvedTarget, resolve, split_argument
 from core import actions, jobs
 from core.audit import audit
-from core.context import ChatContext
+from core.context import ChatContext, chat_context
+from core.crossban import crossban, is_network_reason
 from core.durations import format_duration, parse_duration, split_duration
 from core.jobs import JobName, job_id
 from core.moderation import moderation
 from core.sender import SendPriority, sender
 from i18n.runtime import translator
-from shared.enums import PunishmentType
+from shared.enums import ModuleName, PunishmentType
 from shared.errors import DomainError, InvalidDurationError
 from shared.logging import get_logger
+from shared.schemas.module_configs import CrossbanConfig
 
 logger = get_logger(__name__)
 
@@ -103,6 +105,36 @@ async def _report(
         duration=duration,
         note=note,
     )
+
+
+async def _contribute(
+    ctx: ChatContext,
+    target: ResolvedTarget,
+    *,
+    reason: str,
+    moderator_id: int,
+) -> None:
+    """Offer a local ban to the cross-ban network, if it is the kind that counts.
+
+    DECISION: contributing is silent and never blocks the ban. The moderator asked
+    to remove someone from *their* chat; whether that also becomes network
+    evidence is a platform concern, and a network hiccup must not make `/ban` look
+    like it failed. `crossban.report` itself drops anything whose reason is not
+    scam-ish, so an argument-ending ban never propagates.
+    """
+    if not ctx.module_enabled(ModuleName.CROSSBAN) or not is_network_reason(reason):
+        return
+    config = await chat_context.config(ctx, ModuleName.CROSSBAN, CrossbanConfig)
+    try:
+        await crossban.report(
+            chat_id=ctx.chat_id,
+            tg_user_id=target.tg_user_id,
+            reason=reason,
+            reported_by=moderator_id,
+            config=config,
+        )
+    except Exception:
+        logger.exception("moderation.crossban_report_failed", chat_id=ctx.chat_id)
 
 
 def build_router() -> Router:
@@ -265,6 +297,7 @@ def build_router() -> Router:
             else t("ban-success-forever", user=target.name),
         )
         await _report(ctx, message, action="ban", target=target, reason=reason, duration=pretty)
+        await _contribute(ctx, target, reason=reason, moderator_id=_moderator_id(message))
         _drop_command(ctx, message)
 
     @router.message(Command("unban"), _is_admin)
