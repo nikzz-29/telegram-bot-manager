@@ -1,103 +1,104 @@
-# Deploying
+# Деплой
 
-Four processes, two datastores, and a static bundle. The bot talks to Telegram,
-the API serves the Mini App, the worker runs everything time-shifted, and
-`migrate` runs once before the other three start.
+Четыре процесса, два хранилища и статическая сборка. Бот общается с Telegram,
+API обслуживает Mini App, воркер выполняет всё отложенное, а `migrate`
+отрабатывает один раз перед стартом остальных трёх.
 
-- [Prerequisites](#prerequisites)
-- [First deploy](#first-deploy)
-- [Configuration](#configuration)
-- [Polling or webhook](#polling-or-webhook)
-- [Migrations](#migrations)
-- [The Mini App](#the-mini-app)
-- [Payments](#payments)
-- [Scaling](#scaling)
-- [Operating](#operating)
+- [Требования](#требования)
+- [Первый деплой](#первый-деплой)
+- [Конфигурация](#конфигурация)
+- [Polling или webhook](#polling-или-webhook)
+- [Миграции](#миграции)
+- [Mini App](#mini-app)
+- [Платежи](#платежи)
+- [Масштабирование](#масштабирование)
+- [Эксплуатация](#эксплуатация)
 
-## Prerequisites
+## Требования
 
-- Docker with Compose v2 (`docker compose version` ≥ 2.20).
-- A bot token from [@BotFather](https://t.me/BotFather).
-- For webhook mode: a domain with a TLS certificate and a reverse proxy.
-- For the panel: a [Vercel](https://vercel.com) project, or any static host.
+- Docker с Compose v2 (`docker compose version` ≥ 2.20).
+- Токен бота от [@BotFather](https://t.me/BotFather).
+- Для webhook: домен с TLS-сертификатом и обратный прокси.
+- Для панели: проект на [Vercel](https://vercel.com) или любой статический хостинг.
 
-Nothing else is installed on the host. Postgres and Redis come from the compose
-file, and the three services share one image built from the repository root.
+Больше на хост ничего не ставится. Postgres и Redis поднимаются из compose-файла,
+а три сервиса используют один образ, собранный из корня репозитория.
 
-## First deploy
+## Первый деплой
 
 ```bash
-git clone <your-fork> && cd gateway
+git clone <ваш-форк> && cd gateway
 cp .env.example .env
 $EDITOR .env                      # BOT_TOKEN, JWT_SECRET, CORS_ORIGINS, APP_ENV
 docker compose -f infra/docker/docker-compose.yml up -d --build
 ```
 
-Generate the JWT secret rather than inventing one:
+JWT-секрет нужно сгенерировать, а не придумать:
 
 ```bash
 python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
-With `APP_ENV=production` the process refuses to start on an unsafe
-configuration instead of running with it — a placeholder `JWT_SECRET`, an empty
-`BOT_TOKEN`, `CORS_ORIGINS=*`, or a webhook without a secret. The error names
-every problem at once, so you fix them in one pass.
+При `APP_ENV=production` процесс откажется стартовать на небезопасной
+конфигурации вместо того, чтобы работать с ней: плейсхолдер `JWT_SECRET`, пустой
+`BOT_TOKEN`, `CORS_ORIGINS=*` или webhook без секрета. Ошибка перечисляет все
+проблемы разом, так что чинятся они за один проход.
 
-Check it came up:
+Проверить, что поднялось:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml ps
 curl -fsS localhost:8000/api/health   # {"status":"ok",...}
-curl -fsS localhost:8000/api/ready    # 503 while Redis is unreachable
+curl -fsS localhost:8000/api/ready    # 503, пока Redis недоступен
 docker compose -f infra/docker/docker-compose.yml logs -f bot
 ```
 
-`/health` is the liveness probe and consults nothing: an API that fails it
-because Redis is down would be restarted by the orchestrator, which does not
-bring Redis back. `/ready` is the one that answers 503 when a dependency the API
-cannot serve without is missing — point the load balancer at that one.
+`/health` — это liveness-проба, и она не опрашивает ничего: API, падающий по ней
+из-за недоступного Redis, был бы перезапущен оркестратором, а Redis это не
+вернёт. `/ready` — та, что отвечает 503, когда недоступна зависимость, без
+которой API не может обслуживать запросы. Балансировщик направляйте именно на неё.
 
-## Configuration
+## Конфигурация
 
-Every setting is an environment variable read once at startup by
-`packages/shared/src/shared/config.py`; `.env.example` documents all 23 with the
-defaults. The ones that matter in production:
+Каждая настройка — переменная окружения, читаемая один раз при старте в
+`packages/shared/src/shared/config.py`; в `.env.example` описаны все 23 с
+дефолтами. Те, что важны в проде:
 
-| Variable | Why it matters |
+| Переменная | Почему важна |
 | --- | --- |
-| `APP_ENV` | `production` turns on the startup safety checks below. |
-| `BOT_TOKEN` | From @BotFather. All four processes need it — the worker sends messages of its own. |
-| `JWT_SECRET` | Signs panel sessions. ≥32 bytes, and never the shipped placeholder. |
-| `CORS_ORIGINS` | The panel's exact origin. `*` is refused in production. |
-| `WEBAPP_URL` | Where the Mini App is served. Must match what BotFather has, or `initData` verification fails. |
-| `SUPERADMIN_IDS` | Comma-separated Telegram user ids that may open the platform console. Empty means nobody. |
-| `AI_API_KEY` | Optional. Without it AI moderation degrades to disabled rather than failing messages. |
-| `CRYPTOBOT_TOKEN` | Optional. Stars work without it; crypto payments do not. |
+| `APP_ENV` | `production` включает проверки безопасности при старте. |
+| `BOT_TOKEN` | От @BotFather. Нужен всем четырём процессам — воркер шлёт сообщения сам. |
+| `JWT_SECRET` | Подписывает сессии панели. ≥32 байт и никогда не поставляемый плейсхолдер. |
+| `CORS_ORIGINS` | Точный origin панели. `*` в проде отклоняется. |
+| `WEBAPP_URL` | Где отдаётся Mini App. Должен совпадать с тем, что указан в BotFather, иначе проверка `initData` не пройдёт. |
+| `SUPERADMIN_IDS` | Telegram-id через запятую, кому доступна платформенная консоль. Пусто — никому. |
+| `AI_API_KEY` | Необязателен. Без него ИИ-модерация деградирует в «выключено», а не роняет сообщения. |
+| `CRYPTOBOT_TOKEN` | Необязателен. Stars работают без него, криптоплатежи — нет. |
 
-Compose passes `.env` to every service through `env_file` and then overrides
-`DATABASE_URL` and `REDIS_URL` to the in-network names. The values in `.env`
-stay pointed at `localhost:5433` / `localhost:6380` so `task api` keeps working
-on the host — the same file serves both.
+Compose передаёт `.env` каждому сервису через `env_file`, а затем перекрывает
+`DATABASE_URL` и `REDIS_URL` на внутрисетевые имена. Значения в самом `.env`
+остаются указывать на `localhost:5433` / `localhost:6380`, чтобы `task api`
+продолжал работать на хосте — один файл обслуживает оба случая.
 
-`.env` is in `.gitignore` and `.dockerignore`. It holds a live token, and a copy
-baked into an image outlives any `docker rm`.
+`.env` перечислен в `.gitignore` и `.dockerignore`. В нём живой токен, а копия,
+запечённая в образ, переживает любой `docker rm`.
 
-## Polling or webhook
+## Polling или webhook
 
-Long polling is the default and needs no inbound connectivity at all. It is the
-right choice until the bot is large enough that the extra round trip matters.
+Long polling — режим по умолчанию, ему вообще не нужна входящая связность. Это
+правильный выбор до тех пор, пока бот не вырастет настолько, что лишний
+round-trip начнёт что-то значить.
 
-To switch:
+Переключение:
 
 ```bash
 USE_WEBHOOK=true
-WEBHOOK_BASE_URL=https://bot.example.com   # https, and reachable from Telegram
+WEBHOOK_BASE_URL=https://bot.example.com   # https и доступен со стороны Telegram
 WEBHOOK_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
 ```
 
-The bot then serves its own endpoint on `WEBHOOK_PORT` (8081 by default), which
-compose publishes to `127.0.0.1` only. Terminate TLS in front of it:
+Бот поднимет собственный эндпоинт на `WEBHOOK_PORT` (по умолчанию 8081), который
+compose публикует только на `127.0.0.1`. TLS терминируйте перед ним:
 
 ```nginx
 location /telegram/webhook {
@@ -106,51 +107,51 @@ location /telegram/webhook {
 }
 ```
 
-Telegram sends `WEBHOOK_SECRET` back in that header and the bot compares it, so
-the proxy has to forward it. Without the secret anyone who learns the URL can
-post fabricated updates, which is why production refuses to start when
-`USE_WEBHOOK` is on and it is unset.
+Telegram возвращает `WEBHOOK_SECRET` в этом заголовке, а бот его сверяет — значит,
+прокси обязан заголовок пробрасывать. Без секрета любой, кто узнает URL, сможет
+слать поддельные апдейты; поэтому прод отказывается стартовать, когда
+`USE_WEBHOOK` включён, а секрет не задан.
 
-Switching back to polling needs no cleanup: the bot deletes a leftover webhook
-on startup, because `getUpdates` answers 409 while one is registered and the
-process would otherwise start cleanly and receive nothing.
+Возврат на polling не требует уборки: бот удаляет оставшийся webhook при старте,
+потому что `getUpdates` отвечает 409, пока webhook зарегистрирован, — иначе
+процесс поднялся бы чисто и не получал ничего.
 
-The webhook is deliberately *not* deleted on shutdown. Telegram queues updates
-while an endpoint is unreachable and redelivers them, so a restart loses
-nothing; deleting it would open a window on every deploy.
+Webhook намеренно **не** удаляется при остановке. Telegram копит апдейты, пока
+эндпоинт недоступен, и доставляет их повторно, так что рестарт ничего не теряет;
+удаление же открывало бы окно на каждом деплое.
 
-## Migrations
+## Миграции
 
-The `migrate` service runs `alembic upgrade head` and exits. The other three
-wait on `service_completed_successfully`, so the schema is never a race between
-three processes starting at once. Every `up` applies pending migrations before
-anything serves traffic.
+Сервис `migrate` выполняет `alembic upgrade head` и завершается. Остальные три
+ждут `service_completed_successfully`, поэтому схема никогда не становится
+гонкой трёх процессов, стартующих одновременно. Каждый `up` применяет
+незакрытые миграции до того, как что-либо начнёт обслуживать трафик.
 
-By hand:
+Вручную:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml run --rm migrate
-task migrate                                              # on the host
-task revision -- "add whatever"                           # autogenerate
+task migrate                                              # на хосте
+task revision -- "add whatever"                           # автогенерация
 ```
 
-Read generated migrations before committing them. Autogenerate detects added
-tables and columns reliably; renames it sees as a drop plus an add, which on a
-live table means silent data loss.
+Читайте сгенерированные миграции перед коммитом. Автогенерация надёжно ловит
+добавленные таблицы и колонки; переименование она видит как удаление плюс
+добавление, а на живой таблице это тихая потеря данных.
 
-Back up before a deploy that migrates:
+Бэкап перед деплоем с миграцией:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml exec postgres \
     pg_dump -U postgres tg_manager | gzip > backup-$(date +%F).sql.gz
 ```
 
-## The Mini App
+## Mini App
 
-The panel is a static bundle and does not belong in the Python images —
-`.dockerignore` excludes it. Deploy it to Vercel:
+Панель — статическая сборка, и в Python-образах ей делать нечего:
+`.dockerignore` её исключает. Деплой на Vercel:
 
-| Setting | Value |
+| Настройка | Значение |
 | --- | --- |
 | Root directory | `apps/miniapp` |
 | Install command | `pnpm install` |
@@ -158,119 +159,119 @@ The panel is a static bundle and does not belong in the Python images —
 | Output directory | `dist` |
 | `VITE_API_BASE_URL` | `https://api.example.com` |
 
-Uncheck "Include source files outside of the Root Directory" only if you are
-sure — the build imports `.ftl` files from `packages/i18n` through the
-`@locales` alias so the panel and the bot read one set of locales. Vercel needs
-the repository root available for that import to resolve.
+Снимайте галку «Include source files outside of the Root Directory» только если
+уверены: сборка импортирует `.ftl` из `packages/i18n` через алиас `@locales` —
+так панель и бот читают один набор локалей. Чтобы этот импорт разрешился,
+Vercel нужен корень репозитория.
 
-Then three things have to agree, or `initData` verification fails with a 401
-that looks like a bug:
+Дальше три вещи обязаны совпадать, иначе проверка `initData` даст 401, который
+выглядит как баг:
 
-1. `WEBAPP_URL` in `.env` — the origin the API checks against.
-2. The Web App URL in BotFather (`/mybots` → Bot Settings → Menu Button).
-3. Where Vercel actually serves it.
+1. `WEBAPP_URL` в `.env` — origin, с которым сверяется API.
+2. Web App URL в BotFather (`/mybots` → Bot Settings → Menu Button).
+3. Адрес, по которому панель реально отдаётся с Vercel.
 
-`CORS_ORIGINS` must also name that origin exactly. Production refuses `*`.
+`CORS_ORIGINS` должен называть тот же origin в точности. Прод не принимает `*`.
 
-After changing an API schema, regenerate the typed client so the panel's types
-match what the API returns:
+После изменения схемы API перегенерируйте типизированный клиент, чтобы типы
+панели соответствовали тому, что API отдаёт:
 
 ```bash
-task client       # exports openapi.json, then regenerates src/api/schema.ts
+task client       # экспортирует openapi.json, затем пересобирает src/api/schema.ts
 ```
 
-## Payments
+## Платежи
 
-**Telegram Stars** needs no configuration. Invoices are created by the bot and
-settled by Telegram; the `pre_checkout_query` handler is already wired.
+**Telegram Stars** не требуют настройки. Инвойсы создаёт бот, расчёт проводит
+Telegram; обработчик `pre_checkout_query` уже подключён.
 
-**CryptoBot** needs `CRYPTOBOT_TOKEN` from [@CryptoBot](https://t.me/CryptoBot)
-and a webhook pointing at the API:
+**CryptoBot** требует `CRYPTOBOT_TOKEN` от [@CryptoBot](https://t.me/CryptoBot)
+и вебхука, указывающего на API:
 
 ```
 https://api.example.com/payments/cryptobot/webhook
 ```
 
-That route is excluded from the OpenAPI schema on purpose — it is not part of
-the panel's contract. It answers 200 for anything it has already handled or
-cannot parse, because a non-2xx makes CryptoBot retry forever on a payload that
-will never succeed.
+Этот маршрут намеренно исключён из OpenAPI-схемы — он не часть контракта
+панели. Он отвечает 200 на всё, что уже обработано или не разбирается, потому
+что не-2xx заставит CryptoBot вечно повторять запрос с payload, который никогда
+не пройдёт.
 
-## Scaling
+## Масштабирование
 
-**The worker scales horizontally.** It is where every deferred action runs, and
-it is the first thing to add replicas of:
+**Воркер масштабируется горизонтально.** В нём выполняется каждое отложенное
+действие, и реплики стоит добавлять в первую очередь именно ему:
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml up -d --scale worker=3
 ```
 
-Cron jobs stay correct across replicas: ARQ enqueues them with a deterministic
-job id derived from the scheduled time (`unique=True`), so three workers racing
-the same tick produce one job.
+Cron-джобы остаются корректными на нескольких репликах: ARQ ставит их в очередь
+с детерминированным job id, выведенным из времени запуска (`unique=True`), — три
+воркера, столкнувшись на одном тике, породят одну джобу.
 
-**The API scales horizontally** behind any load balancer. It holds no state
-between requests; sessions are JWTs and everything cached lives in Redis.
+**API масштабируется горизонтально** за любым балансировщиком. Между запросами
+он не хранит состояния: сессии — это JWT, а всё кэшируемое лежит в Redis.
 
-**The bot does not scale by adding replicas while polling.** Two pollers on one
-token both receive every update. Under a webhook it does scale — updates are
-deduplicated through Redis, precisely because Telegram redelivers when a reply
-is slow and a rolling deploy briefly runs two replicas.
+**Бот не масштабируется репликами, пока работает на polling.** Два поллера с
+одним токеном получают каждый апдейт оба. На webhook — масштабируется: апдейты
+дедуплицируются через Redis ровно потому, что Telegram доставляет повторно при
+медленном ответе, а rolling-деплой на короткое время держит две реплики.
 
-Vertical knobs, all in `.env`:
+Вертикальные ручки, все в `.env`:
 
-| Variable | Default | What it controls |
+| Переменная | Дефолт | Что задаёт |
 | --- | --- | --- |
-| `SENDER_WORKERS` | 4 | Concurrent outbound sends per process. |
-| `GLOBAL_SEND_RATE` | 30 | Messages/second across all chats — Telegram's documented ceiling. |
-| `GROUP_SEND_RATE_PER_MINUTE` | 20 | Per-group ceiling. Raising it invites 429s. |
-| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 10 / 20 | Connections per process. Multiply by replica count and compare against Postgres's `max_connections`. |
+| `SENDER_WORKERS` | 4 | Параллельных исходящих отправок на процесс. |
+| `GLOBAL_SEND_RATE` | 30 | Сообщений в секунду по всем чатам — задокументированный потолок Telegram. |
+| `GROUP_SEND_RATE_PER_MINUTE` | 20 | Потолок на группу. Поднимете — получите 429. |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` | 10 / 20 | Соединений на процесс. Умножьте на число реплик и сравните с `max_connections` у Postgres. |
 
-The send rates are Telegram's limits, not ours. Raising them does not send more
-messages; it converts refusals into `retry_after` backoff.
+Лимиты отправки — это лимиты Telegram, а не наши. Их повышение не отправляет
+больше сообщений; оно превращает отказы в ожидание по `retry_after`.
 
-## Operating
+## Эксплуатация
 
-**Logs** are JSON on stdout (`LOG_JSON=true`), which is what a log shipper
-wants. Set it false for human-readable local output.
+**Логи** — JSON в stdout (`LOG_JSON=true`), как и нужно сборщику логов. Для
+человекочитаемого вывода локально поставьте false.
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml logs -f bot worker
 ```
 
-**Deploying a change:**
+**Выкатка изменений:**
 
 ```bash
 git pull
 docker compose -f infra/docker/docker-compose.yml up -d --build
 ```
 
-Compose stops the old containers with SIGTERM, which all three handle rather
-than dying on. The bot returns from its runner and drains the outbound queue, so
-a ban already decided still reaches Telegram. The worker cancels jobs still
-running and re-queues them — ARQ retries on cancellation — then drains its own
-sender in `on_shutdown`. Give them time to finish: `--timeout 30` if the default
-10 seconds proves tight under load.
+Compose останавливает старые контейнеры через SIGTERM, и все три его
+обрабатывают, а не умирают на нём. Бот выходит из своего раннера и дренирует
+очередь отправки — уже принятый бан всё равно дойдёт до Telegram. Воркер
+отменяет выполняющиеся джобы и возвращает их в очередь (ARQ повторяет при
+отмене), после чего дренирует собственный sender в `on_shutdown`. Дайте им
+время закончить: `--timeout 30`, если дефолтных 10 секунд под нагрузкой мало.
 
-**Rolling back** is `git checkout <tag>` and the same command, with one caveat:
-migrations do not roll back with the code. If the bad deploy migrated, either
-`alembic downgrade -1` first (having read what it drops) or roll forward.
+**Откат** — это `git checkout <tag>` и та же команда, с одной оговоркой:
+миграции вместе с кодом не откатываются. Если неудачный деплой мигрировал схему,
+либо сначала `alembic downgrade -1` (прочитав, что именно он удаляет), либо
+катитесь вперёд.
 
-**A shell for one-off work:**
+**Шелл для разовых задач:**
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml exec api python
 docker compose -f infra/docker/docker-compose.yml exec postgres psql -U postgres tg_manager
 ```
 
-**When something is wrong**, in the order that usually finds it:
+**Когда что-то не так** — в том порядке, в котором обычно и находится:
 
-| Symptom | Where to look |
+| Симптом | Куда смотреть |
 | --- | --- |
-| Bot silent, no errors | A webhook is registered while polling. `getWebhookInfo` against the API, or just restart — the bot clears it. |
-| Panel shows 401 | `WEBAPP_URL`, BotFather's Web App URL and the deployed origin disagree. |
-| Panel shows a CORS error | `CORS_ORIGINS` does not name the panel's exact origin. |
-| API returns 503 on `/ready` | Redis is unreachable. `/health` stays 200 — that is intended. |
-| Deferred actions never fire | The worker is down or its Redis is a different instance than the bot's. |
-| Services restart in a loop | Usually the production config check. `logs migrate` and `logs api` name the exact problem. |
-
+| Бот молчит, ошибок нет | При polling зарегистрирован webhook. `getWebhookInfo` через API — или просто перезапустите, бот его снимет. |
+| Панель отдаёт 401 | `WEBAPP_URL`, Web App URL в BotFather и реальный origin деплоя не совпадают. |
+| Панель показывает ошибку CORS | `CORS_ORIGINS` не называет точный origin панели. |
+| API отвечает 503 на `/ready` | Недоступен Redis. `/health` остаётся 200 — так и задумано. |
+| Отложенные действия не срабатывают | Воркер не поднят либо смотрит в другой Redis, не в тот, что бот. |
+| Сервисы перезапускаются по кругу | Обычно это проверка прод-конфигурации. `logs migrate` и `logs api` называют конкретную проблему. |
