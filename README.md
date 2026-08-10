@@ -1,50 +1,124 @@
 # Telegram Bot Manager
 
-Мультитенантный SaaS-бот для управления Telegram-чатами. Сейчас реализован **Этап 0 — скелет**: `uv`-workspace, FastAPI, aiogram, ARQ worker, SQLAlchemy/Alembic, Redis/PostgreSQL, Mini App-заглушка и общий i18n.
+Мультитенантный SaaS-бот для управления Telegram-чатами: модерация, антиспам,
+капча, статистика, репутация, автопостинг, ИИ-модерация и сеть кросс-банов —
+всё настраивается из Telegram Mini App, помодульно и по тарифам.
 
-## Быстрый запуск
+Один бот обслуживает произвольное число чатов. У каждого чата свой тариф, свой
+набор включённых модулей, своя конфигурация каждого модуля и свой язык.
 
-1. Скопируйте `.env.example` в `.env` и укажите `BOT_TOKEN`.
-2. Запустите `docker compose -f infra/docker/docker-compose.yml up --build`.
-3. API будет доступен на `http://localhost:8000/docs`, health-check — `http://localhost:8000/health`.
+## Возможности
 
-Локальные команды:
+| Модуль | Тариф | Что делает |
+| --- | --- | --- |
+| **moderation** | Free | `/ban`, `/mute`, `/warn`, `/kick` и ещё шесть команд; стоп-слова с обходом гомоглифов, фильтры контента, антифлуд со скользящим окном, лог-канал |
+| **entry** | Free | Капча на входе, приветствие, антирейд, автобан новорегов |
+| **stats** | Pro | Счётчики активности, ежедневная агрегация, отчёты в чат |
+| **engagement** | Pro | Триггеры, репутация (`+`/`-`), уровни |
+| **autopost** | Pro | Отложенные и повторяющиеся посты, форс-подписка на канал |
+| **ai_moderation** | Business | Классификация сообщений через любой OpenAI-совместимый эндпоинт, circuit breaker, дневной бюджет |
+| **crossban** | Business | Общий чёрный список: три независимых чата, забанивших за скам, дают глобальный бан |
+
+Тарифы: **Free**, **Pro** (299 ⭐ / $4.99), **Business** (999 ⭐ / $14.99),
+**White Label** (4999 ⭐ / $79). Оплата — Telegram Stars или CryptoBot, с
+напоминаниями об истечении и grace-периодом перед понижением.
+
+Модуль объявляется один раз в `packages/core/src/core/registry.py` — оттуда
+берутся и меню команд бота, и разделы панели, и матрица тарифов. Добавление
+модуля не требует правок в TypeScript.
+
+## Быстрый старт
+
+```bash
+cp .env.example .env      # заполните BOT_TOKEN
+docker compose -f infra/docker/docker-compose.yml up -d --build
+```
+
+API поднимется на `localhost:8000` (`/docs` — Swagger, `/api/health` — проба),
+бот начнёт long polling. Полная инструкция, включая webhook, Vercel и
+масштабирование, — в [`docs/deploy.md`](docs/deploy.md).
+
+## Разработка
+
+Нужны [uv](https://docs.astral.sh/uv/), [Task](https://taskfile.dev) и pnpm.
 
 ```bash
 uv sync
-task api
-task bot
-task worker
-task lint
-task test
+docker compose -f infra/docker/docker-compose.yml up -d postgres redis
+task migrate
+
+task api        # uvicorn с автоперезагрузкой
+task bot        # long polling
+task worker     # ARQ
+task miniapp    # Vite dev-сервер
 ```
 
-Команда `task bot` запускает polling с корректным `PYTHONPATH` для `apps/bot` и общих пакетов.
+Postgres и Redis слушают **5433** и **6380**, а не стандартные порты — чтобы не
+конфликтовать с уже установленными локально.
 
-При запуске приложений из macOS используйте `localhost` для PostgreSQL и Redis. Имена `postgres` и `redis` работают только внутри Docker-сети; команды `task api` и `task worker` уже подставляют локальные адреса автоматически.
+Гейты — те же, что в CI:
 
-## Архитектурные решения
+```bash
+task lint       # ruff check + ruff format --check + mypy .
+task test       # pytest
+task check      # оба
+task client     # перегенерировать TS-клиент из OpenAPI
+```
 
-- `aiogram 3` используется вместо grammY.
-- `FastAPI` используется вместо NestJS.
-- `SQLAlchemy 2.0 + Alembic` используется вместо Prisma.
-- `ARQ` используется вместо BullMQ.
-- `Pydantic v2` используется вместо zod.
-- `structlog` используется вместо pino.
-- `uv workspace + Taskfile` используется вместо Turborepo.
+`mypy .` проходит по всем 137 файлам, включая тесты; 322 теста зелёные.
 
-Приложения импортируют общий код только из `packages/*`; это сохраняет границы между bot, API и worker.
+## Структура
 
-## Сервисы
+```
+apps/
+  bot/        aiogram 3: роутеры модулей, цепочка middleware, runner (polling/webhook)
+  api/        FastAPI: initData → JWT, эндпоинты панели, вебхук CryptoBot
+  worker/     ARQ: всё отложенное — размуты, посты, агрегация, напоминания
+  miniapp/    React + TypeScript + Vite: панель управления
+packages/
+  core/       бизнес-логика: реестр модулей, тарифы, кэш, sender, сервисы
+  db/         SQLAlchemy 2.0 async, репозитории, Unit of Work, Alembic
+  shared/     настройки, enum'ы, Pydantic-схемы, логирование
+  i18n/       Fluent-локали RU/EN — общие для бота и панели
+```
 
-- `apps/api` — REST API и OpenAPI для Mini App.
-- `apps/bot` — Telegram long polling в dev-режиме.
-- `apps/worker` — заготовка ARQ worker.
-- `apps/miniapp` — React + TypeScript + Vite заглушка.
-- `packages/db` — SQLAlchemy-модели и Alembic.
-- `packages/shared` — настройки и общие enum/схемы.
-- `packages/i18n` — Fluent-локали.
+Приложения импортируют общий код только из `packages/*`. Бот не импортирует API,
+API не импортирует бота; всё, что нужно обоим, живёт в `core`.
 
-## ENV
+## Ключевые решения
 
-См. `.env.example`. `BOT_TOKEN` обязателен только для запуска бота; API и миграции могут запускаться без него.
+Стек в ТЗ был описан через TypeScript-аналоги; здесь всё, кроме панели, на
+Python:
+
+| Вместо | Используется | Почему |
+| --- | --- | --- |
+| grammY | **aiogram 3** | Роутеры, middleware, фильтры, FSM — нативный asyncio |
+| NestJS | **FastAPI** | Pydantic v2 как единый слой валидации и OpenAPI |
+| Prisma | **SQLAlchemy 2.0 + Alembic** | Типизированный async ORM и честные миграции |
+| BullMQ | **ARQ** | Персистентные джобы на том же Redis |
+| zod | **Pydantic v2** | Одна схема на валидацию, сериализацию и OpenAPI |
+| pino | **structlog** | JSON-логи с контекстом |
+| Turborepo | **uv workspace + Taskfile** | Один локфайл на весь монорепозиторий |
+
+Решения, которые стоит знать, прежде чем менять код:
+
+- **Ничего отложенного через `asyncio.sleep`.** Размуты, автоудаление и посты —
+  джобы ARQ с явным `_job_id`: идемпотентны, отменяемы, переживают рестарт.
+- **Весь исходящий трафик идёт через `core.sender`** с двумя токен-бакетами в
+  Redis (30/сек глобально, 20/мин на чат) и классификацией ошибок Telegram.
+- **`initData` проверяется на каждый вход в панель**, затем выдаётся JWT;
+  права админа кэшируются на 5 минут, как требует ТЗ.
+- **Все datetime — UTC-aware.** Наивных нет ни в моделях, ни в джобах.
+- **Ни одной захардкоженной строки** в ответах бота и панели: всё через Fluent,
+  один каталог на оба рантайма, парность ключей RU/EN проверяется тестом.
+- **Прод падает на старте при небезопасной конфигурации** — плейсхолдер
+  `JWT_SECRET`, `CORS_ORIGINS=*`, webhook без секрета.
+
+Решения, принятые по ходу, помечены в коде комментариями `# DECISION:` — там,
+где нужно объяснить не «что», а «почему именно так».
+
+## Документация
+
+- [`docs/deploy.md`](docs/deploy.md) — деплой, webhook, миграции, масштабирование
+- [`.env.example`](.env.example) — все 23 переменные с комментариями
+- `/docs` на запущенном API — Swagger по всем 38 операциям
