@@ -1,0 +1,64 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Defaults for every colour the panel uses.
+ *
+ * These are the light-theme values Telegram ships; `theme.ts` overwrites each
+ * one from `themeParams` at startup. They exist so the first paint — before the
+ * SDK has answered, or in a browser with no Telegram at all — is a readable
+ * panel rather than black text on a black background.
+ */
+:root {
+  --tg-bg: #ffffff;
+  --tg-surface: #f4f4f5;
+  --tg-text: #000000;
+  --tg-hint: #707579;
+  --tg-link: #3390ec;
+  --tg-accent: #3390ec;
+  --tg-accent-text: #ffffff;
+  --tg-destructive: #e53935;
+  --tg-separator: rgba(0, 0, 0, 0.08);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--tg-bg);
+  color: var(--tg-text);
+  /* Telegram's own overscroll already bounces the webview; a second one inside
+     the panel makes the whole sheet feel loose. */
+  overscroll-behavior-y: none;
+}
+
+@layer components {
+  /* The list-row look Telegram uses everywhere: grouped rows on a surface, hair-
+     line separators between them, nothing after the last one. */
+  .tg-card {
+    @apply rounded-card bg-surface overflow-hidden;
+  }
+
+  .tg-row {
+    @apply flex items-center gap-3 px-4 py-3 border-b border-separator last:border-b-0;
+  }
+
+  .tg-input {
+    @apply w-full rounded-lg bg-bg px-3 py-2 text-[15px] outline-none
+           border border-separator focus:border-accent;
+  }
+
+  .tg-button {
+    @apply w-full rounded-lg bg-accent px-4 py-3 text-[15px] font-medium
+           text-accent-text disabled:opacity-50;
+  }
+
+  .tg-section-title {
+    @apply px-4 pb-2 pt-5 text-[13px] uppercase tracking-wide text-hint;
+  }
+}
