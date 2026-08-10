@@ -78,6 +78,13 @@ class ChatRepository:
         )
         return list(result.scalars().all())
 
+    async def list_by_ids(self, chat_ids: list[int]) -> list[Chat]:
+        """Batch fetch for cron fan-out — one query, not one per chat."""
+        if not chat_ids:
+            return []
+        result = await self._session.execute(select(Chat).where(Chat.id.in_(chat_ids)))
+        return list(result.scalars().all())
+
     async def list_by_plans(self, plans: list[Plan]) -> list[Chat]:
         result = await self._session.execute(
             select(Chat).where(Chat.plan.in_(plans), Chat.is_active.is_(True))
@@ -153,6 +160,17 @@ class ModuleConfigRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_many(self, chat_ids: list[int], module: str) -> dict[int, ChatModuleConfig]:
+        """One module's rows for many chats, keyed by chat id (cron fan-out)."""
+        if not chat_ids:
+            return {}
+        result = await self._session.execute(
+            select(ChatModuleConfig).where(
+                ChatModuleConfig.chat_id.in_(chat_ids), ChatModuleConfig.module == module
+            )
+        )
+        return {row.chat_id: row for row in result.scalars().all()}
 
     async def upsert(
         self,
