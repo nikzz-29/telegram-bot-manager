@@ -1,0 +1,114 @@
+# The same gates `task check` runs locally, on every push.
+#
+# DECISION: one job, not four parallel ones. The gates share a dependency
+# install that dominates their runtime, and splitting them would pay for it
+# four times to save a few seconds of wall clock on a suite that finishes in
+# ten. They are ordered cheapest-first so an unformatted file fails in seconds
+# rather than after the whole test run.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run's result irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: lint, types, tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.5.11"  # the version the Dockerfile pins
+          enable-cache: true
+
+      - name: Install
+        # --frozen: CI must fail on a stale lockfile rather than quietly
+        # resolving something the Docker build will not reproduce.
+        run: uv sync --frozen
+
+      - name: Lint
+        run: uv run ruff check --output-format=github .
+
+      - name: Format
+        run: uv run ruff format --check .
+
+      - name: Types
+        # `.` and not a bare `mypy`: the packages list in pyproject covers the
+        # source but not tests/.
+        run: uv run mypy .
+
+      - name: Tests
+        run: uv run pytest -q
+
+  miniapp:
+    name: panel build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: apps/miniapp/pnpm-lock.yaml
+
+      - name: Install
+        working-directory: apps/miniapp
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck and build
+        # `pnpm run build` is `tsc -b && vite build`, so this is the typecheck
+        # too. The build reads .ftl files from packages/i18n through the
+        # @locales alias, which is why the whole repo is checked out.
+        working-directory: apps/miniapp
+        run: pnpm run build
+
+  schema:
+    name: api client is current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "0.5.11"
+          enable-cache: true
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: uv sync --frozen
+
+      - name: Regenerate
+        # The panel's types are generated from the API's schema. If a router
+        # changed and nobody ran `task client`, the committed client is lying
+        # about what the API returns -- and it type-checks, because it is
+        # internally consistent. Regenerating and diffing is the only way that
+        # shows up before a user does.
+        run: |
+          uv run python scripts/export_openapi.py
+          cd apps/miniapp
+          pnpm install --frozen-lockfile
+          pnpm run generate
+
+      - name: Diff
+        run: |
+          git diff --exit-code -- apps/miniapp/openapi.json apps/miniapp/src/api/schema.ts \
+            || { echo "::error::API schema changed but the client was not regenerated. Run 'task client' and commit."; exit 1; }
