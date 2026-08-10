@@ -67,7 +67,10 @@ log-action-captcha-timeout = Captcha timed out
 log-action-autoban = Auto-ban on entry
 log-action-raid = Raid
 log-action-lockdown = Chat closed to new members
-log-action-lockdown-off = Chat reopened to new members
+log-action-lockdown-off = Chat reopened
+log-action-forced-subscription = Message without subscription
+log-action-trigger = Trigger fired
+log-action-autopost = Scheduled post to new members
 log-field-target = Member: {$value}
 log-field-moderator = Moderator: {$value}
 log-field-duration = Duration: {$value}
@@ -100,6 +103,70 @@ raid-log-note = joins: {$joins} in {$seconds}s
 lockdown-on = The chat is closed to new members for {$duration}.
 lockdown-off = The chat is open to new members again.
 lockdown-over = The restriction on new members has been lifted.
+
+## Chat entry — forced subscription
+forced-sub-required = {$user}, please subscribe to the channel before posting here.
+forced-sub-join-button = Subscribe
+forced-sub-check-button = I subscribed
+forced-sub-open = Open this message in the chat.
+forced-sub-still-missing = No subscription found. Join the channel, then tap the button again.
+forced-sub-thanks = Thanks, you can post now!
+
+## Statistics
+stats-title = 📊 <b>{$chat}</b> — last {$days} days
+stats-messages = Messages: {$count}
+stats-active = Active members: {$count}
+stats-joins = Joined: {$count}
+stats-leaves = Left: {$count}
+stats-growth = Net growth: {$count}
+stats-chart = Activity: {$chart}
+stats-top-title = <b>Most active</b>
+stats-top-row = {$place}. {$user} — {$messages}
+stats-empty = No data yet — statistics appear after the module's first hour.
+
+## Reputation and levels
+rep-granted = {$user}: +{$points} reputation.
+rep-standing = <b>{$user}</b> — reputation: {$points}
+rep-level = Level: {$level}
+rep-level-titled = Level: {$level} — {$title}
+rep-progress = To the next level: {$earned}/{$needed}
+rep-rank = Rank: {$place}
+rep-top-title = <b>Top by reputation</b>
+rep-top-title-level = <b>Top by level</b>
+rep-top-row = {$place}. {$user} — {$points}
+rep-top-row-level = {$place}. {$user} — level {$level}, reputation {$points}
+rep-top-empty = Nobody has earned reputation yet.
+level-up = 🎉 {$user} reached level {$level}!
+level-up-titled = 🎉 {$user} reached level {$level} — {$title}!
+
+## Triggers
+trigger-list-title = <b>Triggers</b> — {$count}/{$limit}
+trigger-list-row = #{$id} · {$pattern} · {$match} · hits: {$hits} · {$state}
+trigger-list-more = …and {$count} more. The full list is in the control panel.
+trigger-list-empty = No triggers yet.
+trigger-usage = Usage: /addtrigger phrase {$separator} reply. Prefix re: for a regular expression, prefix = for an exact match.
+trigger-added = Trigger #{$id} added: {$pattern}
+trigger-deleted = Trigger #{$id} deleted.
+trigger-delete-usage = Usage: /deltrigger 12 — the number comes from /triggers.
+trigger-not-found = Trigger #{$id} not found.
+
+## Autoposting
+post-list-title = <b>Scheduled posts</b> — {$count}/{$limit}
+post-list-row = #{$id} · {$title} · {$schedule} · {$next}
+post-list-more = …and {$count} more. The full list is in the control panel.
+post-list-empty = No scheduled posts — create the first one in the control panel.
+post-module-paused = The autoposting module is off; nothing is being sent.
+post-paused = paused
+post-expired = will not repeat
+post-not-found = Post #{$id} not found.
+post-toggle-usage = Usage: /postpause 12 or /postresume 12 — the number comes from /posts.
+post-paused-ok = Post #{$id} is paused.
+post-resumed = Post #{$id} is back on schedule.
+
+## Shared
+state-on = on
+state-off = off
+limit-triggers = Trigger limit reached: {$limit}. Delete some or move to a higher plan.
 
 ## Errors
 error-generic = The action could not be completed. Please try again later.
@@ -142,6 +209,8 @@ cmd-triggers = list triggers
 cmd-rep = member reputation
 cmd-top = top members
 cmd-posts = scheduled posts
+cmd-postpause = pause a scheduled post
+cmd-postresume = put a post back on schedule
 cmd-gban = global ban
 
 ## Modules — titles and descriptions for the Mini App

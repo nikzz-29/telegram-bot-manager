@@ -67,6 +67,9 @@ log-action-autoban = Автобан на входе
 log-action-raid = Рейд
 log-action-lockdown = Чат закрыт для новых
 log-action-lockdown-off = Чат открыт для новых
+log-action-forced-subscription = Сообщение без подписки
+log-action-trigger = Сработал триггер
+log-action-autopost = Публикация по расписанию
 log-field-target = Участник: {$value}
 log-field-moderator = Модератор: {$value}
 log-field-duration = Срок: {$value}
@@ -99,6 +102,70 @@ raid-log-note = входов: {$joins} за {$seconds} с
 lockdown-on = Чат закрыт для новых участников на {$duration}.
 lockdown-off = Чат снова открыт для новых участников.
 lockdown-over = Ограничение для новых участников снято.
+
+## Вход в чат — обязательная подписка
+forced-sub-required = {$user}, чтобы писать в этом чате, подпишитесь на канал.
+forced-sub-join-button = Подписаться
+forced-sub-check-button = Я подписался
+forced-sub-open = Откройте это сообщение в чате.
+forced-sub-still-missing = Подписка не найдена. Подпишитесь на канал и нажмите кнопку ещё раз.
+forced-sub-thanks = Спасибо, можно писать!
+
+## Статистика
+stats-title = 📊 <b>{$chat}</b> — за {$days} дн.
+stats-messages = Сообщений: {$count}
+stats-active = Активных участников: {$count}
+stats-joins = Пришли: {$count}
+stats-leaves = Ушли: {$count}
+stats-growth = Прирост: {$count}
+stats-chart = Активность: {$chart}
+stats-top-title = <b>Самые активные</b>
+stats-top-row = {$place}. {$user} — {$messages}
+stats-empty = Данных пока нет — статистика появится после первого часа работы модуля.
+
+## Репутация и уровни
+rep-granted = {$user}: +{$points} к репутации.
+rep-standing = <b>{$user}</b> — репутация: {$points}
+rep-level = Уровень: {$level}
+rep-level-titled = Уровень: {$level} — {$title}
+rep-progress = До следующего уровня: {$earned}/{$needed}
+rep-rank = Место в топе: {$place}
+rep-top-title = <b>Топ по репутации</b>
+rep-top-title-level = <b>Топ по уровням</b>
+rep-top-row = {$place}. {$user} — {$points}
+rep-top-row-level = {$place}. {$user} — уровень {$level}, репутация {$points}
+rep-top-empty = Репутацию пока никто не набрал.
+level-up = 🎉 {$user} выходит на {$level} уровень!
+level-up-titled = 🎉 {$user} выходит на {$level} уровень — {$title}!
+
+## Триггеры
+trigger-list-title = <b>Триггеры</b> — {$count}/{$limit}
+trigger-list-row = #{$id} · {$pattern} · {$match} · срабатываний: {$hits} · {$state}
+trigger-list-more = …и ещё {$count}. Полный список — в панели управления.
+trigger-list-empty = Триггеров пока нет.
+trigger-usage = Использование: /addtrigger фраза {$separator} ответ. Префикс re: — регулярное выражение, префикс = — точное совпадение.
+trigger-added = Триггер #{$id} добавлен: {$pattern}
+trigger-deleted = Триггер #{$id} удалён.
+trigger-delete-usage = Использование: /deltrigger 12 — номер берётся из /triggers.
+trigger-not-found = Триггер #{$id} не найден.
+
+## Автопостинг
+post-list-title = <b>Публикации</b> — {$count}/{$limit}
+post-list-row = #{$id} · {$title} · {$schedule} · {$next}
+post-list-more = …и ещё {$count}. Полный список — в панели управления.
+post-list-empty = Запланированных публикаций нет — создайте первую в панели управления.
+post-module-paused = Модуль автопостинга выключен, публикации не отправляются.
+post-paused = на паузе
+post-expired = больше не повторится
+post-not-found = Публикация #{$id} не найдена.
+post-toggle-usage = Использование: /postpause 12 или /postresume 12 — номер берётся из /posts.
+post-paused-ok = Публикация #{$id} поставлена на паузу.
+post-resumed = Публикация #{$id} снова в расписании.
+
+## Общее
+state-on = вкл
+state-off = выкл
+limit-triggers = Достигнут лимит триггеров: {$limit}. Удалите ненужные или перейдите на более высокий тариф.
 
 ## Ошибки
 error-generic = Не удалось выполнить действие. Попробуйте позже.
@@ -141,6 +208,8 @@ cmd-triggers = список триггеров
 cmd-rep = репутация участника
 cmd-top = топ участников
 cmd-posts = запланированные публикации
+cmd-postpause = приостановить публикацию
+cmd-postresume = вернуть публикацию в расписание
 cmd-gban = глобальная блокировка
 
 ## Модули — заголовки и описания для Mini App
