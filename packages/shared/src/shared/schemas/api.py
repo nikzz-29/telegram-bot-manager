@@ -286,6 +286,12 @@ class ReputationEntry(ApiModel):
     display_name: str | None = None
 
 
+class ReputationAdjust(ApiModel):
+    """A manual correction, expressed as a delta so concurrent edits compose."""
+
+    delta: int = Field(ge=-100_000, le=100_000)
+
+
 # --------------------------------------------------------------------------
 # payments / plans
 # --------------------------------------------------------------------------

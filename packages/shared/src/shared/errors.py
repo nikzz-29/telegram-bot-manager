@@ -51,6 +51,19 @@ class ChatNotFoundError(DomainError):
     http_status = 404
 
 
+class ResourceNotFoundError(DomainError):
+    """A chat-scoped row (trigger, post, …) does not exist under this chat.
+
+    Deliberately the same answer as "exists, but belongs to another chat": the
+    repositories filter by `chat_id`, so an id from a neighbouring chat is
+    indistinguishable from one that was never created.
+    """
+
+    code = "not-found"
+    i18n_key = "error-not-found"
+    http_status = 404
+
+
 class NotChatAdminError(DomainError):
     """User is not an administrator of this chat."""
 
