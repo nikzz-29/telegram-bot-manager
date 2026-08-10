@@ -28,8 +28,9 @@ from aiogram.types import (
 )
 
 from bot import middlewares, modules
-from bot.commands import private
+from bot.commands import payments, private
 from core.admins import admins
+from core.billing import billing
 from core.cache import close_cache, setup_cache
 from core.jobs import close_arq
 from core.redis_client import close_redis
@@ -63,6 +64,9 @@ def build_dispatcher() -> Dispatcher:
     # Private-chat commands sit outside the module system: `/start` has to answer
     # before the user has any chat, let alone a plan.
     dispatcher.include_router(private.build_router())
+    # Checkout updates carry no chat context either — the payload is the context —
+    # and they arrive in whatever chat the invoice was opened from.
+    dispatcher.include_router(payments.build_router())
     return dispatcher
 
 
@@ -111,6 +115,7 @@ async def run() -> None:
     # same call against a channel; `sender` owns every outbound call.
     admins.bind(bot)
     subscription.bind(bot)
+    billing.bind(bot)
     await sender.start(bot)
 
     dispatcher = build_dispatcher()
