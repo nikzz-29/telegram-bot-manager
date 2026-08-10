@@ -18,7 +18,10 @@ tasks:
     cmds:
       - uv run ruff check .
       - uv run ruff format --check .
-      - uv run mypy
+      # `.` and not a bare `mypy`: the `packages` list in pyproject covers the
+      # source but not `tests/`, and the tests are where the type errors that
+      # actually reach a reviewer tend to be.
+      - uv run mypy .
   format:
     cmds:
       - uv run ruff format .

@@ -1982,6 +1982,7 @@ version = "0.1.0"
 source = { editable = "apps/bot" }
 dependencies = [
     { name = "aiogram" },
+    { name = "aiohttp" },
     { name = "arq" },
     { name = "cashews" },
     { name = "redis" },
@@ -1995,6 +1996,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aiogram", specifier = ">=3.13.1" },
+    { name = "aiohttp", specifier = ">=3.10" },
     { name = "arq", specifier = ">=0.26.1" },
     { name = "cashews", specifier = ">=7.1.0" },
     { name = "redis", specifier = ">=5.0.8" },

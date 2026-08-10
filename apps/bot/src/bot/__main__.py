@@ -4,10 +4,9 @@ The whole process is assembled here and nowhere else — logging, cache, the
 dispatcher's middleware chain, the module routers, and the outbound sender. Each
 of those knows how to configure itself; this file only decides the order.
 
-DECISION: long polling, not a webhook. A webhook needs a public TLS endpoint and
-a reverse proxy in front of it, which is deployment complexity the project does
-not need until it has the traffic to justify it. `start_polling` is swapped for
-`start_webhook` in one place when that day comes.
+DECISION: how updates arrive is `bot.runner`'s problem, not this file's. Polling
+and webhook differ only in that one call, and keeping the choice there means the
+assembly and the teardown below are identical either way.
 """
 
 from __future__ import annotations
@@ -29,6 +28,7 @@ from aiogram.types import (
 
 from bot import middlewares, modules
 from bot.commands import payments, private
+from bot.runner import run_updates
 from core.admins import admins
 from core.billing import billing
 from core.cache import close_cache, setup_cache
@@ -131,16 +131,11 @@ async def run() -> None:
     # "post clean, then edit in the spam" into a free bypass.
     allowed_updates = sorted({*dispatcher.resolve_used_update_types(), "edited_message"})
     try:
-        # Old updates are dropped: a mute the bot "missed" during a deploy has
-        # long since stopped being the right response by the time it comes back.
-        await dispatcher.start_polling(
-            bot,
-            handle_signals=False,
-            drop_pending_updates=True,
-            allowed_updates=allowed_updates,
-        )
+        await run_updates(bot, dispatcher, allowed_updates=allowed_updates)
     finally:
         # Drain: a moderation action already decided must still reach Telegram.
+        # This is why the runner handles SIGTERM instead of letting the default
+        # disposition kill the process — a hard kill never reaches this block.
         await sender.stop(drain=True)
         await bot.session.close()
         await close_cache()

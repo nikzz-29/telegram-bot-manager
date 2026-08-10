@@ -89,6 +89,9 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile
       target: bot
+    # Only listens when USE_WEBHOOK is on; harmless while polling. Publish it to
+    # the reverse proxy that terminates TLS, not to the internet.
+    ports: ["127.0.0.1:8081:8081"]
 
   worker:
     <<: *service

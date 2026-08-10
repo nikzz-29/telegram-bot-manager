@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     webhook_base_url: str = ""
     webhook_path: str = "/telegram/webhook"
     webhook_secret: str = ""
+    # Where the bot's own aiohttp server binds. This is the *internal* address the
+    # reverse proxy forwards to; `webhook_base_url` is what Telegram is told.
+    webhook_host: str = "0.0.0.0"
+    webhook_port: int = 8081
     drop_pending_updates: bool = True
 
     # --- infrastructure ---
@@ -123,6 +127,10 @@ class Settings(BaseSettings):
         if self.use_webhook and not self.webhook_secret:
             # Without it, anyone who learns the URL can post fabricated updates.
             problems.append("WEBHOOK_SECRET is required when USE_WEBHOOK is on")
+        if self.use_webhook and not self.webhook_base_url.startswith("https://"):
+            # Telegram only delivers to HTTPS, and an empty base URL would make
+            # `setWebhook` fail at startup with a much less obvious message.
+            problems.append("WEBHOOK_BASE_URL must be an https:// URL when USE_WEBHOOK is on")
 
         if problems:
             raise ValueError("Unsafe production configuration: " + "; ".join(problems))
