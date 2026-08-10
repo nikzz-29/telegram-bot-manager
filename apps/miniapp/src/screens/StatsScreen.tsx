@@ -7,12 +7,30 @@
  */
 import React, { useState } from "react";
 import type { StatPoint, StatsOverview } from "../api/client";
-import { Card, EmptyState, ErrorState, Row, Screen, SectionTitle, Spinner } from "../components/ui";
+import {
+  Card,
+  EmptyState,
+  ErrorState,
+  Header,
+  Row,
+  Screen,
+  SectionTitle,
+  SkeletonRows,
+} from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
 import { useStats } from "../hooks/queries";
 
 const RANGES = [7, 30, 90] as const;
 
+/**
+ * The four headline figures.
+ *
+ * DECISION: a figure with its caption underneath, not a row with a trailing
+ * value. These four numbers are the reason the screen exists, and a grouped list
+ * gives them the same weight as a setting — the eye runs down the labels and the
+ * numbers arrive second. Inverting that (number at display size, label dropped to
+ * hint) is what makes the screen answer its question at a glance.
+ */
 function Totals({ stats }: { stats: StatsOverview }): React.JSX.Element {
   const t = useT();
   const cells: [string, number][] = [
@@ -24,10 +42,10 @@ function Totals({ stats }: { stats: StatsOverview }): React.JSX.Element {
   return (
     <div className="grid grid-cols-2 gap-2">
       {cells.map(([key, value]) => (
-        <div key={key} className="tg-card px-4 py-3">
-          <div className="text-[22px] font-semibold tabular-nums">{value}</div>
-          <div className="text-[13px] text-hint">{t(key)}</div>
-        </div>
+        <Card key={key} className="px-4 py-3">
+          <div className="text-display font-semibold tabular-nums">{value}</div>
+          <div className="mt-0.5 text-label text-hint">{t(key)}</div>
+        </Card>
       ))}
     </div>
   );
@@ -66,6 +84,37 @@ function Chart({ series }: { series: readonly StatPoint[] }): React.JSX.Element 
   );
 }
 
+/**
+ * The shape of this screen while it loads.
+ *
+ * DECISION: not the shared `SkeletonRows` on its own. Most of what arrives here
+ * is a grid of figures and a chart, and a placeholder made only of rows would
+ * describe a layout that never comes — the page would jump the moment it
+ * resolved, which is the one thing a skeleton exists to prevent.
+ */
+function StatsSkeleton(): React.JSX.Element {
+  return (
+    <>
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {[0, 1, 2, 3].map((index) => (
+          <Card key={index} className="px-4 py-3">
+            <span className="tg-skeleton block h-[22px] w-1/2" />
+            <span className="tg-skeleton mt-2 block h-[13px] w-3/4" />
+          </Card>
+        ))}
+      </div>
+      <div className="mt-4">
+        <Card className="px-3 py-4">
+          <span className="tg-skeleton block h-24 w-full" />
+        </Card>
+      </div>
+      <div className="mt-4">
+        <SkeletonRows count={3} />
+      </div>
+    </>
+  );
+}
+
 export function StatsScreen({ chatId }: { chatId: number }): React.JSX.Element {
   const t = useT();
   const [days, setDays] = useState<number>(7);
@@ -73,15 +122,24 @@ export function StatsScreen({ chatId }: { chatId: number }): React.JSX.Element {
 
   return (
     <Screen>
+      <Header title={t("stats-screen-title")} icon="chart" />
+
       <SectionTitle>{t("stats-range")}</SectionTitle>
-      <div className="flex gap-2">
+      {/*
+       * DECISION: one tinted track with the chosen range raised out of it, rather
+       * than three separate buttons. Three equal pills never read as one choice —
+       * the two unselected ones looked like further actions you could also take —
+       * and a segmented control says "pick exactly one of these" without a word.
+       */}
+      <div className="flex gap-1 rounded-control bg-hint-tint p-1">
         {RANGES.map((range) => (
           <button
             key={range}
             type="button"
+            aria-pressed={range === days}
             onClick={() => setDays(range)}
-            className={`flex-1 rounded-lg px-3 py-2 text-[14px] ${
-              range === days ? "bg-accent text-accent-text" : "bg-surface text-link"
+            className={`flex-1 rounded-[7px] px-3 py-1.5 text-label font-medium transition-colors duration-[--panel-motion] ease-panel ${
+              range === days ? "bg-card text-text shadow-card" : "text-hint"
             }`}
           >
             {t(`stats-range-${range}`)}
@@ -89,15 +147,22 @@ export function StatsScreen({ chatId }: { chatId: number }): React.JSX.Element {
         ))}
       </div>
 
-      {stats.isPending && <Spinner />}
+      {stats.isPending && <StatsSkeleton />}
       {stats.isError && (
         <ErrorState message={stats.error.message} onRetry={() => void stats.refetch()} />
       )}
       {stats.isSuccess && (
         <>
-          {/* The API clamps `days` to the plan's retention; say so when it did. */}
+          {/*
+           * The API clamps `days` to the plan's retention; say so when it did.
+           *
+           * DECISION: a left-aligned footnote in hint text, not a centred notice.
+           * It explains the control immediately above it and nothing has gone
+           * wrong, so it takes Telegram's group-footer treatment — the same one
+           * every explanatory sentence in the panel gets.
+           */}
           {stats.data.period_days < days && (
-            <p className="mt-3 text-center text-[13px] text-hint">
+            <p className="px-1 pt-2 text-label text-hint">
               {t("stats-retention-capped", { days: stats.data.period_days })}
             </p>
           )}
@@ -109,7 +174,7 @@ export function StatsScreen({ chatId }: { chatId: number }): React.JSX.Element {
           <SectionTitle>{t("stats-metric-messages")}</SectionTitle>
           <Card className="px-3 py-4">
             {(stats.data.series ?? []).length === 0 ? (
-              <EmptyState text={t("stats-no-data")} />
+              <EmptyState text={t("stats-no-data")} icon="chart" />
             ) : (
               <Chart series={stats.data.series ?? []} />
             )}
@@ -118,7 +183,7 @@ export function StatsScreen({ chatId }: { chatId: number }): React.JSX.Element {
           <SectionTitle>{t("stats-top-users")}</SectionTitle>
           <Card>
             {(stats.data.top_users ?? []).length === 0 ? (
-              <EmptyState text={t("stats-no-data")} />
+              <EmptyState text={t("stats-no-data")} icon="chat" />
             ) : (
               (stats.data.top_users ?? []).map((user) => (
                 <Row
@@ -128,7 +193,7 @@ export function StatsScreen({ chatId }: { chatId: number }): React.JSX.Element {
                     (user.username != null ? `@${user.username}` : String(user.tg_user_id))
                   }
                   right={
-                    <span className="tabular-nums text-hint">
+                    <span className="text-label tabular-nums text-hint">
                       {t("field-messages-count", { count: user.messages })}
                     </span>
                   }
