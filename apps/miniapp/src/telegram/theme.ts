@@ -31,17 +31,47 @@ const MAPPING: ReadonlyArray<readonly [string, ColorSignal, string]> = [
   ["--tg-destructive", themeParams.destructiveTextColor, "#e53935"],
 ];
 
+/**
+ * The low-alpha tints, as `[variable, source, fallback, alpha]`.
+ *
+ * DECISION: the alpha is baked in here rather than expressed as a Tailwind
+ * `/15` modifier at the call site. Tailwind can only insert an alpha into a
+ * colour whose channels it can see, and these all arrive as opaque values — so
+ * `bg-hint/40` compiles to nothing at all, with no error. Deriving the tint
+ * where the colour is set is also exactly how `--tg-separator` already works.
+ *
+ * The alpha is two hex digits appended to a `#rrggbb` string: Telegram's SDK
+ * normalises every theme colour to that form, which is what makes it safe.
+ */
+const TINTS: ReadonlyArray<readonly [string, ColorSignal, string, string]> = [
+  ["--tg-accent-tint", themeParams.buttonColor, "#3390ec", "1a"], // 10%
+  ["--tg-hint-tint", themeParams.hintColor, "#707579", "33"], // 20% — skeletons, tiles
+  ["--tg-hint-track", themeParams.hintColor, "#707579", "66"], // 40% — a switch, off
+  ["--tg-destructive-tint", themeParams.destructiveTextColor, "#e53935", "1a"], // 10%
+];
+
 function apply(): void {
   const root = document.documentElement;
   for (const [cssVar, signal, fallback] of MAPPING) {
     root.style.setProperty(cssVar, signal() ?? fallback);
   }
+  for (const [cssVar, signal, fallback, alpha] of TINTS) {
+    root.style.setProperty(cssVar, `${signal() ?? fallback}${alpha}`);
+  }
   // Telegram has no separator colour, so it is derived from the text colour —
   // the one value guaranteed to contrast with the background it sits on.
   root.style.setProperty("--tg-separator", `${themeParams.textColor() ?? "#000000"}14`);
+  // The wash under a pressed row, derived the same way and for the same reason.
+  // It is a shade of the text rather than of the accent: a press is feedback
+  // that the row was hit, not a claim that anything is now selected.
+  root.style.setProperty("--panel-press", `${themeParams.textColor() ?? "#000000"}0f`);
   // `color-scheme` decides what the *browser* draws — scrollbars, form controls,
   // the flash behind an overscroll — none of which `themeParams` covers.
-  root.style.setProperty("color-scheme", themeParams.isDark() ? "dark" : "light");
+  const isDark = themeParams.isDark();
+  root.style.setProperty("color-scheme", isDark ? "dark" : "light");
+  // What Tailwind's `dark:` variant keys off. It follows Telegram's theme rather
+  // than the phone's, which are free to disagree.
+  root.classList.toggle("dark", isDark);
 }
 
 /** Start mirroring Telegram's theme. Returns an unsubscribe function. */

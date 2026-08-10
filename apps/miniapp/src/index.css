@@ -20,6 +20,59 @@
   --tg-accent-text: #ffffff;
   --tg-destructive: #e53935;
   --tg-separator: rgba(0, 0, 0, 0.08);
+
+  /*
+   * The grouped-list ground.
+   *
+   * DECISION: the page takes Telegram's *secondary* background and the cards
+   * take its primary one, which is the opposite of what reads naturally from
+   * the variable names. It is how every native Telegram settings screen is
+   * built — grey ground, white cells — and doing it the intuitive way around
+   * gives white-on-white, which is why the panel used to look like unstyled
+   * markup: the cards were there, but nothing separated them from the page.
+   */
+  --panel-ground: var(--tg-surface);
+  --panel-card: var(--tg-bg);
+
+  /* A theme is free to send the same colour for both, and a few do. The hairline
+     keeps a card's edge visible when the fill alone cannot. */
+  --panel-card-border: var(--tg-separator);
+
+  /* The wash under a pressed row. Derived from the text colour by `theme.ts`,
+     the same way the separator is — it is the one colour guaranteed to contrast
+     with whatever the card is filled with. */
+  --panel-press: rgba(0, 0, 0, 0.06);
+
+  /*
+   * Tints: an accent or hint colour at low alpha, for icon tiles, skeletons and
+   * badge fills.
+   *
+   * DECISION: each tint is its own variable, derived in `theme.ts`, rather than a
+   * Tailwind `/15` opacity modifier. Tailwind can only apply an alpha modifier to
+   * a colour whose channels it can see, and every colour here arrives from
+   * `themeParams` as an opaque `var()` — so `bg-hint/20` silently produces
+   * nothing (and hard-errors inside `@apply`). Deriving the alpha where the
+   * colour is set is also how `--tg-separator` has always worked.
+   */
+  --tg-accent-tint: rgba(51, 144, 236, 0.1);
+  --tg-hint-tint: rgba(112, 117, 121, 0.2);
+  --tg-hint-track: rgba(112, 117, 121, 0.4);
+  --tg-destructive-tint: rgba(229, 57, 53, 0.1);
+
+  /*
+   * Elevation, kept deliberately shallow.
+   *
+   * Telegram's own surfaces are flat; a Mini App with material-style drop
+   * shadows announces itself as a web page embedded in a chat client. These are
+   * just enough to lift a card off the ground and to seat a pressed row.
+   */
+  --panel-shadow-card: 0 1px 2px rgb(0 0 0 / 4%);
+  --panel-shadow-raised: 0 4px 16px rgb(0 0 0 / 10%);
+
+  /* One motion duration, one curve. Anything that animates uses these, so the
+     whole panel moves at one speed instead of each component picking its own. */
+  --panel-motion: 160ms;
+  --panel-ease: cubic-bezier(0.2, 0, 0.2, 1);
 }
 
 html,
@@ -30,35 +83,105 @@ body,
 
 body {
   margin: 0;
-  background: var(--tg-bg);
+  background: var(--panel-ground);
   color: var(--tg-text);
   /* Telegram's own overscroll already bounces the webview; a second one inside
      the panel makes the whole sheet feel loose. */
   overscroll-behavior-y: none;
+  /* Telegram renders headings and labels at weights the default stack only
+     approximates; these two keep text from looking heavier than the client's. */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* A tap on a row should feel like the row, not like a browser highlighting a
+   link, and a long-press must not offer to select the label text. */
+button,
+[role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /*
+   * Honour the system setting rather than animating anyway. The panel's motion
+   * is decorative — every transition here has a static end state that is just
+   * as usable — so there is nothing to preserve a reduced-motion fallback for.
+   */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer components {
-  /* The list-row look Telegram uses everywhere: grouped rows on a surface, hair-
-     line separators between them, nothing after the last one. */
+  /* The list-row look Telegram uses everywhere: grouped rows on a card, hairline
+     separators between them, nothing after the last one. */
   .tg-card {
-    @apply rounded-card bg-surface overflow-hidden;
+    @apply overflow-hidden rounded-card border border-card-border bg-card;
+    box-shadow: var(--panel-shadow-card);
   }
 
   .tg-row {
     @apply flex items-center gap-3 px-4 py-3 border-b border-separator last:border-b-0;
+    min-height: 48px; /* the tap target Telegram itself uses for a settings cell */
+  }
+
+  /* Only rows that actually do something react to a press. */
+  .tg-row-pressable {
+    @apply transition-colors;
+    transition-duration: var(--panel-motion);
+    transition-timing-function: var(--panel-ease);
+  }
+
+  .tg-row-pressable:active {
+    background-color: var(--panel-press);
   }
 
   .tg-input {
-    @apply w-full rounded-lg bg-bg px-3 py-2 text-[15px] outline-none
-           border border-separator focus:border-accent;
+    @apply w-full rounded-lg bg-ground px-3 py-2.5 text-[15px] outline-none
+           border border-separator transition-colors
+           focus:border-accent focus:ring-1 focus:ring-accent;
+    transition-duration: var(--panel-motion);
   }
 
   .tg-button {
     @apply w-full rounded-lg bg-accent px-4 py-3 text-[15px] font-medium
-           text-accent-text disabled:opacity-50;
+           text-accent-text transition-opacity disabled:opacity-50;
+    transition-duration: var(--panel-motion);
   }
 
+  .tg-button:active:not(:disabled) {
+    opacity: 0.7;
+  }
+
+  /*
+   * A group heading, in Telegram's own idiom: small, uppercase, hint-coloured,
+   * sitting on the ground above the card it introduces rather than inside it.
+   */
   .tg-section-title {
-    @apply px-4 pb-2 pt-5 text-[13px] uppercase tracking-wide text-hint;
+    @apply px-4 pb-2 pt-5 text-[13px] font-medium uppercase tracking-wide text-hint;
+  }
+
+  /*
+   * The loading placeholder. It pulses rather than sweeping a gradient: a sweep
+   * has to know how wide it is, and these stand in for rows of unknown width.
+   */
+  .tg-skeleton {
+    @apply rounded bg-hint-tint;
+    animation: tg-pulse 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes tg-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
   }
 }
