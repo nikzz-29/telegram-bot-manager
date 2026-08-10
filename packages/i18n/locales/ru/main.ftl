@@ -238,3 +238,35 @@ section-ai = AI
 section-crossban = Кросс-бан
 
 api-status = API работает
+
+## Тарифы и платежи
+plan-free = Free
+plan-pro = Pro
+plan-business = Business
+plan-white_label = White Label
+
+billing-invoice-title = Подписка {$plan}
+billing-invoice-description = Тариф {$plan} для этого чата на {$months ->
+        [one] {$months} месяц
+        [few] {$months} месяца
+       *[other] {$months} месяцев
+    }.
+billing-payment-received = Платёж получен. Тариф {$plan} активен до {$until}.
+billing-payment-replayed = Этот платёж уже был зачтён — подписка не изменилась.
+
+billing-reminder-title = Подписка скоро закончится
+billing-reminder-body = Тариф {$plan} в чате «{$chat}» закончится {$until} — это через {$days ->
+        [one] {$days} день
+        [few] {$days} дня
+       *[other] {$days} дней
+    }. Продлите подписку, чтобы платные модули продолжили работать.
+billing-reminder-button = Продлить подписку
+
+billing-grace-title = Подписка закончилась
+billing-grace-body = Тариф {$plan} в чате «{$chat}» закончился. Платные модули работают ещё {$days ->
+        [one] {$days} день
+        [few] {$days} дня
+       *[other] {$days} дней
+    } — до {$until}. После этого чат перейдёт на Free.
+billing-downgraded-title = Чат переведён на Free
+billing-downgraded-body = Подписка в чате «{$chat}» не была продлена, поэтому платные модули отключены. Настройки сохранены и вернутся сразу после оплаты.

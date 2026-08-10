@@ -239,3 +239,32 @@ section-ai = AI
 section-crossban = Cross-ban
 
 api-status = API is healthy
+
+## Plans and payments
+plan-free = Free
+plan-pro = Pro
+plan-business = Business
+plan-white_label = White Label
+
+billing-invoice-title = {$plan} subscription
+billing-invoice-description = {$plan} plan for this chat, {$months ->
+        [one] {$months} month
+       *[other] {$months} months
+    }.
+billing-payment-received = Payment received. {$plan} is active until {$until}.
+billing-payment-replayed = This payment was already credited — nothing changed.
+
+billing-reminder-title = Your subscription ends soon
+billing-reminder-body = The {$plan} plan for "{$chat}" ends on {$until}, in {$days ->
+        [one] {$days} day
+       *[other] {$days} days
+    }. Renew it to keep the paid modules running.
+billing-reminder-button = Renew subscription
+
+billing-grace-title = Subscription ended
+billing-grace-body = The {$plan} plan for "{$chat}" has ended. Paid modules keep working for {$days ->
+        [one] {$days} more day
+       *[other] {$days} more days
+    }, until {$until}. After that the chat moves to Free.
+billing-downgraded-title = Chat moved to Free
+billing-downgraded-body = The subscription for "{$chat}" was not renewed, so the paid modules are off. Your settings are kept and come back the moment you pay.
