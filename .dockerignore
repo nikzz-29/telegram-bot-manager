@@ -1,5 +1,24 @@
+# Everything the build does not need. `.env` is the important one: it holds a
+# live bot token, and a copy baked into an image outlives any `docker rm`.
+.env
+.env.*
+!.env.example
+
 .git
+.github
 .venv
 node_modules
+dist
 __pycache__
+*.pyc
+.mypy_cache
 .pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# The panel is a static bundle deployed to Vercel, not part of any Python image.
+apps/miniapp
+
+PROMPT.md
+.vscode

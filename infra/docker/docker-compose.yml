@@ -1,3 +1,31 @@
+# The full stack: Postgres, Redis, the migration gate, and the three services.
+#
+# DECISION: `migrate` runs as a one-shot service the other three wait on, rather
+# than as an entrypoint step in each image. Three processes racing `alembic
+# upgrade head` against one database is a deadlock waiting for a slow migration;
+# one runs it, the rest start once it has exited cleanly.
+#
+# DECISION: the host ports are 5433 and 6380, not 5432 and 6379. A developer who
+# already runs Postgres locally should not have to stop it to run this stack, and
+# the same offsets are what `.env.example` points at.
+name: tg-bot-manager
+
+x-service: &service
+  build:
+    context: ../..
+    dockerfile: infra/docker/Dockerfile
+  env_file: [../../.env]
+  environment:
+    # Inside the network the services reach each other by name on the default
+    # ports; the host-side offsets above do not apply here.
+    DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/tg_manager
+    REDIS_URL: redis://redis:6379/0
+  restart: unless-stopped
+  depends_on:
+    postgres: {condition: service_healthy}
+    redis: {condition: service_healthy}
+    migrate: {condition: service_completed_successfully}
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -5,59 +33,70 @@ services:
       POSTGRES_DB: tg_manager
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-    # Host port 5433 avoids clashing with a locally installed Postgres on 5432.
     ports: ["5433:5432"]
     volumes: ["postgres_data:/var/lib/postgresql/data"]
+    restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d tg_manager"]
       interval: 5s
       timeout: 3s
       retries: 10
+
   redis:
     image: redis:7-alpine
+    # ARQ's queues and the sender's rate-limit buckets both live here. The
+    # buckets are rebuildable, the queued jobs are not, so the data is persisted.
+    command: ["redis-server", "--appendonly", "yes"]
     ports: ["6380:6379"]
+    volumes: ["redis_data:/data"]
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 10
+
+  migrate:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      target: migrate
+    env_file: [../../.env]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/tg_manager
+    # One shot: it exits, and the gate above opens.
+    restart: "no"
+    depends_on:
+      postgres: {condition: service_healthy}
+
   api:
+    <<: *service
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile
       target: api
-    env_file: [../../.env]
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/tg_manager
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      postgres: {condition: service_healthy}
-      redis: {condition: service_healthy}
     ports: ["8000:8000"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request as r; r.urlopen('http://localhost:8000/api/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   bot:
+    <<: *service
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile
       target: bot
-    env_file: [../../.env]
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/tg_manager
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      postgres: {condition: service_healthy}
-      redis: {condition: service_healthy}
+
   worker:
+    <<: *service
     build:
       context: ../..
       dockerfile: infra/docker/Dockerfile
       target: worker
-    env_file: [../../.env]
-    environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/tg_manager
-      REDIS_URL: redis://redis:6379/0
-    depends_on:
-      postgres: {condition: service_healthy}
-      redis: {condition: service_healthy}
 
 volumes:
   postgres_data:
+  redis_data:
