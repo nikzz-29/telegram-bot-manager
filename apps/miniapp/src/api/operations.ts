@@ -6,10 +6,19 @@
  */
 import {
   type AuthUser,
+  type BroadcastRequest,
   type ChatDetail,
   type ChatSummary,
+  type GlobalBanCreate,
+  type GlobalBanEntry,
+  type InvoiceRequest,
+  type InvoiceResponse,
   type MetaResponse,
   type ModuleConfigResponse,
+  type OperationResult,
+  type PaymentEntry,
+  type PlanCatalog,
+  type PlatformStats,
   type PostCreate,
   type PostEntry,
   type PostUpdate,
@@ -243,4 +252,73 @@ export async function adjustReputation(
       body: { delta },
     }),
   );
+}
+
+// --- billing ---------------------------------------------------------------
+/** Plans this chat can move to, priced, with the one it is on right now. */
+export async function fetchPlans(chatId: number): Promise<PlanCatalog> {
+  return unwrap(
+    await client.GET("/api/chats/{chat_id}/plans", {
+      params: { path: { chat_id: chatId } },
+    }),
+  );
+}
+
+/**
+ * Ask the API to create an invoice.
+ *
+ * The panel never talks to a payment provider itself: the amount, the payload
+ * and the signature are the server's to decide, or a client could name its own
+ * price for a Business subscription.
+ */
+export async function createInvoice(
+  chatId: number,
+  body: InvoiceRequest,
+): Promise<InvoiceResponse> {
+  return unwrap(
+    await client.POST("/api/chats/{chat_id}/invoice", {
+      params: { path: { chat_id: chatId } },
+      body,
+    }),
+  );
+}
+
+export async function fetchPayments(chatId: number): Promise<PaymentEntry[]> {
+  return unwrap(
+    await client.GET("/api/chats/{chat_id}/payments", {
+      params: { path: { chat_id: chatId } },
+    }),
+  );
+}
+
+// --- platform operator -----------------------------------------------------
+export async function fetchPlatformStats(): Promise<PlatformStats> {
+  return unwrap(await client.GET("/api/platform/stats", {}));
+}
+
+export async function fetchGlobalBans(
+  options: { activeOnly?: boolean; limit?: number } = {},
+): Promise<GlobalBanEntry[]> {
+  return unwrap(
+    await client.GET("/api/platform/bans", {
+      params: { query: { active_only: options.activeOnly, limit: options.limit } },
+    }),
+  );
+}
+
+export async function createGlobalBan(body: GlobalBanCreate): Promise<GlobalBanEntry> {
+  return unwrap(await client.POST("/api/platform/bans", { body }));
+}
+
+export async function revokeGlobalBan(tgUserId: number): Promise<OperationResult> {
+  return unwrap(
+    await client.DELETE("/api/platform/bans/{tg_user_id}", {
+      params: { path: { tg_user_id: tgUserId } },
+    }),
+  );
+}
+
+/** Queues the fan-out on the worker; the response is the queued chat count. */
+export async function sendBroadcast(body: BroadcastRequest): Promise<OperationResult> {
+  return unwrap(await client.POST("/api/platform/broadcast", { body }));
 }

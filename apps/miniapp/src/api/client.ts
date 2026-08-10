@@ -30,10 +30,22 @@ export type TriggerUpdate = Schemas["TriggerUpdate"];
 export type PostEntry = Schemas["PostEntry"];
 export type PostCreate = Schemas["PostCreate"];
 export type PostUpdate = Schemas["PostUpdate"];
+export type ScheduleKind = Schemas["ScheduleKind"];
 export type StatsOverview = Schemas["StatsOverview"];
 export type StatPoint = Schemas["StatPoint"];
 export type TopUser = Schemas["TopUser"];
 export type ReputationEntry = Schemas["ReputationEntry"];
+export type PlanCatalog = Schemas["PlanCatalog"];
+export type PlanOption = Schemas["PlanOption"];
+export type InvoiceRequest = Schemas["InvoiceRequest"];
+export type InvoiceResponse = Schemas["InvoiceResponse"];
+export type PaymentEntry = Schemas["PaymentEntry"];
+export type PaymentProvider = Schemas["PaymentProvider"];
+export type PlatformStats = Schemas["PlatformStats"];
+export type GlobalBanEntry = Schemas["GlobalBanEntry"];
+export type GlobalBanCreate = Schemas["GlobalBanCreate"];
+export type BroadcastRequest = Schemas["BroadcastRequest"];
+export type OperationResult = Schemas["OperationResult"];
 
 /** Empty in dev (Vite proxies `/api`); the deployed panel points at the API host. */
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
