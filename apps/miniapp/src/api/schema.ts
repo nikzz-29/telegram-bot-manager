@@ -250,6 +250,174 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chats/{chat_id}/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every trigger rule in a chat
+         * @description Disabled rules included — the panel renders them with the switch off.
+         */
+        get: operations["listTriggers"];
+        put?: never;
+        /** Add a trigger rule */
+        post: operations["createTrigger"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/triggers/{trigger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One trigger rule */
+        get: operations["getTrigger"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a trigger rule
+         * @description Not plan-gated: a downgraded chat must still be able to clear its rules.
+         */
+        delete: operations["deleteTrigger"];
+        options?: never;
+        head?: never;
+        /** Change a trigger rule */
+        patch: operations["updateTrigger"];
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/posts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every scheduled post in a chat
+         * @description Disabled posts included — the panel renders them with the switch off.
+         */
+        get: operations["listPosts"];
+        put?: never;
+        /** Schedule a new post */
+        post: operations["createPost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/posts/{post_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One scheduled post */
+        get: operations["getPost"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete a scheduled post
+         * @description Not plan-gated: a downgraded chat must still be able to clear its posts.
+         */
+        delete: operations["deletePost"];
+        options?: never;
+        head?: never;
+        /**
+         * Change a scheduled post
+         * @description Any write recomputes the next fire, not only one that moved the schedule.
+         *
+         *     A one-shot may have come due while the panel was open, and a post being
+         *     re-enabled needs its job back; recomputing unconditionally is cheaper than
+         *     reasoning about which field combinations imply a re-arm.
+         */
+        patch: operations["updatePost"];
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activity totals, series and top users for a chat */
+        get: operations["getChatStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/reputation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reputation leaderboard for a chat */
+        get: operations["listReputation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/reputation/{tg_user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One member's reputation and level */
+        get: operations["getReputation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/reputation/{tg_user_id}/adjust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add to or subtract from a member's reputation
+         * @description A relative delta, not an absolute score.
+         *
+         *     DECISION: the panel sends `+5`/`-5` rather than the new total. Two admins
+         *     correcting the same farmed score at once would otherwise overwrite each
+         *     other; a delta applied by the database composes, whichever order it lands in.
+         */
+        post: operations["adjustReputation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -498,6 +666,98 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /** PostCreate */
+        PostCreate: {
+            /**
+             * Title
+             * @default
+             */
+            title: string;
+            /** Content */
+            content: string;
+            /** Media File Id */
+            media_file_id?: string | null;
+            /** Buttons */
+            buttons?: components["schemas"]["TriggerButton"][];
+            /** @default daily */
+            schedule_kind: components["schemas"]["ScheduleKind"];
+            /** Schedule Value */
+            schedule_value: string;
+            /** Target Chat Id */
+            target_chat_id?: number | null;
+            /**
+             * Pin
+             * @default false
+             */
+            pin: boolean;
+            /**
+             * Delete Previous
+             * @default false
+             */
+            delete_previous: boolean;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** PostEntry */
+        PostEntry: {
+            /** Id */
+            id: number;
+            /** Title */
+            title: string;
+            /** Content */
+            content: string;
+            /** Media File Id */
+            media_file_id?: string | null;
+            /** Buttons */
+            buttons?: components["schemas"]["TriggerButton"][];
+            schedule_kind: components["schemas"]["ScheduleKind"];
+            /** Schedule Value */
+            schedule_value: string;
+            /** Target Chat Id */
+            target_chat_id?: number | null;
+            /** Next Run At */
+            next_run_at?: string | null;
+            /**
+             * Pin
+             * @default false
+             */
+            pin: boolean;
+            /**
+             * Delete Previous
+             * @default false
+             */
+            delete_previous: boolean;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** PostUpdate */
+        PostUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Content */
+            content?: string | null;
+            /** Media File Id */
+            media_file_id?: string | null;
+            /** Buttons */
+            buttons?: components["schemas"]["TriggerButton"][] | null;
+            schedule_kind?: components["schemas"]["ScheduleKind"] | null;
+            /** Schedule Value */
+            schedule_value?: string | null;
+            /** Target Chat Id */
+            target_chat_id?: number | null;
+            /** Pin */
+            pin?: boolean | null;
+            /** Delete Previous */
+            delete_previous?: boolean | null;
+            /** Enabled */
+            enabled?: boolean | null;
+        };
         /**
          * Problem
          * @description RFC7807-like error body returned by the API exception handler.
@@ -533,6 +793,187 @@ export interface components {
             context?: {
                 [key: string]: unknown;
             };
+        };
+        /**
+         * ReputationAdjust
+         * @description A manual correction, expressed as a delta so concurrent edits compose.
+         */
+        ReputationAdjust: {
+            /** Delta */
+            delta: number;
+        };
+        /** ReputationEntry */
+        ReputationEntry: {
+            /** Tg User Id */
+            tg_user_id: number;
+            /** Points */
+            points: number;
+            /** Level */
+            level: number;
+            /** Username */
+            username?: string | null;
+            /** Display Name */
+            display_name?: string | null;
+        };
+        /**
+         * ScheduleKind
+         * @enum {string}
+         */
+        ScheduleKind: "once" | "daily" | "cron";
+        /** StatPoint */
+        StatPoint: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /**
+             * Messages
+             * @default 0
+             */
+            messages: number;
+            /**
+             * Active Users
+             * @default 0
+             */
+            active_users: number;
+            /**
+             * Joins
+             * @default 0
+             */
+            joins: number;
+            /**
+             * Leaves
+             * @default 0
+             */
+            leaves: number;
+            /**
+             * Moderation Actions
+             * @default 0
+             */
+            moderation_actions: number;
+        };
+        /** StatsOverview */
+        StatsOverview: {
+            /** Period Days */
+            period_days: number;
+            /** Total Messages */
+            total_messages: number;
+            /** Total Active Users */
+            total_active_users: number;
+            /** Total Joins */
+            total_joins: number;
+            /** Total Leaves */
+            total_leaves: number;
+            /** Net Growth */
+            net_growth: number;
+            /** Series */
+            series?: components["schemas"]["StatPoint"][];
+            /** Top Users */
+            top_users?: components["schemas"]["TopUser"][];
+        };
+        /** TopUser */
+        TopUser: {
+            /** Tg User Id */
+            tg_user_id: number;
+            /** Messages */
+            messages: number;
+            /** Username */
+            username?: string | null;
+            /** Display Name */
+            display_name?: string | null;
+        };
+        /** TriggerButton */
+        TriggerButton: {
+            /** Text */
+            text: string;
+            /** Url */
+            url: string;
+        };
+        /** TriggerCreate */
+        TriggerCreate: {
+            /** Pattern */
+            pattern: string;
+            /** @default contains */
+            match: components["schemas"]["TriggerMatch"];
+            /** Response */
+            response: string;
+            /** Media File Id */
+            media_file_id?: string | null;
+            /** Buttons */
+            buttons?: components["schemas"]["TriggerButton"][];
+            /**
+             * Case Sensitive
+             * @default false
+             */
+            case_sensitive: boolean;
+            /**
+             * Delete Trigger
+             * @default false
+             */
+            delete_trigger: boolean;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+        };
+        /** TriggerEntry */
+        TriggerEntry: {
+            /** Id */
+            id: number;
+            /** Pattern */
+            pattern: string;
+            match: components["schemas"]["TriggerMatch"];
+            /** Response */
+            response: string;
+            /** Media File Id */
+            media_file_id?: string | null;
+            /** Buttons */
+            buttons?: components["schemas"]["TriggerButton"][];
+            /**
+             * Case Sensitive
+             * @default false
+             */
+            case_sensitive: boolean;
+            /**
+             * Delete Trigger
+             * @default false
+             */
+            delete_trigger: boolean;
+            /**
+             * Enabled
+             * @default true
+             */
+            enabled: boolean;
+            /**
+             * Hits
+             * @default 0
+             */
+            hits: number;
+        };
+        /**
+         * TriggerMatch
+         * @enum {string}
+         */
+        TriggerMatch: "exact" | "contains" | "regex";
+        /** TriggerUpdate */
+        TriggerUpdate: {
+            /** Pattern */
+            pattern?: string | null;
+            match?: components["schemas"]["TriggerMatch"] | null;
+            /** Response */
+            response?: string | null;
+            /** Media File Id */
+            media_file_id?: string | null;
+            /** Buttons */
+            buttons?: components["schemas"]["TriggerButton"][] | null;
+            /** Case Sensitive */
+            case_sensitive?: boolean | null;
+            /** Delete Trigger */
+            delete_trigger?: boolean | null;
+            /** Enabled */
+            enabled?: boolean | null;
         };
     };
     responses: never;
@@ -1230,6 +1671,950 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModuleConfigResponse"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listTriggers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerEntry"][];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerEntry"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Trigger id, unique per chat. */
+                trigger_id: number;
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerEntry"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deleteTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Trigger id, unique per chat. */
+                trigger_id: number;
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationResult"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateTrigger: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Trigger id, unique per chat. */
+                trigger_id: number;
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerEntry"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listPosts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostEntry"][];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    createPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostEntry"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getPost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Post id, unique per chat. */
+                post_id: number;
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostEntry"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    deletePost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Post id, unique per chat. */
+                post_id: number;
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationResult"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updatePost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Post id, unique per chat. */
+                post_id: number;
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PostUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostEntry"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getChatStats: {
+        parameters: {
+            query?: {
+                /** @description Window length in days */
+                days?: number;
+            };
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatsOverview"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listReputation: {
+        parameters: {
+            query?: {
+                limit?: number;
+                order_by?: string;
+            };
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReputationEntry"][];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getReputation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Telegram user id. */
+                tg_user_id: number;
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReputationEntry"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The chat's plan does not include this feature. */
+            402: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    adjustReputation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Telegram user id. */
+                tg_user_id: number;
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReputationAdjust"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReputationEntry"];
                 };
             };
             /** @description Session token missing, malformed or expired. */

@@ -10,6 +10,14 @@ import {
   type ChatSummary,
   type MetaResponse,
   type ModuleConfigResponse,
+  type PostCreate,
+  type PostEntry,
+  type PostUpdate,
+  type ReputationEntry,
+  type StatsOverview,
+  type TriggerCreate,
+  type TriggerEntry,
+  type TriggerUpdate,
   client,
   setSessionToken,
   unwrap,
@@ -114,6 +122,125 @@ export async function syncAdmins(chatId: number): Promise<void> {
   unwrap(
     await client.POST("/api/chats/{chat_id}/admins/sync", {
       params: { path: { chat_id: chatId } },
+    }),
+  );
+}
+
+// --- triggers --------------------------------------------------------------
+export async function fetchTriggers(chatId: number): Promise<TriggerEntry[]> {
+  return unwrap(
+    await client.GET("/api/chats/{chat_id}/triggers", {
+      params: { path: { chat_id: chatId } },
+    }),
+  );
+}
+
+export async function createTrigger(
+  chatId: number,
+  body: TriggerCreate,
+): Promise<TriggerEntry> {
+  return unwrap(
+    await client.POST("/api/chats/{chat_id}/triggers", {
+      params: { path: { chat_id: chatId } },
+      body,
+    }),
+  );
+}
+
+export async function updateTrigger(
+  chatId: number,
+  triggerId: number,
+  body: TriggerUpdate,
+): Promise<TriggerEntry> {
+  return unwrap(
+    await client.PATCH("/api/chats/{chat_id}/triggers/{trigger_id}", {
+      params: { path: { chat_id: chatId, trigger_id: triggerId } },
+      body,
+    }),
+  );
+}
+
+export async function deleteTrigger(chatId: number, triggerId: number): Promise<void> {
+  unwrap(
+    await client.DELETE("/api/chats/{chat_id}/triggers/{trigger_id}", {
+      params: { path: { chat_id: chatId, trigger_id: triggerId } },
+    }),
+  );
+}
+
+// --- scheduled posts -------------------------------------------------------
+export async function fetchPosts(chatId: number): Promise<PostEntry[]> {
+  return unwrap(
+    await client.GET("/api/chats/{chat_id}/posts", {
+      params: { path: { chat_id: chatId } },
+    }),
+  );
+}
+
+export async function createPost(chatId: number, body: PostCreate): Promise<PostEntry> {
+  return unwrap(
+    await client.POST("/api/chats/{chat_id}/posts", {
+      params: { path: { chat_id: chatId } },
+      body,
+    }),
+  );
+}
+
+export async function updatePost(
+  chatId: number,
+  postId: number,
+  body: PostUpdate,
+): Promise<PostEntry> {
+  return unwrap(
+    await client.PATCH("/api/chats/{chat_id}/posts/{post_id}", {
+      params: { path: { chat_id: chatId, post_id: postId } },
+      body,
+    }),
+  );
+}
+
+export async function deletePost(chatId: number, postId: number): Promise<void> {
+  unwrap(
+    await client.DELETE("/api/chats/{chat_id}/posts/{post_id}", {
+      params: { path: { chat_id: chatId, post_id: postId } },
+    }),
+  );
+}
+
+// --- statistics and reputation ---------------------------------------------
+/** `days` is a request, not a promise: the API clamps it to the plan's retention. */
+export async function fetchStats(chatId: number, days = 7): Promise<StatsOverview> {
+  return unwrap(
+    await client.GET("/api/chats/{chat_id}/stats", {
+      params: { path: { chat_id: chatId }, query: { days } },
+    }),
+  );
+}
+
+export async function fetchReputation(
+  chatId: number,
+  options: { limit?: number; orderBy?: string } = {},
+): Promise<ReputationEntry[]> {
+  return unwrap(
+    await client.GET("/api/chats/{chat_id}/reputation", {
+      params: {
+        path: { chat_id: chatId },
+        query: { limit: options.limit, order_by: options.orderBy },
+      },
+    }),
+  );
+}
+
+/** A signed delta, never an absolute score — see the API's own note on why. */
+export async function adjustReputation(
+  chatId: number,
+  tgUserId: number,
+  delta: number,
+): Promise<ReputationEntry> {
+  return unwrap(
+    await client.POST("/api/chats/{chat_id}/reputation/{tg_user_id}/adjust", {
+      params: { path: { chat_id: chatId, tg_user_id: tgUserId } },
+      body: { delta },
     }),
   );
 }

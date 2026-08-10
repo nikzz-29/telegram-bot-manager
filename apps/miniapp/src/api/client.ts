@@ -24,6 +24,16 @@ export type PlanMeta = Schemas["PlanMeta"];
 export type AuthUser = Schemas["AuthUser"];
 export type Problem = Schemas["Problem"];
 export type Plan = Schemas["Plan"];
+export type TriggerEntry = Schemas["TriggerEntry"];
+export type TriggerCreate = Schemas["TriggerCreate"];
+export type TriggerUpdate = Schemas["TriggerUpdate"];
+export type PostEntry = Schemas["PostEntry"];
+export type PostCreate = Schemas["PostCreate"];
+export type PostUpdate = Schemas["PostUpdate"];
+export type StatsOverview = Schemas["StatsOverview"];
+export type StatPoint = Schemas["StatPoint"];
+export type TopUser = Schemas["TopUser"];
+export type ReputationEntry = Schemas["ReputationEntry"];
 
 /** Empty in dev (Vite proxies `/api`); the deployed panel points at the API host. */
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
