@@ -10,11 +10,14 @@ import React, { useMemo, useState } from "react";
 import {
   Button,
   Card,
+  EmptyState,
   ErrorState,
+  Header,
+  Icon,
   Row,
   Screen,
   SectionTitle,
-  Spinner,
+  SkeletonRows,
   Toggle,
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
@@ -55,7 +58,14 @@ export function ModuleScreen({
   if (meta.isPending || modules.isPending) {
     return (
       <Screen>
-        <Spinner />
+        {/*
+         * DECISION: a row skeleton rather than the spinner, even though this
+         * screen is a form. What arrives is a stack of grouped cells — the form
+         * is spelled as a settings list, not as labelled inputs — so rows are an
+         * honest description of the shape, and the page does not jump when the
+         * schema resolves.
+         */}
+        <SkeletonRows count={5} />
       </Screen>
     );
   }
@@ -70,12 +80,26 @@ export function ModuleScreen({
   const config = draft ?? state.config;
   const dirty = draft !== null;
   const locked = !state.available;
+  const plan = t(`plan-${spec.required_plan}`);
 
   return (
     <Screen>
-      <SectionTitle>{t(spec.title_key)}</SectionTitle>
+      {/* The registry names the glyph server-side, so a module added after this
+          build ships still opens under its own icon. */}
+      <Header
+        title={t(spec.title_key)}
+        subtitle={t(spec.description_key)}
+        icon={spec.icon}
+      />
+
+      {/*
+       * DECISION: the master switch gets a card to itself, above every group. It
+       * used to be the second row of a two-row list, spelled identically to the
+       * settings it governs — but turning the module off makes the whole rest of
+       * the screen moot, so it has to read as the decision the others hang from
+       * rather than as one more of them.
+       */}
       <Card>
-        <Row title={t(spec.description_key)} />
         <Row
           title={t("module-enabled")}
           right={
@@ -95,10 +119,21 @@ export function ModuleScreen({
 
       {locked ? (
         <Card className="mt-4">
-          <Row
-            title={t("module-locked", { plan: t(`plan-${spec.required_plan}`) })}
-            subtitle={t("module-locked-cta", { plan: t(`plan-${spec.required_plan}`) })}
-          />
+          {/*
+           * DECISION: a locked module is drawn as a state, not as a grey row of
+           * text. Nothing has failed here — the module exists and this chat's
+           * plan does not reach it — so it takes the shield and a centred
+           * sentence, the shape of a door, rather than the shape of an error.
+           *
+           * DECISION: the upsell stays text rather than becoming a button. A
+           * button would have to open the billing screen, and this screen does
+           * not navigate — giving it the look of one without the push behind it
+           * is a worse lie than the plain sentence it replaced.
+           */}
+          <EmptyState icon="shield" text={t("module-locked", { plan })} />
+          <p className="px-6 pb-8 text-center text-label text-hint">
+            {t("module-locked-cta", { plan })}
+          </p>
         </Card>
       ) : (
         <>
@@ -139,10 +174,17 @@ export function ModuleScreen({
               {save.isPending ? t("panel-saving") : t("panel-save")}
             </Button>
             {save.isError && (
-              <p className="text-center text-[13px] text-destructive">
-                {save.error.message}
-              </p>
+              <p className="text-center text-label text-destructive">{save.error.message}</p>
             )}
+          </div>
+
+          {/*
+           * DECISION: reset sits in its own block below the save stack instead of
+           * directly under it. It discards every field on the screen at once, and
+           * a destructive control one thumb-width from the primary one is exactly
+           * how that gets tapped by mistake.
+           */}
+          <div className="mt-8">
             <Button
               variant="destructive"
               disabled={reset.isPending}
@@ -159,7 +201,10 @@ export function ModuleScreen({
                 });
               }}
             >
-              {t("module-reset")}
+              <span className="inline-flex items-center justify-center gap-2">
+                <Icon name="trash" size={18} />
+                {t("module-reset")}
+              </span>
             </Button>
           </div>
         </>
