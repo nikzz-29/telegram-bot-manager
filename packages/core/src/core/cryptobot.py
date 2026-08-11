@@ -13,6 +13,14 @@ DECISION: an unconfigured token is not an error at import — the platform is
 perfectly usable on Stars alone, and CI has no CryptoBot credentials. It becomes
 `ProviderUnavailableError` at the moment someone actually asks for a crypto
 invoice, which is where the caller can turn it into a 503 the panel can render.
+
+DECISION: the network (live or test) is chosen from configuration rather than by
+constructing a second client. Crypto Pay's test host is a full copy of the API
+reachable with a token from @CryptoTestnetBot, so the only difference worth
+modelling is the base URL — everything below this module, the webhook signature
+check included, behaves identically. `Settings._refuse_unsafe_production_config`
+is what stops a test-host deployment from reaching real users: there, an invoice
+settles a subscription against play money.
 """
 
 from __future__ import annotations
@@ -59,13 +67,39 @@ class CryptoInvoice:
 class CryptoBotClient:
     """Thin, testable seam over `aiocryptopay`."""
 
-    def __init__(self, token: str | None = None) -> None:
+    def __init__(self, token: str | None = None, *, testnet: bool | None = None) -> None:
         self._token = token
+        self._testnet = testnet
         self._client: AioCryptoPay | None = None
 
     @property
     def configured(self) -> bool:
         return bool(self._token or get_settings().cryptobot_token)
+
+    @property
+    def testnet(self) -> bool:
+        """Whether invoices are opened against Crypto Pay's test host.
+
+        Settings are read here rather than in `__init__` because the module-level
+        `cryptobot` singleton is built at import time, before `.env` is
+        necessarily loaded, and because the test suite swaps settings per case.
+        """
+        if self._testnet is not None:
+            return self._testnet
+        return get_settings().cryptobot_testnet
+
+    @property
+    def network(self) -> str:
+        """The Crypto Pay base URL this client talks to.
+
+        Public because it is the one thing worth reading back: a token issued for
+        one network is refused by the other, and the failure — an unauthorised
+        response to `createInvoice` — says nothing about which of the two is
+        wrong. It is logged when the session opens and reported to the operator.
+        """
+        from aiocryptopay import Networks
+
+        return str(Networks.TEST_NET if self.testnet else Networks.MAIN_NET)
 
     def _api(self) -> AioCryptoPay:
         if self._client is not None:
@@ -75,7 +109,9 @@ class CryptoBotClient:
             raise ProviderUnavailableError("CryptoBot is not configured.")
         from aiocryptopay import AioCryptoPay
 
-        self._client = AioCryptoPay(token)
+        network = self.network
+        logger.info("cryptobot.client_opened", testnet=self.testnet, network=network)
+        self._client = AioCryptoPay(token, network=network)
         return self._client
 
     async def create_invoice(

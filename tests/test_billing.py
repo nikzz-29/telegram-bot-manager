@@ -27,17 +27,21 @@ import hmac
 import json
 from typing import Any
 
+from aiocryptopay import Networks
 import httpx
+from pydantic import ValidationError
 import pytest
 
 from api.app import create_app
 from api.routers import billing as billing_router
 from core import billing as billing_module
 from core import cache
+from core import cryptobot as cryptobot_module
 from core.billing import InvoicePayload, billing, price_for, term_end
 from core.cryptobot import PAID_STATUS, SIGNATURE_HEADER, CryptoBotClient
 from core.features import effective_plan, in_grace_period
 from db.models import Chat, Payment
+from shared.config import Settings
 from shared.enums import ChatType, PaymentProvider, PaymentStatus, Plan
 from shared.errors import PaymentError
 from shared.plans import (
@@ -407,8 +411,53 @@ def test_the_catalog_reports_the_effective_plan_during_grace() -> None:
     assert billing.catalog(chat, now=NOW).current_plan is Plan.PRO
 
 
-# --- the Crypto Pay webhook -----------------------------------------------------
+# --- the Crypto Pay network -----------------------------------------------------
+#
+# The test host is a byte-for-byte copy of the API behind a different base URL,
+# and a token is issued for exactly one of the two. Point them at each other and
+# every invoice fails with an unauthorised response that names neither — so the
+# wiring is asserted here instead of discovered in production.
 CRYPTO_TOKEN = "12345:test-crypto-pay-token"
+
+
+def test_invoices_go_to_the_live_host_by_default() -> None:
+    assert CryptoBotClient(CRYPTO_TOKEN, testnet=False).network == Networks.MAIN_NET
+
+
+def test_the_testnet_flag_moves_invoices_to_the_test_host() -> None:
+    assert CryptoBotClient(CRYPTO_TOKEN, testnet=True).network == Networks.TEST_NET
+
+
+def test_the_network_follows_settings_when_the_caller_says_nothing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The process-wide singleton is built at import time, before `.env` is read.
+
+    So the flag has to be consulted per call rather than captured in `__init__`,
+    and this is the test that fails if it ever moves back into the constructor.
+    """
+    monkeypatch.setattr(
+        cryptobot_module,
+        "get_settings",
+        lambda: Settings(cryptobot_testnet=True, _env_file=None),
+    )
+    assert CryptoBotClient(CRYPTO_TOKEN).network == Networks.TEST_NET
+
+
+def test_testnet_cannot_reach_production() -> None:
+    """A test invoice settles in play money but extends the plan for real."""
+    with pytest.raises(ValidationError, match="CRYPTOBOT_TESTNET"):
+        Settings(
+            app_env="production",
+            jwt_secret="x" * 43,
+            bot_token="123:fake",
+            cors_origins="https://panel.example.com",
+            cryptobot_testnet=True,
+            _env_file=None,
+        )
+
+
+# --- the Crypto Pay webhook -----------------------------------------------------
 
 
 def crypto_signature(body: bytes, *, token: str = CRYPTO_TOKEN) -> str:

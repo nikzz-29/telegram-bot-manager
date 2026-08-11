@@ -67,6 +67,12 @@ class Settings(BaseSettings):
 
     # --- payments ---
     cryptobot_token: str = ""
+    # Which Crypto Pay network the token belongs to. One flag rather than a second
+    # token variable: a token is issued for exactly one network (@CryptoBot for
+    # live, @CryptoTestnetBot for test), so two of them side by side would only
+    # create the mismatch where a live token is sent to the test host and every
+    # invoice fails with an unauthorised error nobody can place.
+    cryptobot_testnet: bool = False
     cryptobot_webhook_path: str = "/payments/cryptobot/webhook"
     payment_grace_days: int = 3
     payment_reminder_days: int = 3
@@ -131,6 +137,11 @@ class Settings(BaseSettings):
             # Telegram only delivers to HTTPS, and an empty base URL would make
             # `setWebhook` fail at startup with a much less obvious message.
             problems.append("WEBHOOK_BASE_URL must be an https:// URL when USE_WEBHOOK is on")
+        if self.cryptobot_testnet:
+            # Test-host invoices settle in play money, and `core.billing` cannot
+            # tell them apart: a paid webhook extends the plan either way. Left
+            # on in production it gives away every paid tier for free.
+            problems.append("CRYPTOBOT_TESTNET must be off in production")
 
         if problems:
             raise ValueError("Unsafe production configuration: " + "; ".join(problems))
