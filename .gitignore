@@ -3,6 +3,12 @@
 .env.*
 !.env.example
 
+# Database dumps. `docs/deploy.md` has you run `pg_dump` from the repository
+# root, and the result is every chat's data — the one file here that must not
+# reach a remote by accident.
+backup-*.sql
+backup-*.sql.gz
+
 # Python
 .venv/
 __pycache__/
