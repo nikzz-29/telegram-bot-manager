@@ -120,7 +120,8 @@ export function Row({
 }): React.JSX.Element {
   const navigates = onClick !== undefined && !disabled;
   const showChevron = navigates && (chevron ?? right === undefined);
-  const content = (
+  const hasTrailing = right !== undefined || showChevron;
+  const body = (
     <>
       {icon !== undefined && (
         <IconTile name={icon} tone={iconTone ?? (destructive ? "destructive" : "accent")} />
@@ -133,30 +134,96 @@ export function Row({
           <div className="mt-0.5 text-label leading-snug text-hint">{subtitle}</div>
         )}
       </div>
-      {(right !== undefined || showChevron) && (
-        <div className="flex shrink-0 items-center gap-1.5">
-          {right}
-          {showChevron && <Icon name="chevron" size={18} className="text-hint opacity-60" />}
-        </div>
-      )}
     </>
+  );
+  const trailing = hasTrailing && (
+    <div className="flex shrink-0 items-center gap-1.5">
+      {right}
+      {showChevron && <Icon name="chevron" size={18} className="text-hint opacity-60" />}
+    </div>
   );
 
   if (onClick === undefined) {
-    return <div className="tg-row">{content}</div>;
+    return (
+      <div className="tg-row">
+        {body}
+        {trailing}
+      </div>
+    );
   }
+  /*
+   * DECISION: the button covers the label, not the row. It used to wrap the
+   * whole cell including `right` — which put the module switch *inside* the
+   * navigating button, so one tap on the switch both flipped the module and
+   * pushed its screen. Nesting a control inside a button is also invalid HTML,
+   * and browsers are free to resolve that press either way.
+   *
+   * The negative margins give the label back the row's own padding, so the tap
+   * target is still the full height and reaches the left edge — it simply stops
+   * where the trailing control begins. The press tint following that boundary is
+   * the point: it shows which half of the row answers a tap.
+   */
   return (
-    <button
-      type="button"
-      disabled={disabled}
-      className="tg-row tg-row-pressable w-full text-left disabled:opacity-50"
-      onClick={() => {
-        haptic();
-        onClick();
-      }}
-    >
-      {content}
-    </button>
+    <div className="tg-row">
+      <button
+        type="button"
+        disabled={disabled}
+        className={`tg-row-pressable -my-3 flex min-w-0 flex-1 items-center gap-3 self-stretch py-3 text-left disabled:opacity-50 ${
+          hasTrailing ? "-ml-4 pl-4 pr-3" : "-mx-4 px-4"
+        }`}
+        onClick={() => {
+          haptic();
+          onClick();
+        }}
+      >
+        {body}
+      </button>
+      {trailing}
+    </div>
+  );
+}
+
+/**
+ * One choice out of N, drawn as a segmented control.
+ *
+ * DECISION: one tinted track with the chosen option raised out of it, rather
+ * than separate buttons. Three equal pills never read as one choice — the
+ * unselected ones look like further actions you could also take — and a
+ * segmented control says "pick exactly one of these" without a word. The
+ * selected state is `aria-pressed`, not a colour, so it survives without the
+ * accent too.
+ */
+export function SegmentedControl<T extends string | number>({
+  value,
+  onChange,
+  options,
+  disabled = false,
+}: {
+  value: T;
+  onChange: (value: T) => void;
+  options: ReadonlyArray<{ value: T; label: string }>;
+  disabled?: boolean;
+}): React.JSX.Element {
+  return (
+    <div className="flex gap-1 rounded-control bg-hint-tint p-1">
+      {options.map((option) => (
+        <button
+          key={option.value}
+          type="button"
+          aria-pressed={option.value === value}
+          disabled={disabled}
+          onClick={() => {
+            haptic();
+            onChange(option.value);
+          }}
+          className={`flex-1 rounded-[7px] px-3 py-1.5 text-label font-medium transition-colors duration-[--panel-motion] ease-panel disabled:opacity-50 ${
+            option.value === value ? "bg-card text-text shadow-card" : "text-hint"
+          }`}
+        >
+          {option.label}
+        </button>
+      ))}
+    </div>
   );
 }
 

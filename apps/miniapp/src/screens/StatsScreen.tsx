@@ -15,6 +15,7 @@ import {
   Row,
   Screen,
   SectionTitle,
+  SegmentedControl,
   SkeletonRows,
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
@@ -125,27 +126,14 @@ export function StatsScreen({ chatId }: { chatId: number }): React.JSX.Element {
       <Header title={t("stats-screen-title")} icon="chart" />
 
       <SectionTitle>{t("stats-range")}</SectionTitle>
-      {/*
-       * DECISION: one tinted track with the chosen range raised out of it, rather
-       * than three separate buttons. Three equal pills never read as one choice —
-       * the two unselected ones looked like further actions you could also take —
-       * and a segmented control says "pick exactly one of these" without a word.
-       */}
-      <div className="flex gap-1 rounded-control bg-hint-tint p-1">
-        {RANGES.map((range) => (
-          <button
-            key={range}
-            type="button"
-            aria-pressed={range === days}
-            onClick={() => setDays(range)}
-            className={`flex-1 rounded-[7px] px-3 py-1.5 text-label font-medium transition-colors duration-[--panel-motion] ease-panel ${
-              range === days ? "bg-card text-text shadow-card" : "text-hint"
-            }`}
-          >
-            {t(`stats-range-${range}`)}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        value={days}
+        onChange={setDays}
+        options={RANGES.map((range) => ({
+          value: range,
+          label: t(`stats-range-${range}`),
+        }))}
+      />
 
       {stats.isPending && <StatsSkeleton />}
       {stats.isError && (
