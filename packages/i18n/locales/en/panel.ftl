@@ -5,19 +5,13 @@
 # This file holds only what exists on screen and nowhere else.
 
 ## Shell
-panel-title = Bot manager
 panel-loading = Loading…
 panel-retry = Try again
 panel-save = Save
 panel-saving = Saving…
-panel-saved = Saved
 panel-cancel = Cancel
 panel-delete = Delete
-panel-add = Add
 panel-edit = Edit
-panel-close = Close
-panel-back = Back
-panel-empty = Nothing here yet
 panel-confirm-delete = Delete this permanently?
 panel-language = Language
 # Language names stay in their own language — a Russian speaker looking for the
@@ -206,7 +200,6 @@ triggers-match-contains = Contains
 triggers-match-regex = Regular expression
 triggers-case-sensitive = Case-sensitive
 triggers-delete-source = Delete the triggering message
-triggers-cooldown = Cooldown, seconds
 triggers-empty = No triggers yet. Add one to reply automatically to a keyword.
 
 ## Scheduled posts

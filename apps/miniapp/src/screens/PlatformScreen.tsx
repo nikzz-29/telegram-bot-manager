@@ -288,8 +288,14 @@ function Broadcast(): React.JSX.Element {
         >
           {broadcast.isPending ? t("panel-saving") : t("platform-broadcast-send")}
         </Button>
+        {/* `detail` carries the chat count as a bare string — rendering it raw
+            printed "47" under the button with nothing saying what 47 was. */}
         {broadcast.isSuccess && (
-          <p className="text-center text-label text-hint">{broadcast.data.detail}</p>
+          <p className="text-center text-label text-hint">
+            {t("platform-broadcast-queued", {
+              count: Number.parseInt(broadcast.data.detail, 10) || 0,
+            })}
+          </p>
         )}
         {broadcast.isError && (
           <p className="text-center text-label text-destructive">

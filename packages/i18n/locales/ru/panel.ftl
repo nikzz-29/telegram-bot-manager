@@ -5,19 +5,13 @@
 # переиспользуются оттуда. Здесь только то, чего больше нигде нет.
 
 ## Оболочка
-panel-title = Менеджер бота
 panel-loading = Загрузка…
 panel-retry = Повторить
 panel-save = Сохранить
 panel-saving = Сохраняем…
-panel-saved = Сохранено
 panel-cancel = Отмена
 panel-delete = Удалить
-panel-add = Добавить
 panel-edit = Изменить
-panel-close = Закрыть
-panel-back = Назад
-panel-empty = Пока пусто
 panel-confirm-delete = Удалить безвозвратно?
 panel-language = Язык
 # Названия языков остаются на своём языке — тот, кто ищет переключатель,
@@ -209,7 +203,6 @@ triggers-match-contains = Содержит
 triggers-match-regex = Регулярное выражение
 triggers-case-sensitive = Учитывать регистр
 triggers-delete-source = Удалять сообщение-триггер
-triggers-cooldown = Пауза, секунд
 triggers-empty = Триггеров пока нет. Добавьте первый, чтобы отвечать на ключевое слово автоматически.
 
 ## Отложенные посты

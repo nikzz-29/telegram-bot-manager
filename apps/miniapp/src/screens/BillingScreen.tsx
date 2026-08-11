@@ -107,7 +107,13 @@ function PlanCard({
   const t = useT();
   return (
     <>
+      {/* The plan name heads the block; the list under it needs its own heading
+          or the first row reads as the plan's own subtitle rather than as the
+          first of a dozen things the plan includes. */}
       <SectionTitle>{t(`plan-${option.plan}`)}</SectionTitle>
+      <p className="px-4 pb-1 text-caption uppercase tracking-wide text-hint">
+        {t("billing-features")}
+      </p>
       <Card>
         {option.features.map((feature) => (
           <Row
