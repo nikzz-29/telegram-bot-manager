@@ -22,7 +22,12 @@ from i18n.runtime import LOCALES_DIR, SUPPORTED_LOCALES, translator
 
 # `key = value` at the start of a line. Fluent attributes (`    .label = ...`)
 # and comments are indented or prefixed, so this matches messages only.
-_MESSAGE = re.compile(r"^([a-z][a-z0-9-]*)\s*=\s*(.+)$", re.MULTILINE)
+#
+# The character class includes `_` because Fluent identifiers allow it and one
+# key uses it (`plan-white_label`). Without it that key is invisible to every
+# test in this file — including the parity check, which is the one place a
+# locale quietly losing a key is supposed to be caught.
+_MESSAGE = re.compile(r"^([a-z][a-z0-9_-]*)\s*=\s*(.+)$", re.MULTILINE)
 
 # `{$placeholder}` — every argument a message expects from its caller.
 _PLACEABLE = re.compile(r"\{\s*\$([a-zA-Z_][a-zA-Z0-9_]*)\s*\}")
@@ -101,7 +106,7 @@ def test_code_only_uses_keys_that_exist() -> None:
     this covers the literal ones — which is where typos actually happen.
     """
     root = Path(__file__).resolve().parents[1]
-    call = re.compile(r"""\bt\(\s*["']([a-z][a-z0-9-]*)["']""")
+    call = re.compile(r"""\bt\(\s*["']([a-z][a-z0-9_-]*)["']""")
     defined = set(_messages("ru"))
 
     missing: set[str] = set()
