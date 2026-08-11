@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from pydantic import ValidationError
 import pytest
 
 from core import ai_moderation as ai_module
@@ -343,3 +344,52 @@ async def test_a_provider_outage_degrades_instead_of_raising(
     assert not decision.should_act
     assert not verdict_cache.store, "a failure must not be cached as a verdict"
     assert not redis.counters, "a failed call must not be charged for"
+
+
+# --- the config model: what the panel draws ------------------------------------
+
+
+def test_an_ok_entry_cannot_change_an_outcome() -> None:
+    """`ok` is inert by construction, so it is normalised out of both maps.
+
+    `_action_for` returns `NOTHING` for a non-actionable verdict before the maps
+    are consulted, so a threshold or action keyed `ok` can never fire. Keeping
+    the key would let a config carry settings that silently do nothing — and the
+    panel generates one row per key, which would draw a control with no effect.
+    """
+    parsed = AiModerationConfig.model_validate(
+        {
+            "thresholds": {"ok": 0.99, "scam": 0.9},
+            "actions": {"ok": ModerationAction.DELETE},
+        }
+    )
+    assert AiVerdictLabel.OK not in parsed.thresholds
+    assert AiVerdictLabel.OK not in parsed.actions
+    assert parsed.thresholds[AiVerdictLabel.SCAM] == 0.9
+
+
+def test_a_threshold_is_a_confidence_and_cannot_exit_the_unit_interval() -> None:
+    """A confidence the model can only ever answer in 0–1 is rejected past it.
+
+    The bound lives on the dict's value type so the generated form gets a
+    `min`/`max` from `additionalProperties`; without it the panel accepted `50`
+    for a threshold no verdict could clear.
+    """
+    with pytest.raises(ValidationError):
+        AiModerationConfig.model_validate({"thresholds": {"scam": 1.5}})
+
+
+def test_the_ai_map_schema_names_every_row_the_panel_will_draw() -> None:
+    """The panel derives its rows from `propertyNames.enum`; the schema has to
+    say which keys exist, and `ok` must not be one of them."""
+    schema = AiModerationConfig.model_json_schema()
+    keys = schema["properties"]["thresholds"]["propertyNames"]["enum"]
+    assert keys == ["toxic", "hidden_ad", "scam"]
+    assert schema["properties"]["thresholds"]["additionalProperties"] == {
+        "type": "number",
+        "minimum": 0.0,
+        "maximum": 1.0,
+    }
+    assert schema["properties"]["actions"]["additionalProperties"]["$ref"].endswith(
+        "ModerationAction"
+    )

@@ -82,7 +82,26 @@ def _rendered(
                 found.append((path, prop))
         elif prop.get("type") == "object" and prop.get("properties"):
             found.extend(_rendered(prop, defs, path))
+        elif prop.get("type") == "object":
+            found.extend(_map_rows(prop, defs, path))
     return found
+
+
+def _map_rows(
+    prop: dict[str, Any], defs: dict[str, Any], path: str
+) -> list[tuple[str, dict[str, Any]]]:
+    """A `dict[SomeEnum, V]`, as the one row per key the panel draws for it.
+
+    Only a closed key set qualifies: the panel needs to know every row before it
+    can render one, which `propertyNames.enum` is what tells it. An open-ended
+    map (`dict[str, str]`) has no generated form and no labels to check.
+    """
+    keys = prop.get("propertyNames", {}).get("enum")
+    value = prop.get("additionalProperties")
+    if keys is None or not isinstance(value, dict):
+        return []
+    resolved = _deref(value, defs)
+    return [(f"{path}.{key}", resolved) for key in keys]
 
 
 def _all_fields() -> list[tuple[str, dict[str, Any]]]:

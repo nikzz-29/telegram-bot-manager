@@ -90,6 +90,12 @@ settings-group-reputation = Reputation
 settings-group-levels = Levels
 settings-group-track = Tracking
 settings-group-report = Reports
+# The two AI moderation fields are maps keyed by the model's verdict, so the
+# panel draws one row per verdict. Each map gets its own heading: the rows are
+# named the same in both, and without a heading there is nothing to say which
+# one is the confidence and which one is the response.
+settings-group-thresholds = Confidence needed
+settings-group-actions = What to do when it clears
 
 ## Settings — enum choices
 option-nothing = Do nothing
@@ -172,6 +178,14 @@ setting-points-per-message = Points per message
 setting-triggers-enabled = Triggers enabled
 setting-sample-rate = Share of messages checked
 setting-min-text-length = Minimum length to check
+# One row per verdict the model can return. The labels are the verdicts
+# themselves; which map they belong to is what the group heading above says.
+setting-thresholds-toxic = Toxic
+setting-thresholds-hidden-ad = Hidden advertising
+setting-thresholds-scam = Scam
+setting-actions-toxic = Toxic
+setting-actions-hidden-ad = Hidden advertising
+setting-actions-scam = Scam
 setting-alert-chat-id = Alert chat ID
 setting-autoban-on-join = Ban listed users on join
 setting-alert-only = Alert instead of banning

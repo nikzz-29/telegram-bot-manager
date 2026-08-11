@@ -7,6 +7,8 @@ without a migration.
 
 from __future__ import annotations
 
+from typing import Annotated, Any, Final
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from shared.enums import (
@@ -154,25 +156,56 @@ class AutopostConfig(ModuleConfig):
     timezone: str = "UTC"
 
 
+# The keys either AI map may carry, named in the schema so the panel knows which
+# rows to draw — it generates one per key, and Pydantic on its own would emit a
+# `$ref` to the whole enum, `ok` included.
+#
+# `ok` is left out on purpose. `AiModerationService._action_for` returns `NOTHING`
+# for a non-actionable verdict before it consults either map, so an `ok` entry
+# cannot change an outcome; on screen it would be a threshold that does nothing
+# whatever it is set to.
+_VERDICT_KEYS: Final[dict[str, Any]] = {
+    "propertyNames": {
+        "enum": [label.value for label in AiVerdictLabel if label is not AiVerdictLabel.OK]
+    }
+}
+
+# A confidence, on the same 0–1 scale `parse_verdict` clamps the model's answer
+# to. Spelled on the value type so it reaches `additionalProperties` in the JSON
+# Schema, which is where the panel looks for a numeric field's bounds — left
+# unbounded, the form accepted `50` for a threshold no verdict could ever clear.
+Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
+
+
 class AiModerationConfig(ModuleConfig):
     enabled: bool = False
     sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
     min_text_length: int = Field(default=12, ge=1, le=4_000)
-    thresholds: dict[AiVerdictLabel, float] = Field(
+    thresholds: dict[AiVerdictLabel, Confidence] = Field(
         default_factory=lambda: {
             AiVerdictLabel.TOXIC: 0.85,
             AiVerdictLabel.HIDDEN_AD: 0.80,
             AiVerdictLabel.SCAM: 0.75,
-        }
+        },
+        json_schema_extra=_VERDICT_KEYS,
     )
     actions: dict[AiVerdictLabel, ModerationAction] = Field(
         default_factory=lambda: {
             AiVerdictLabel.TOXIC: ModerationAction.ALERT_ADMINS,
             AiVerdictLabel.HIDDEN_AD: ModerationAction.DELETE,
             AiVerdictLabel.SCAM: ModerationAction.DELETE_WARN,
-        }
+        },
+        json_schema_extra=_VERDICT_KEYS,
     )
     alert_chat_id: int | None = None
+
+    @field_validator("thresholds", "actions")
+    @classmethod
+    def _drop_inert_ok(cls, value: dict[AiVerdictLabel, Any]) -> dict[AiVerdictLabel, Any]:
+        """Normalise away an `ok` key rather than keep a setting with no effect."""
+        return {
+            label: setting for label, setting in value.items() if label is not AiVerdictLabel.OK
+        }
 
 
 class CrossbanConfig(ModuleConfig):

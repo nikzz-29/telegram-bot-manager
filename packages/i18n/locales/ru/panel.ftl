@@ -92,6 +92,12 @@ settings-group-reputation = Репутация
 settings-group-levels = Уровни
 settings-group-track = Учёт
 settings-group-report = Отчёты
+# Два поля ИИ-модерации — это словари, у которых ключ — вердикт модели. Панель
+# рисует по строке на вердикт, поэтому у каждого словаря свой заголовок: сами
+# строки в обоих называются одинаково, и без заголовка непонятно, где порог, а
+# где действие.
+settings-group-thresholds = Пороги уверенности
+settings-group-actions = Что делать при срабатывании
 
 ## Настройки — варианты выбора
 option-nothing = Ничего не делать
@@ -174,6 +180,14 @@ setting-points-per-message = Очков за сообщение
 setting-triggers-enabled = Триггеры включены
 setting-sample-rate = Доля проверяемых сообщений
 setting-min-text-length = Минимальная длина для проверки
+# По строке на вердикт модели. Подписи — сами вердикты: что это порог, а что
+# действие, говорит заголовок группы над ними.
+setting-thresholds-toxic = Токсичность
+setting-thresholds-hidden-ad = Скрытая реклама
+setting-thresholds-scam = Мошенничество
+setting-actions-toxic = Токсичность
+setting-actions-hidden-ad = Скрытая реклама
+setting-actions-scam = Мошенничество
 setting-alert-chat-id = ID чата для оповещений
 setting-autoban-on-join = Банить при входе
 setting-alert-only = Только оповещать, не банить

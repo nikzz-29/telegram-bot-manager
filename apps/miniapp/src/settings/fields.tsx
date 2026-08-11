@@ -30,6 +30,12 @@ const GROUP_PREFIXES: readonly string[] = [
   "report",
   "daily_report",
   "weekly_report",
+  // The two AI maps. Their rows share the same three labels in both, so each
+  // map needs a heading of its own to say which is the confidence and which is
+  // the response. `thresholds` and `actions` are also full property names, and
+  // the rows beneath them are its keys, so the head of the path is the map.
+  "thresholds",
+  "actions",
 ];
 
 /** Prefixes that name the same feature, folded onto one group. */

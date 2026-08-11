@@ -8,9 +8,19 @@
  * simply never appears. Generating means a new field shows up by existing.
  *
  * DECISION: what the generator cannot express, it declines to render rather than
- * guessing. `dict[AiVerdictLabel, float]` and the greeting's button list get
- * purpose-built editors elsewhere; here they are dropped, because a wrong widget
- * that writes a wrong shape is worse than an absent one.
+ * guessing. A wrong widget that writes a wrong shape is worse than an absent
+ * one. Two things fall in that hole today and are genuinely unreachable in the
+ * panel: the greeting's inline buttons (`list[InlineButton]`) and the level
+ * titles (`dict[str, str]`, open-ended keys). Both need a purpose-built editor
+ * that does not exist yet.
+ *
+ * A map whose keys are a *closed* enum is not in that hole, though it used to be
+ * treated as one: `dict[AiVerdictLabel, float]` names its key set in
+ * `propertyNames.enum` and its value type in `additionalProperties`, which is
+ * every ingredient needed to draw one row per member. That omission hid the two
+ * settings that decide what AI moderation actually does — the confidence each
+ * verdict needs, and what happens once it clears — leaving a screen that could
+ * turn the feature on but never say what it should do about anything.
  */
 
 export type FieldKind =
@@ -51,6 +61,8 @@ interface JsonSchema {
   maxLength?: number;
   title?: string;
   additionalProperties?: boolean | JsonSchema;
+  /** For a `dict[K, V]`: the schema its *keys* satisfy. */
+  propertyNames?: JsonSchema;
 }
 
 /** Long free text gets a textarea; these are the fields that deserve one. */
@@ -128,7 +140,27 @@ function describe(
     const children = fieldsOf(schema, defs, path);
     return children.length > 0 ? { ...base, kind: "nested", children } : null;
   }
-  // A free-form mapping (`dict[Label, float]`) — see the note at the top.
+  /*
+   * A map with a closed key set, expanded into one child per key.
+   *
+   * It is spelled as `nested` on purpose: the children carry real dotted paths
+   * (`thresholds.toxic`), so `readPath`/`writePath` reach into the map with no
+   * special case, and the form groups and renders them like any other subobject.
+   * The value schema is shared by every key, so each child is described from it
+   * once, under the key's own name.
+   */
+  if (schema.type === "object") {
+    const memberKeys = deref(schema.propertyNames ?? {}, defs).enum;
+    const value = schema.additionalProperties;
+    if (memberKeys === undefined || typeof value !== "object" || value === null) {
+      return null;
+    }
+    const children = memberKeys
+      .map((key) => describe(key, value, defs, path))
+      .filter((child): child is Field => child !== null);
+    return children.length > 0 ? { ...base, kind: "nested", children } : null;
+  }
+  // Anything left is a shape with no widget — see the note at the top.
   return null;
 }
 
