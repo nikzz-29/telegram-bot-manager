@@ -7,8 +7,8 @@
  * so the prefix is the grouping the author intended — recording it here costs one
  * table and saves adding UI metadata to every model field.
  */
-import React, { useState } from "react";
-import { Icon, Row, Toggle } from "../components/ui";
+import React from "react";
+import { PickerRow, Row, Toggle, VALUE_INPUT } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
 import type { Field } from "./schema";
 
@@ -140,18 +140,6 @@ export function outOfRange(field: Field, value: unknown): boolean {
   );
 }
 
-/**
- * An editable value on a settings row.
- *
- * DECISION: seated on the ground colour rather than left transparent. A bare
- * value flush against the card is indistinguishable from one the row is merely
- * stating — the whole form read as a list of facts, and nothing said which of
- * them could be typed into. This is the same treatment the scheduled-post editor
- * gives its time field.
- */
-const VALUE_INPUT =
-  "rounded-control bg-ground px-2.5 py-1.5 text-right text-row text-link outline-none disabled:opacity-50";
-
 export interface FieldProps {
   field: Field;
   value: unknown;
@@ -193,73 +181,26 @@ function NumberInput({ field, value, onChange, disabled }: FieldProps): React.JS
 /**
  * An enum, as a row that opens its options underneath itself.
  *
- * DECISION: not a native `<select>`. It is the one control on these screens that
- * could not be themed — it renders in the OS's own font and chrome, so a form of
- * Telegram-styled rows had a piece of Android or Safari sitting in the middle of
- * it. The two hand-written editors already replaced theirs for exactly this
- * reason; the generated form was the last place it survived.
- *
- * DECISION: it discloses in place rather than listing every option inline the way
- * those two editors do. They pick between three modes once; a module here can
- * carry several enums of five options each, and spelling them all out turns a
- * scannable form into a wall of radio rows. Collapsed, the row still states its
- * current value, which is what the reader came for.
+ * The disclosure itself is `PickerRow`; this only turns a `Field` into the
+ * options it takes. The general settings make the same choice over locales, and
+ * two copies of a rotating chevron and a checkmark column is one too many.
  */
 function EnumInput({ field, value, onChange, disabled }: FieldProps): React.JSX.Element {
   const t = useT();
-  const [open, setOpen] = useState(false);
-  const options = field.options ?? [];
   const current = typeof value === "string" ? value : "";
 
   return (
-    <>
-      <Row
-        title={t(labelKey(field))}
-        onClick={disabled ? undefined : () => setOpen(!open)}
-        right={
-          <>
-            <span className="text-row text-link">
-              {current === "" ? t("field-unset") : t(optionKey(current))}
-            </span>
-            {/* Hand-drawn rather than `Row`'s own chevron, because this one
-                turns: the row does not go anywhere, it opens, and a chevron that
-                stayed pointing right would promise a screen. */}
-            <Icon
-              name="chevron"
-              size={18}
-              className={`text-hint opacity-60 transition-transform duration-[--panel-motion] ease-panel ${
-                open ? "rotate-90" : ""
-              }`}
-            />
-          </>
-        }
-      />
-      {open && (
-        /* Recessed onto the ground, so the options read as belonging to the row
-           above them rather than as further settings of their own. */
-        <div className="bg-ground">
-          {options.map((option) => (
-            <Row
-              key={option}
-              title={t(optionKey(option))}
-              onClick={() => {
-                onChange(option);
-                setOpen(false);
-              }}
-              // Always rendered, merely hidden when unselected: it holds the
-              // column steady as the choice moves.
-              right={
-                <Icon
-                  name="check"
-                  size={18}
-                  className={option === current ? "text-accent" : "invisible"}
-                />
-              }
-            />
-          ))}
-        </div>
-      )}
-    </>
+    <PickerRow
+      title={t(labelKey(field))}
+      value={current}
+      disabled={disabled}
+      unsetLabel={t("field-unset")}
+      options={(field.options ?? []).map((option) => ({
+        value: option,
+        label: t(optionKey(option)),
+      }))}
+      onPick={(option) => onChange(option)}
+    />
   );
 }
 

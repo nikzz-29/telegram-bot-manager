@@ -24,6 +24,7 @@ import {
   SectionTitle,
   SkeletonRows,
   Toggle,
+  VALUE_INPUT,
 } from "../components/ui";
 import { useI18n, useT } from "../i18n/I18nProvider";
 import { useCreatePost, useDeletePost, usePosts, useUpdatePost } from "../hooks/queries";
@@ -147,7 +148,7 @@ function ScheduleInput({
           type={kind === "once" ? "datetime-local" : "time"}
           // Seated on the ground colour, so the value reads as something you can
           // tap and edit rather than as a stated fact like the rows above it.
-          className="rounded-control bg-ground px-2.5 py-1.5 text-right text-row text-link outline-none disabled:opacity-50"
+          className={VALUE_INPUT}
           value={value}
           disabled={disabled}
           onChange={(event) => onChange(event.target.value)}

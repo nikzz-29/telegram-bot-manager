@@ -227,6 +227,108 @@ export function SegmentedControl<T extends string | number>({
   );
 }
 
+/**
+ * An editable value sitting at the end of a row.
+ *
+ * DECISION: seated on the ground colour rather than left transparent. A bare
+ * value flush against the card is indistinguishable from one the row is merely
+ * stating — a form of them reads as a list of facts, with nothing saying which
+ * could be typed into. Shared because three screens had grown their own
+ * identical copy of this string.
+ */
+export const VALUE_INPUT =
+  "rounded-control bg-ground px-2.5 py-1.5 text-right text-row text-link outline-none disabled:opacity-50";
+
+/**
+ * One choice out of N, as a row that opens its options underneath itself.
+ *
+ * DECISION: this exists instead of a native `<select>`. A select is the one
+ * control in the panel that cannot be themed — it renders in the OS's own font
+ * and chrome, so a column of Telegram-styled rows had a piece of Android or
+ * Safari sitting in the middle of it. It also hides every option but one behind
+ * a tap, and gives no haptic, because the press never reaches our code.
+ *
+ * DECISION: it discloses in place rather than listing the options inline the way
+ * `SegmentedControl` and the two hand-written mode pickers do. Those choose
+ * between three short labels once; this is for lists that are longer than that
+ * or whose labels are full words, where spelling them all out at rest turns a
+ * scannable form into a wall of radio rows. Collapsed, the row still states its
+ * current value, which is what a reader came for.
+ */
+export function PickerRow<T extends string>({
+  title,
+  subtitle,
+  value,
+  options,
+  onPick,
+  unsetLabel,
+  disabled = false,
+}: {
+  title: React.ReactNode;
+  subtitle?: React.ReactNode;
+  value: T | "";
+  options: ReadonlyArray<{ value: T; label: string }>;
+  onPick: (value: T) => void;
+  /** Shown when `value` matches no option — an unset field, or a stale one. */
+  unsetLabel: string;
+  disabled?: boolean;
+}): React.JSX.Element {
+  const [open, setOpen] = React.useState(false);
+  const current = options.find((option) => option.value === value);
+
+  return (
+    <>
+      <Row
+        title={title}
+        subtitle={subtitle}
+        onClick={disabled ? undefined : () => setOpen(!open)}
+        right={
+          <>
+            <span className={`text-row ${disabled ? "text-hint" : "text-link"}`}>
+              {current?.label ?? unsetLabel}
+            </span>
+            {/* Hand-drawn rather than `Row`'s own chevron, because this one
+                turns: the row does not go anywhere, it opens, and a chevron that
+                stayed pointing right would promise a screen. */}
+            <Icon
+              name="chevron"
+              size={18}
+              className={`text-hint opacity-60 transition-transform duration-[--panel-motion] ease-panel ${
+                open ? "rotate-90" : ""
+              }`}
+            />
+          </>
+        }
+      />
+      {open && (
+        /* Recessed onto the ground, so the options read as belonging to the row
+           above them rather than as further settings of their own. */
+        <div className="bg-ground">
+          {options.map((option) => (
+            <Row
+              key={option.value}
+              title={option.label}
+              onClick={() => {
+                onPick(option.value);
+                setOpen(false);
+              }}
+              // Always rendered, merely hidden when unselected: it holds the
+              // column steady as the choice moves.
+              right={
+                <Icon
+                  name="check"
+                  size={18}
+                  className={option.value === value ? "text-accent" : "invisible"}
+                />
+              }
+            />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
 /** A small pill: a plan, a state, a count. */
 export function Badge({
   children,
