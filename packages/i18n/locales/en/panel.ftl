@@ -260,6 +260,8 @@ billing-status-refunded = Refunded
 billing-invoice-opening = Opening the invoice…
 billing-invoice-paid = Payment received. Your plan is active.
 billing-invoice-cancelled = Payment cancelled.
+billing-invoice-failed = Couldn't open the payment. Nothing was charged, please try again.
+billing-invoice-unsupported = This client can't open payment links. Open the chat on Telegram and try again.
 billing-choose-term = Term
 billing-features = Included
 

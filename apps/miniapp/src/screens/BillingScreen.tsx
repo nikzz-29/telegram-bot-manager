@@ -19,6 +19,7 @@ import {
   Row,
   Screen,
   SectionTitle,
+  SegmentedControl,
   SkeletonRows,
 } from "../components/ui";
 import { useI18n, useT } from "../i18n/I18nProvider";
@@ -187,12 +188,21 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
         onSuccess: async (response) => {
           const url = response.invoice_url;
           if (url == null) {
-            setNotice(null);
+            // The API accepted the order and returned no link. Nothing was
+            // charged, but saying nothing here reads as "the tap did nothing" —
+            // and the next thing a user does about that is tap again.
+            setNotice(t("billing-invoice-failed"));
+            hapticResult(false);
             return;
           }
           if (provider === "cryptobot") {
             // An external checkout: we cannot observe it, so refetch on return.
-            openExternal(url);
+            if (!openExternal(url)) {
+              // No link opener in this client, so no sheet is coming.
+              setNotice(t("billing-invoice-unsupported"));
+              hapticResult(false);
+              return;
+            }
             setNotice(null);
             await plans.refetch();
             await payments.refetch();
@@ -205,7 +215,9 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
               ? t("billing-invoice-paid")
               : outcome === "cancelled"
                 ? t("billing-invoice-cancelled")
-                : null,
+                : outcome === "unsupported"
+                  ? t("billing-invoice-unsupported")
+                  : t("billing-invoice-failed"),
           );
           // Even a cancelled sheet is worth a refetch — the webhook for a
           // previous attempt may have landed while it was open.
@@ -252,25 +264,15 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
       )}
 
       <SectionTitle>{t("billing-choose-term")}</SectionTitle>
-      {/*
-        A segmented control on a card, the way Telegram draws a range picker,
-        rather than three loose buttons on the grey ground — the tray is what
-        says these are one choice with three answers.
-      */}
-      <div className="flex gap-1 rounded-control border border-card-border bg-card p-1">
-        {TERMS.map((term) => (
-          <button
-            key={term}
-            type="button"
-            onClick={() => setMonths(term)}
-            className={`flex-1 rounded-[8px] px-3 py-2 text-label font-medium transition-colors duration-[--panel-motion] ease-panel ${
-              term === months ? "bg-accent text-accent-text" : "text-link"
-            }`}
-          >
-            {t("billing-months", { count: term })}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        value={months}
+        onChange={setMonths}
+        disabled={invoice.isPending}
+        options={TERMS.map((term) => ({
+          value: term,
+          label: t("billing-months", { count: term }),
+        }))}
+      />
 
       {upgrades.map((option) => (
         <PlanCard
@@ -282,6 +284,24 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
         />
       ))}
 
+      {/*
+       * The history says what has already been charged, so it has to account for
+       * itself. Rendered only on success, a failed fetch left a hole where the
+       * section belongs — indistinguishable from a chat that has never paid, and
+       * the one reading it is deciding whether to pay again.
+       */}
+      {payments.isPending && <SkeletonRows count={3} />}
+      {payments.isError && (
+        <>
+          <SectionTitle>{t("billing-history")}</SectionTitle>
+          <Card>
+            <ErrorState
+              message={payments.error.message}
+              onRetry={() => void payments.refetch()}
+            />
+          </Card>
+        </>
+      )}
       {payments.isSuccess && <History payments={payments.data} />}
     </Screen>
   );

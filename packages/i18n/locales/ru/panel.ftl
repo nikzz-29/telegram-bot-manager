@@ -264,6 +264,8 @@ billing-status-refunded = Возвращён
 billing-invoice-opening = Открываем счёт…
 billing-invoice-paid = Платёж получен. Тариф активен.
 billing-invoice-cancelled = Оплата отменена.
+billing-invoice-failed = Не удалось открыть оплату. Деньги не списаны, попробуйте ещё раз.
+billing-invoice-unsupported = Этот клиент не умеет открывать ссылки оплаты. Откройте чат в Telegram и попробуйте снова.
 billing-choose-term = Срок
 billing-features = Что входит
 
