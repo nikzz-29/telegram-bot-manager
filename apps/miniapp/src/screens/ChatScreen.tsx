@@ -134,6 +134,7 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
               right={
                 <Toggle
                   checked={entry?.enabled ?? false}
+                  label={t(module.title_key)}
                   // A mandatory module is the moderation core: the toggle shows
                   // its state but the chat cannot run without it.
                   disabled={!available || module.mandatory || saveModule.isPending}

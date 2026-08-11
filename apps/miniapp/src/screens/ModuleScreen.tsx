@@ -141,6 +141,7 @@ export function ModuleScreen({
           right={
             <Toggle
               checked={state.enabled}
+              label={t("module-enabled")}
               disabled={locked || spec.mandatory || save.isPending}
               onChange={(enabled) =>
                 save.mutate(

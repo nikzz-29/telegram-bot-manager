@@ -260,6 +260,7 @@ function Broadcast(): React.JSX.Element {
             right={
               <Toggle
                 checked={plans.includes(plan)}
+                label={t(`plan-${plan}`)}
                 onChange={(on) => toggle(plan, on)}
               />
             }

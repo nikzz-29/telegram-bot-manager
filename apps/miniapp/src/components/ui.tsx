@@ -259,15 +259,21 @@ export function Badge({
  *
  * Rendered from a real `<input type="checkbox">` so it keeps the keyboard and
  * screen-reader behaviour a `<div role="switch">` would have to reimplement.
+ *
+ * `label` names it. The visible name is its `Row`'s title, which is a sibling
+ * rather than a parent, so nothing associates the two — without this a screen
+ * reader reads the whole settings list as a column of unnamed checkboxes.
  */
 export function Toggle({
   checked,
   onChange,
   disabled = false,
+  label,
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
   disabled?: boolean;
+  label?: string;
 }): React.JSX.Element {
   return (
     <label
@@ -280,6 +286,7 @@ export function Toggle({
         className="peer sr-only"
         checked={checked}
         disabled={disabled}
+        aria-label={label}
         onChange={(event) => {
           haptic();
           onChange(event.target.checked);

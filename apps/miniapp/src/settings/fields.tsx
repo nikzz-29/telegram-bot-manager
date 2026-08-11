@@ -305,6 +305,7 @@ export function FieldInput(props: FieldProps): React.JSX.Element {
             <Toggle
               checked={value === true}
               disabled={disabled}
+              label={label}
               onChange={(next) => onChange(next)}
             />
           }

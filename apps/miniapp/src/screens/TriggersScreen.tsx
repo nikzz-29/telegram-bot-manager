@@ -178,6 +178,7 @@ function Editor({
           right={
             <Toggle
               checked={draft.case_sensitive ?? false}
+              label={t("triggers-case-sensitive")}
               onChange={(value) => setDraft({ ...draft, case_sensitive: value })}
             />
           }
@@ -187,6 +188,7 @@ function Editor({
           right={
             <Toggle
               checked={draft.delete_trigger ?? false}
+              label={t("triggers-delete-source")}
               onChange={(value) => setDraft({ ...draft, delete_trigger: value })}
             />
           }

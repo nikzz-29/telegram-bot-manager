@@ -263,14 +263,25 @@ function Editor({
       </Card>
 
       <Card className="mt-2">
-        <Row title={t("posts-pin")} right={<Toggle checked={pin} onChange={setPin} />} />
+        <Row
+          title={t("posts-pin")}
+          right={<Toggle checked={pin} onChange={setPin} label={t("posts-pin")} />}
+        />
         <Row
           title={t("posts-delete-previous")}
-          right={<Toggle checked={deletePrevious} onChange={setDeletePrevious} />}
+          right={
+            <Toggle
+              checked={deletePrevious}
+              onChange={setDeletePrevious}
+              label={t("posts-delete-previous")}
+            />
+          }
         />
         <Row
           title={t("posts-enabled")}
-          right={<Toggle checked={enabled} onChange={setEnabled} />}
+          right={
+            <Toggle checked={enabled} onChange={setEnabled} label={t("posts-enabled")} />
+          }
         />
       </Card>
 
