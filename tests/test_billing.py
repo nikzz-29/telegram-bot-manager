@@ -329,6 +329,42 @@ async def test_a_chat_in_grace_still_gets_its_paid_features(ledger: FakeUow) -> 
     assert in_grace_period(chat, now=NOW)
 
 
+async def test_the_catalog_reports_an_open_grace_window(ledger: FakeUow) -> None:
+    """Without this the panel calls a chat that is still on Pro "expired".
+
+    Inside the window `current_plan` is the paid plan while `expires_at` is
+    already in the past — the two together are indistinguishable from a chat
+    that has lapsed to free, so the catalogue has to say which it is.
+    """
+    chat = ledger.chats.chats[CHAT_ID]
+    chat.plan = Plan.PRO
+    chat.plan_expires_at = NOW - timedelta(hours=1)
+    until = await billing.begin_grace(chat, now=NOW)
+
+    catalog = billing.catalog(chat, now=NOW)
+
+    assert catalog.current_plan is Plan.PRO
+    assert catalog.grace_until == until
+
+
+async def test_the_catalog_drops_a_grace_window_that_has_closed(ledger: FakeUow) -> None:
+    """`grace_until` keeps its value after the window shuts; the catalogue must not.
+
+    A stale date here would tell the panel a lapsed chat is still covered — the
+    one state where it matters that the answer is honest, because it is the
+    state in which the user has to decide whether to pay again.
+    """
+    chat = ledger.chats.chats[CHAT_ID]
+    chat.plan = Plan.PRO
+    chat.plan_expires_at = NOW - timedelta(days=30)
+    chat.grace_until = NOW - timedelta(days=7)
+
+    catalog = billing.catalog(chat, now=NOW)
+
+    assert not in_grace_period(chat, now=NOW)
+    assert catalog.grace_until is None
+
+
 async def test_a_lapsed_chat_falls_back_to_free_when_grace_runs_out() -> None:
     """`effective_plan` decides this from the row alone, before any job runs."""
     chat = make_chat(

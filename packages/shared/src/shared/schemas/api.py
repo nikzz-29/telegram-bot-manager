@@ -305,6 +305,11 @@ class PlanOption(ApiModel):
 class PlanCatalog(ApiModel):
     current_plan: Plan
     expires_at: datetime | None = None
+    # Set only while the paid term has lapsed and grace has not. `current_plan`
+    # already folds grace in, so without this the panel cannot tell a chat still
+    # running on Pro from one that has dropped to Free — both arrive as a plan
+    # plus a past `expires_at`, and it would report the paid plan as expired.
+    grace_until: datetime | None = None
     options: list[PlanOption]
 
 

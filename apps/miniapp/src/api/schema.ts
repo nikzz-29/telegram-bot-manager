@@ -876,6 +876,8 @@ export interface components {
             current_plan: components["schemas"]["Plan"];
             /** Expires At */
             expires_at?: string | null;
+            /** Grace Until */
+            grace_until?: string | null;
             /** Options */
             options: components["schemas"]["PlanOption"][];
         };

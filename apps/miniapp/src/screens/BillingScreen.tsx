@@ -53,13 +53,22 @@ function formatDate(value: string, locale: string): string {
 function CurrentPlan({
   plan,
   expiresAt,
+  graceUntil,
 }: {
   plan: Plan;
   expiresAt: string | null | undefined;
+  graceUntil: string | null | undefined;
 }): React.JSX.Element {
   const { t, locale } = useI18n();
   const lapsed = expiresAt != null && new Date(expiresAt).getTime() < Date.now();
+  const inGrace = graceUntil != null && new Date(graceUntil).getTime() > Date.now();
   const expiry = (): string => {
+    // `current_plan` already folds grace in: when it is active, `expires_at` is
+    // in the past while the chat is still on the paid plan. Saying "expired"
+    // there would read as an error, so the grace line takes over.
+    if (inGrace) {
+      return t("billing-grace", { date: formatDate(graceUntil as string, locale) });
+    }
     if (expiresAt == null) {
       return t("billing-lifetime");
     }
@@ -72,7 +81,7 @@ function CurrentPlan({
    * for not having bought anything — and would make the one row that should
    * read as an upsell look like a settled subscription.
    */
-  const tone = lapsed ? "destructive" : plan === "free" ? "neutral" : "success";
+  const tone = inGrace ? "warning" : lapsed ? "destructive" : plan === "free" ? "neutral" : "success";
   return (
     <Card className="mt-3">
       <Row
@@ -254,7 +263,11 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
   return (
     <Screen>
       <Header title={t("billing-title")} icon="star" />
-      <CurrentPlan plan={plans.data.current_plan} expiresAt={plans.data.expires_at} />
+      <CurrentPlan
+        plan={plans.data.current_plan}
+        expiresAt={plans.data.expires_at}
+        graceUntil={plans.data.grace_until}
+      />
 
       {notice != null && <p className="mt-3 text-center text-label text-hint">{notice}</p>}
       {invoice.isError && (

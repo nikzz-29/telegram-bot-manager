@@ -30,7 +30,7 @@ from aiogram.types import LabeledPrice, SuccessfulPayment
 
 from core import cache
 from core.cryptobot import cryptobot
-from core.features import effective_plan
+from core.features import effective_plan, in_grace_period
 from db.models import Chat, Payment
 from db.uow import UnitOfWork
 from i18n.runtime import Translator
@@ -157,6 +157,10 @@ class BillingService:
         return PlanCatalog(
             current_plan=effective_plan(chat, now=now),
             expires_at=chat.plan_expires_at,
+            # Only while it is actually running: `grace_until` keeps its value
+            # after the window closes, and a stale one would tell the panel a
+            # lapsed chat is still covered.
+            grace_until=chat.grace_until if in_grace_period(chat, now=now) else None,
             options=[
                 PlanOption(
                     plan=plan,
