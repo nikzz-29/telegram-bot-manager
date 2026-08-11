@@ -1,10 +1,13 @@
 /**
  * Reputation: the leaderboard, with a manual adjustment per member.
  *
- * DECISION: the adjustment field takes a delta, not a new total. An admin
- * correcting an abuse ("someone farmed +40 off alt accounts") knows the amount
- * to remove, not the number that should be left — and a delta is also what the
- * API's endpoint speaks, so no arithmetic happens in two places.
+ * DECISION: the adjustment is a delta, not a new total. An admin correcting an
+ * abuse ("someone farmed +40 off alt accounts") knows the amount to remove, not
+ * the number that should be left — and a delta is also what the API's endpoint
+ * speaks, so no arithmetic happens in two places.
+ *
+ * DECISION: that delta is entered as a direction plus a count rather than as a
+ * signed number. See the comment on `sign` in `Adjuster`.
  */
 import React, { useState } from "react";
 import type { ReputationEntry } from "../api/client";
@@ -17,12 +20,17 @@ import {
   Row,
   Screen,
   SectionTitle,
+  SegmentedControl,
   SkeletonRows,
+  VALUE_INPUT,
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
 import { useAdjustReputation, useReputation } from "../hooks/queries";
 import { useDiscardGuard } from "../hooks/useDiscardGuard";
 import { hapticResult } from "../telegram/sdk";
+
+/** Which way the amount below it goes. */
+type Sign = "add" | "remove";
 
 function nameOf(entry: ReputationEntry): string {
   return (
@@ -42,13 +50,26 @@ function Adjuster({
 }): React.JSX.Element {
   const t = useT();
   const adjust = useAdjustReputation(chatId);
-  const [delta, setDelta] = useState("");
-  const parsed = Number.parseInt(delta, 10);
-  const valid = Number.isFinite(parsed) && parsed !== 0;
+  /*
+   * DECISION: the sign is a control, not a character in the field. The delta is
+   * usually negative — the reason an admin opens this screen is almost always
+   * points someone should not have — and the field asked for that minus from an
+   * `inputMode="numeric"` keypad, which on iOS has no minus key at all. Its own
+   * placeholder read "-10", a value the keyboard it summons cannot type.
+   *
+   * Splitting them also lets the field state the amount as a plain count, which
+   * is how the person doing it thinks about it: take 10 points away, not add -10.
+   */
+  const [sign, setSign] = useState<Sign>("remove");
+  const [amount, setAmount] = useState("");
+  const magnitude = Number.parseInt(amount, 10);
+  const valid = Number.isFinite(magnitude) && magnitude > 0;
+  const delta = sign === "remove" ? -magnitude : magnitude;
 
-  // One field, so dirtiness is just "something is typed" — including a lone
-  // minus sign, which is not a valid delta but is a keystroke worth protecting.
-  const confirmDiscard = useDiscardGuard({ dirty: delta !== "", onClose: onDone });
+  // One field, so dirtiness is just "something is typed". The sign alone is not
+  // a draft: it opens on a value, and flipping it back and forth changes nothing
+  // until an amount exists to apply it to.
+  const confirmDiscard = useDiscardGuard({ dirty: amount !== "", onClose: onDone });
   const leave = (): void => {
     void confirmDiscard().then((may) => {
       if (may) {
@@ -80,15 +101,35 @@ function Adjuster({
       <SectionTitle>{t("reputation-adjust")}</SectionTitle>
       <Card>
         <div className="px-4 py-3">
-          <input
-            className="tg-input tabular-nums"
-            inputMode="numeric"
-            value={delta}
-            placeholder="-10"
+          <SegmentedControl<Sign>
+            value={sign}
+            onChange={setSign}
             disabled={adjust.isPending}
-            onChange={(event) => setDelta(event.target.value)}
+            options={[
+              { value: "add", label: t("reputation-adjust-add") },
+              { value: "remove", label: t("reputation-adjust-remove") },
+            ]}
           />
         </div>
+        <Row
+          title={t("reputation-adjust-amount")}
+          // The arithmetic is done here rather than left to the admin. The field
+          // takes a count and the control above says which way it goes; what the
+          // person actually wants to know is the number the member ends up with.
+          subtitle={
+            valid ? t("reputation-adjust-result", { total: entry.points + delta }) : undefined
+          }
+          right={
+            <input
+              className={`w-24 tabular-nums ${VALUE_INPUT}`}
+              inputMode="numeric"
+              value={amount}
+              placeholder="10"
+              disabled={adjust.isPending}
+              onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))}
+            />
+          }
+        />
       </Card>
       {/* Telegram puts the sentence that qualifies a field under the group, not
           inside it — the field is the control, this is the caveat about it. */}
@@ -99,7 +140,7 @@ function Adjuster({
           disabled={!valid || adjust.isPending}
           onClick={() =>
             adjust.mutate(
-              { tgUserId: entry.tg_user_id, delta: parsed },
+              { tgUserId: entry.tg_user_id, delta },
               {
                 onSuccess: () => {
                   hapticResult(true);

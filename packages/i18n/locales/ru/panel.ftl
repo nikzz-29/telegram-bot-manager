@@ -237,7 +237,11 @@ reputation-empty = Репутация пока не начислялась.
 reputation-score = Очки
 reputation-level = Уровень {$level}
 reputation-adjust = Изменить
-reputation-adjust-hint = Изменение в плюс или минус, а не новое значение.
+reputation-adjust-add = Добавить
+reputation-adjust-remove = Снять
+reputation-adjust-amount = Сколько очков
+reputation-adjust-result = Станет {$total}
+reputation-adjust-hint = Прибавка или убавка к текущим очкам, а не новое значение.
 
 ## Тариф и оплата
 billing-title = Тариф

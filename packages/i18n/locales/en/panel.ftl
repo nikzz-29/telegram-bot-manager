@@ -234,7 +234,11 @@ reputation-empty = No reputation recorded yet.
 reputation-score = Score
 reputation-level = Level {$level}
 reputation-adjust = Adjust
-reputation-adjust-hint = A positive or negative change, not a new total.
+reputation-adjust-add = Add
+reputation-adjust-remove = Take away
+reputation-adjust-amount = How many points
+reputation-adjust-result = Becomes {$total}
+reputation-adjust-hint = Added to or taken off the current score, not a new total.
 
 ## Billing
 billing-title = Plan
