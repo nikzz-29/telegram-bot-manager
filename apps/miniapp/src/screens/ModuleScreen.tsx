@@ -22,7 +22,7 @@ import {
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
 import { useMeta, useModules, useResetModule, useSaveModule } from "../hooks/queries";
-import { FieldInput, groupFields, groupKey } from "../settings/fields";
+import { FieldInput, groupFields, groupKey, outOfRange } from "../settings/fields";
 import { type Field, fieldsOf, readPath, writePath } from "../settings/schema";
 import { hapticResult } from "../telegram/sdk";
 
@@ -81,6 +81,13 @@ export function ModuleScreen({
   const dirty = draft !== null;
   const locked = !state.available;
   const plan = t(`plan-${spec.required_plan}`);
+  // Save refuses a draft the schema's own bounds reject. Without this the field
+  // states the range and the button ships the value anyway — the API answers 422
+  // and the panel reports it as a bare message, one round trip away from the row
+  // that caused it.
+  const invalid = groups.some(([, fields]) =>
+    fields.some((field) => outOfRange(field, readPath(config, field.path))),
+  );
 
   return (
     <Screen>
@@ -156,7 +163,7 @@ export function ModuleScreen({
 
           <div className="mt-6 space-y-3">
             <Button
-              disabled={!dirty || save.isPending}
+              disabled={!dirty || invalid || save.isPending}
               onClick={() =>
                 save.mutate(
                   { module, config },
