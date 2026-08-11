@@ -36,7 +36,10 @@ tasks:
   revision:
     desc: 'Autogenerate a migration: task revision -- "message"'
     cmds:
-      - uv run alembic revision --autogenerate -m "{{.CLI_ARGS}}"
+      # Unquoted on purpose: Task shell-quotes CLI_ARGS itself as soon as an
+      # argument contains a space, so `-m "{{.CLI_ARGS}}"` expands to
+      # `-m "'add whatever'"` and the quotes end up inside the message.
+      - uv run alembic revision --autogenerate -m {{.CLI_ARGS}}
   openapi:
     desc: Dump the API schema to apps/miniapp/openapi.json
     cmds:
