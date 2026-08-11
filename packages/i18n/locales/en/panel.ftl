@@ -296,6 +296,7 @@ platform-ban-add = Blacklist a user
 platform-ban-user-id = Telegram user ID
 platform-ban-reason = Reason
 platform-ban-revoke = Lift ban
+platform-ban-revoke-confirm = Lift the global ban on {$id}? They will be able to post in every chat again.
 platform-ban-chats = Reported by {$count ->
         [one] {$count} chat
        *[other] {$count} chats

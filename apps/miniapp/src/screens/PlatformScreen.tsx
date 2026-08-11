@@ -125,20 +125,38 @@ function Blacklist(): React.JSX.Element {
   const parsed = Number.parseInt(userId, 10);
   const valid = Number.isFinite(parsed) && parsed > 0;
 
+  /*
+   * DECISION: revoke asks first, and is a 44px target rather than a line of
+   * 13px text. Lifting a ban is the one irreversible thing on this screen — the
+   * entry carries the reason it was issued, and re-adding it needs that reason
+   * typed again from memory — and it sat as a tap target barely taller than the
+   * glyph inside it, directly beside the row's own body. The label is gone with
+   * it: on a list where every row is a ban, five repetitions of "Снять" is the
+   * loudest text in the card, and the trash mark says the same thing.
+   */
   const rowRight = (ban: GlobalBanEntry): React.JSX.Element => (
     <button
       type="button"
-      className="flex items-center gap-1 text-label text-destructive disabled:opacity-50"
+      aria-label={t("platform-ban-revoke")}
+      className="-m-2 flex h-11 w-11 items-center justify-center text-destructive transition-opacity active:opacity-60 disabled:opacity-50"
       disabled={revoke.isPending}
-      onClick={() =>
+      onClick={async () => {
+        const confirmed = await askConfirmation({
+          message: t("platform-ban-revoke-confirm", { id: ban.tg_user_id }),
+          confirmText: t("platform-ban-revoke"),
+          cancelText: t("panel-cancel"),
+          destructive: true,
+        });
+        if (!confirmed) {
+          return;
+        }
         revoke.mutate(ban.tg_user_id, {
           onSuccess: () => hapticResult(true),
           onError: () => hapticResult(false),
-        })
-      }
+        });
+      }}
     >
-      <Icon name="trash" size={16} />
-      {t("platform-ban-revoke")}
+      <Icon name="trash" size={18} />
     </button>
   );
 
@@ -173,6 +191,13 @@ function Blacklist(): React.JSX.Element {
             ))
           )}
         </Card>
+      )}
+      {/* A failed revoke used to report itself as a single buzz, which is what a
+          tap that never registered also feels like. The row cannot hold this —
+          the mutation is one per screen, not one per ban — so it goes under the
+          list, where the entry that refused to go away is still visible. */}
+      {revoke.isError && (
+        <p className="px-1 pt-2 text-label text-destructive">{revoke.error.message}</p>
       )}
 
       <Card className="mt-3">

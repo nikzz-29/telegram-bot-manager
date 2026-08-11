@@ -300,6 +300,7 @@ platform-ban-add = Добавить в чёрный список
 platform-ban-user-id = Telegram ID пользователя
 platform-ban-reason = Причина
 platform-ban-revoke = Снять бан
+platform-ban-revoke-confirm = Снять глобальный бан с {$id}? Пользователь снова сможет писать во все чаты.
 platform-ban-chats = Пожаловались {$count ->
         [one] {$count} чат
         [few] {$count} чата
