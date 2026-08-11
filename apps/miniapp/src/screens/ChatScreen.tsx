@@ -16,6 +16,7 @@ import {
   Screen,
   SectionTitle,
   SkeletonRows,
+  Spinner,
   Toggle,
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
@@ -191,13 +192,38 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
       </Card>
 
       <Card className="mt-4">
+        {/*
+         * DECISION: this row reports all four states of its own mutation, and no
+         * chevron. It used to show only the success one — and to keep showing it
+         * for as long as the screen stayed open, so a later promotion in Telegram
+         * was answered by a row still claiming the list was current. A failure
+         * showed nothing at all beyond a buzz, which is indistinguishable from a
+         * tap that never registered.
+         *
+         * The success line clears itself after a few seconds. It is a receipt for
+         * the tap, not a fact about the chat, and once it stops being the former
+         * it is only pretending to be the latter.
+         */}
         <Row
           title={t("chat-sync-admins")}
           icon="refresh"
-          subtitle={syncAdmins.isSuccess ? t("chat-sync-done") : t("chat-sync-admins-hint")}
+          chevron={false}
+          subtitle={
+            syncAdmins.isError ? (
+              <span className="text-destructive">{syncAdmins.error.message}</span>
+            ) : syncAdmins.isSuccess ? (
+              t("chat-sync-done")
+            ) : (
+              t("chat-sync-admins-hint")
+            )
+          }
+          right={syncAdmins.isPending ? <Spinner /> : undefined}
           onClick={() => {
             syncAdmins.mutate(undefined, {
-              onSuccess: () => hapticResult(true),
+              onSuccess: () => {
+                hapticResult(true);
+                window.setTimeout(() => syncAdmins.reset(), 4000);
+              },
               onError: () => hapticResult(false),
             });
           }}

@@ -69,6 +69,23 @@ export function ModuleScreen({
       </Screen>
     );
   }
+  // A failed query also has undefined `data`, so this has to come before the
+  // not-found check below — otherwise a dropped connection is reported as a
+  // module that does not exist, and the retry the user needs is never offered.
+  const failure = meta.isError ? meta.error : modules.isError ? modules.error : null;
+  if (failure !== null) {
+    return (
+      <Screen>
+        <ErrorState
+          message={failure.message}
+          onRetry={() => {
+            void meta.refetch();
+            void modules.refetch();
+          }}
+        />
+      </Screen>
+    );
+  }
   if (spec === undefined || state === undefined) {
     return (
       <Screen>
