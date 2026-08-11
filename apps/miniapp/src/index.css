@@ -63,11 +63,14 @@
    * Elevation, kept deliberately shallow.
    *
    * Telegram's own surfaces are flat; a Mini App with material-style drop
-   * shadows announces itself as a web page embedded in a chat client. These are
-   * just enough to lift a card off the ground and to seat a pressed row.
+   * shadows announces itself as a web page embedded in a chat client. This is
+   * just enough to lift a card off the ground.
+   *
+   * It is a light-theme device, and the only value here `theme.ts` clears rather
+   * than recomputes — see the note there for why a dark theme gets no shadow at
+   * all instead of a stronger one.
    */
   --panel-shadow-card: 0 1px 2px rgb(0 0 0 / 4%);
-  --panel-shadow-raised: 0 4px 16px rgb(0 0 0 / 10%);
 
   /* One motion duration, one curve. Anything that animates uses these, so the
      whole panel moves at one speed instead of each component picking its own. */

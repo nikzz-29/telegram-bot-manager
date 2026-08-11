@@ -58,7 +58,6 @@ export default {
       },
       boxShadow: {
         card: "var(--panel-shadow-card)",
-        raised: "var(--panel-shadow-raised)",
       },
       transitionTimingFunction: {
         panel: "var(--panel-ease)",

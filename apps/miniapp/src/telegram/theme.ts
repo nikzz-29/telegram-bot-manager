@@ -69,6 +69,24 @@ function apply(): void {
   // the flash behind an overscroll — none of which `themeParams` covers.
   const isDark = themeParams.isDark();
   root.style.setProperty("color-scheme", isDark ? "dark" : "light");
+  /*
+   * Elevation, dropped on a dark theme rather than restated for it.
+   *
+   * The card shadow is black at 4%, which is what lifts a white card off a grey
+   * page. Over a dark ground it moves the colour by one value in 255 — it cannot
+   * lift anything, and raising the alpha until it showed would put a halo under
+   * every card that Telegram's own dark theme does not have. On dark the card is
+   * the *lighter* surface, so the fill difference is already the lift, and the
+   * hairline (derived from the text colour, so visible either way) draws the edge.
+   *
+   * Cleared rather than set to the light value, so `index.css` stays the one
+   * place that says how deep the shadow is.
+   */
+  if (isDark) {
+    root.style.setProperty("--panel-shadow-card", "none");
+  } else {
+    root.style.removeProperty("--panel-shadow-card");
+  }
   // What Tailwind's `dark:` variant keys off. It follows Telegram's theme rather
   // than the phone's, which are free to disagree.
   root.classList.toggle("dark", isDark);
