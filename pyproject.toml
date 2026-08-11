@@ -68,7 +68,9 @@ namespace_packages = true
 explicit_package_bases = true
 
 [[tool.mypy.overrides]]
-module = ["fluent.*", "aiocryptopay.*", "cashews.*", "arq.*"]
+# `mako` arrives with alembic and ships no py.typed; `tests/test_migrations.py`
+# renders the revision template through it.
+module = ["fluent.*", "aiocryptopay.*", "cashews.*", "arq.*", "mako.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
