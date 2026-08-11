@@ -85,6 +85,7 @@ function Adjuster({
             inputMode="numeric"
             value={delta}
             placeholder="-10"
+            disabled={adjust.isPending}
             onChange={(event) => setDelta(event.target.value)}
           />
         </div>

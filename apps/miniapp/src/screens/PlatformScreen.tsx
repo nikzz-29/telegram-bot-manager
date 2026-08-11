@@ -182,6 +182,7 @@ function Blacklist(): React.JSX.Element {
             className="tg-input mt-2 w-full tabular-nums"
             inputMode="numeric"
             value={userId}
+            disabled={create.isPending}
             onChange={(event) => setUserId(event.target.value)}
           />
         </div>
@@ -191,6 +192,7 @@ function Blacklist(): React.JSX.Element {
             className="tg-input mt-2 w-full"
             value={reason}
             maxLength={256}
+            disabled={create.isPending}
             onChange={(event) => setReason(event.target.value)}
           />
         </div>
@@ -246,6 +248,7 @@ function Broadcast(): React.JSX.Element {
             className="tg-input mt-2 h-32 w-full resize-y"
             value={text}
             maxLength={4000}
+            disabled={broadcast.isPending}
             onChange={(event) => setText(event.target.value)}
           />
         </div>
@@ -261,6 +264,7 @@ function Broadcast(): React.JSX.Element {
               <Toggle
                 checked={plans.includes(plan)}
                 label={t(`plan-${plan}`)}
+                disabled={broadcast.isPending}
                 onChange={(on) => toggle(plan, on)}
               />
             }

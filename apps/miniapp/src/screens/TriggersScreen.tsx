@@ -55,9 +55,11 @@ const BLANK: TriggerCreate = {
 function MatchPicker({
   match,
   onPick,
+  disabled,
 }: {
   match: TriggerCreate["match"];
   onPick: (next: TriggerCreate["match"]) => void;
+  disabled: boolean;
 }): React.JSX.Element {
   const t = useT();
   return (
@@ -67,6 +69,7 @@ function MatchPicker({
           key={option}
           title={t(`triggers-match-${option}`)}
           onClick={() => onPick(option)}
+          disabled={disabled}
           // The check is always rendered and merely hidden when unselected: it
           // holds the column width steady as the choice moves, and giving `Row` a
           // `right` is what stops it drawing a chevron on a row that picks rather
@@ -113,6 +116,14 @@ function Editor({
   );
   const [draft, setDraft] = useState<TriggerCreate>(initial);
 
+  /*
+   * DECISION: `pending` locks the fields, not just the buttons. It used to grey
+   * out the three buttons and leave every input, picker and switch live — so a
+   * character typed while the request was in flight went into a draft the
+   * response then replaced, and the edit vanished with nothing to say it had.
+   * The form is being sent; there is no such thing as a change to it that still
+   * counts.
+   */
   const pending = create.isPending || update.isPending || remove.isPending;
   const failure = create.error ?? update.error;
   const valid = draft.pattern.trim() !== "" && draft.response.trim() !== "";
@@ -159,6 +170,7 @@ function Editor({
             value={draft.pattern}
             maxLength={256}
             spellCheck={false}
+            disabled={pending}
             onChange={(event) => setDraft({ ...draft, pattern: event.target.value })}
           />
         </div>
@@ -168,6 +180,7 @@ function Editor({
       <Card>
         <MatchPicker
           match={draft.match ?? "contains"}
+          disabled={pending}
           onPick={(next) => setDraft({ ...draft, match: next })}
         />
       </Card>
@@ -179,6 +192,7 @@ function Editor({
             <Toggle
               checked={draft.case_sensitive ?? false}
               label={t("triggers-case-sensitive")}
+              disabled={pending}
               onChange={(value) => setDraft({ ...draft, case_sensitive: value })}
             />
           }
@@ -189,6 +203,7 @@ function Editor({
             <Toggle
               checked={draft.delete_trigger ?? false}
               label={t("triggers-delete-source")}
+              disabled={pending}
               onChange={(value) => setDraft({ ...draft, delete_trigger: value })}
             />
           }
@@ -202,6 +217,7 @@ function Editor({
             className="tg-input mt-2 h-32 w-full resize-y"
             value={draft.response}
             maxLength={4000}
+            disabled={pending}
             onChange={(event) => setDraft({ ...draft, response: event.target.value })}
           />
         </div>

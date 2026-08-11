@@ -79,9 +79,11 @@ function toInput(kind: ScheduleKind, stored: string): string {
 function KindPicker({
   kind,
   onPick,
+  disabled,
 }: {
   kind: ScheduleKind;
   onPick: (next: ScheduleKind) => void;
+  disabled: boolean;
 }): React.JSX.Element {
   const t = useT();
   return (
@@ -91,6 +93,7 @@ function KindPicker({
           key={option}
           title={t(`posts-schedule-${option}`)}
           onClick={() => onPick(option)}
+          disabled={disabled}
           // The check is always rendered and merely hidden when unselected: it
           // holds the column width steady as the choice moves, and giving `Row` a
           // `right` is what stops it drawing a chevron on a row that picks rather
@@ -112,10 +115,12 @@ function ScheduleInput({
   kind,
   value,
   onChange,
+  disabled,
 }: {
   kind: ScheduleKind;
   value: string;
   onChange: (value: string) => void;
+  disabled: boolean;
 }): React.JSX.Element {
   const t = useT();
   if (kind === "cron") {
@@ -126,6 +131,7 @@ function ScheduleInput({
           className="tg-input mt-2 w-full font-mono"
           value={value}
           spellCheck={false}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
         />
         <p className="mt-2 text-label text-hint">{t("posts-cron-hint")}</p>
@@ -141,8 +147,9 @@ function ScheduleInput({
           type={kind === "once" ? "datetime-local" : "time"}
           // Seated on the ground colour, so the value reads as something you can
           // tap and edit rather than as a stated fact like the rows above it.
-          className="rounded-control bg-ground px-2.5 py-1.5 text-right text-row text-link outline-none"
+          className="rounded-control bg-ground px-2.5 py-1.5 text-right text-row text-link outline-none disabled:opacity-50"
           value={value}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
         />
       }
@@ -240,6 +247,7 @@ function Editor({
             className="tg-input mt-2 w-full"
             value={title}
             maxLength={128}
+            disabled={pending}
             onChange={(event) => setTitle(event.target.value)}
           />
         </div>
@@ -249,6 +257,7 @@ function Editor({
             className="tg-input mt-2 h-40 w-full resize-y"
             value={content}
             maxLength={4000}
+            disabled={pending}
             onChange={(event) => setContent(event.target.value)}
           />
         </div>
@@ -258,14 +267,16 @@ function Editor({
       {/* The kind and the value it takes are one decision, so they share a card:
           picking a row above changes the field directly below it. */}
       <Card>
-        <KindPicker kind={kind} onPick={switchKind} />
-        <ScheduleInput kind={kind} value={value} onChange={setValue} />
+        <KindPicker kind={kind} onPick={switchKind} disabled={pending} />
+        <ScheduleInput kind={kind} value={value} onChange={setValue} disabled={pending} />
       </Card>
 
       <Card className="mt-2">
         <Row
           title={t("posts-pin")}
-          right={<Toggle checked={pin} onChange={setPin} label={t("posts-pin")} />}
+          right={
+            <Toggle checked={pin} onChange={setPin} label={t("posts-pin")} disabled={pending} />
+          }
         />
         <Row
           title={t("posts-delete-previous")}
@@ -274,13 +285,19 @@ function Editor({
               checked={deletePrevious}
               onChange={setDeletePrevious}
               label={t("posts-delete-previous")}
+              disabled={pending}
             />
           }
         />
         <Row
           title={t("posts-enabled")}
           right={
-            <Toggle checked={enabled} onChange={setEnabled} label={t("posts-enabled")} />
+            <Toggle
+              checked={enabled}
+              onChange={setEnabled}
+              label={t("posts-enabled")}
+              disabled={pending}
+            />
           }
         />
       </Card>
