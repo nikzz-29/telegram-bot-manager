@@ -22,6 +22,7 @@ import {
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
 import { useMeta, useModules, useResetModule, useSaveModule } from "../hooks/queries";
+import { useNavigation } from "../navigation";
 import { FieldInput, groupFields, groupKey, outOfRange } from "../settings/fields";
 import { type Field, fieldsOf, readPath, writePath } from "../settings/schema";
 import { hapticResult } from "../telegram/sdk";
@@ -41,6 +42,7 @@ export function ModuleScreen({
   module: string;
 }): React.JSX.Element {
   const t = useT();
+  const navigation = useNavigation();
   const meta = useMeta();
   const modules = useModules(chatId);
   const save = useSaveModule(chatId);
@@ -149,15 +151,19 @@ export function ModuleScreen({
            * plan does not reach it — so it takes the shield and a centred
            * sentence, the shape of a door, rather than the shape of an error.
            *
-           * DECISION: the upsell stays text rather than becoming a button. A
-           * button would have to open the billing screen, and this screen does
-           * not navigate — giving it the look of one without the push behind it
-           * is a worse lie than the plain sentence it replaced.
+           * DECISION: the upsell is a button that opens billing. It was left as a
+           * plain sentence on the grounds that this screen could not navigate —
+           * which was never true: the `billing` route takes the `chatId` already
+           * in props. So the one screen that states a plan is too low was also
+           * the one screen offering no way to raise it, and "Upgrade to Pro" sat
+           * there as an instruction with nothing behind it.
            */}
           <EmptyState icon="shield" text={t("module-locked", { plan })} />
-          <p className="px-6 pb-8 text-center text-label text-hint">
-            {t("module-locked-cta", { plan })}
-          </p>
+          <div className="px-6 pb-8">
+            <Button onClick={() => navigation.push({ name: "billing", chatId })}>
+              {t("module-locked-cta", { plan })}
+            </Button>
+          </div>
         </Card>
       ) : (
         <>
