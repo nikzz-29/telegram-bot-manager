@@ -62,12 +62,14 @@ function ScreenFor({ route }: { route: Route }): React.JSX.Element {
 }
 
 function Stack(): React.JSX.Element {
-  const { route, atRoot, pop } = useNavigation();
+  const { route, atRoot, requestPop } = useNavigation();
 
   useEffect(() => {
-    // The one exit from every screen is Telegram's own back button.
-    return setBackHandler(atRoot ? null : pop);
-  }, [atRoot, pop]);
+    // The one exit from every screen is Telegram's own back button. It goes
+    // through `requestPop` so a screen with unsaved state can ask before the
+    // gesture becomes a loss.
+    return setBackHandler(atRoot ? null : requestPop);
+  }, [atRoot, requestPop]);
 
   return <ScreenFor route={route} />;
 }

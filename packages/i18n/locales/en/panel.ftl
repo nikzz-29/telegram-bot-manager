@@ -13,6 +13,11 @@ panel-cancel = Cancel
 panel-delete = Delete
 panel-edit = Edit
 panel-confirm-delete = Delete this permanently?
+# Buttons for the unsaved-changes popup. Not "Cancel" — it is ambiguous about
+# what is being cancelled, the leaving or the edits themselves.
+panel-discard = Your changes are not saved. Leaving loses them.
+panel-discard-leave = Leave
+panel-discard-stay = Stay
 panel-language = Language
 # Language names stay in their own language — a Russian speaker looking for the
 # switch scans for "Русский", not for the English word for it.

@@ -7,7 +7,15 @@
  * matches that exactly, and wiring the native back button to `pop` gives the
  * Android hardware gesture the behaviour people expect for free.
  */
-import React, { createContext, useCallback, useContext, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 export type Route =
   | { name: "chats" }
@@ -27,7 +35,28 @@ export interface Navigation {
   push: (route: Route) => void;
   pop: () => void;
   reset: (route: Route) => void;
+  /**
+   * Go back: what Telegram's back button calls.
+   *
+   * Screens holding unsaved state take this over with `useBackIntercept`; with no
+   * interceptor registered it is just `pop`.
+   */
+  requestPop: () => void;
+  /** See `useBackIntercept`. Returns the unregister function. */
+  registerBackIntercept: (intercept: BackIntercept) => () => void;
 }
+
+/**
+ * Called instead of popping the stack.
+ *
+ * Returns true to let the pop proceed, false when the screen handled the gesture
+ * itself — an editor rendered inside its list screen closes back to the list,
+ * which is one level shallower than leaving the route.
+ *
+ * Async because the answer may be a native popup, which is a round trip through
+ * the Telegram client.
+ */
+export type BackIntercept = () => boolean | Promise<boolean>;
 
 const NavigationContext = createContext<Navigation | null>(null);
 
@@ -56,6 +85,38 @@ export function NavigationProvider({
     window.scrollTo(0, 0);
   }, []);
 
+  /*
+   * DECISION: the interceptor lives in a ref, not in state. It is read when the
+   * user taps back and never rendered, so holding it in state would re-render the
+   * whole stack every time an editor's dirty flag flips — and the interceptor
+   * closes over that flag, so its identity changes on every keystroke.
+   */
+  const intercept = useRef<BackIntercept | null>(null);
+
+  const registerBackIntercept = useCallback((next: BackIntercept) => {
+    intercept.current = next;
+    return () => {
+      // Only if it is still ours: an editor unmounting after its replacement
+      // registered would otherwise clear an interceptor it does not own.
+      if (intercept.current === next) {
+        intercept.current = null;
+      }
+    };
+  }, []);
+
+  const requestPop = useCallback(() => {
+    const ask = intercept.current;
+    if (ask === null) {
+      pop();
+      return;
+    }
+    void (async () => {
+      if (await ask()) {
+        pop();
+      }
+    })();
+  }, [pop]);
+
   const value = useMemo<Navigation>(
     () => ({
       route: stack[stack.length - 1] as Route,
@@ -63,8 +124,10 @@ export function NavigationProvider({
       push,
       pop,
       reset,
+      requestPop,
+      registerBackIntercept,
     }),
-    [stack, push, pop, reset],
+    [stack, push, pop, reset, requestPop, registerBackIntercept],
   );
 
   return (
@@ -78,4 +141,28 @@ export function useNavigation(): Navigation {
     throw new Error("useNavigation must be used inside <NavigationProvider>");
   }
   return value;
+}
+
+/**
+ * Take over the back button for the lifetime of the current screen.
+ *
+ * Used by editors: while the screen's back button is active, this component is
+ * its only exit, so the interceptor is also the natural place to close a local
+ * editor back to the list — see `BackIntercept`.
+ *
+ * One interceptor at a time: the last to register wins. Only one screen renders
+ * per route and the editors replace their list rather than sitting over it, so
+ * two live at once is not a state this app can reach.
+ *
+ * Pass `null` when the screen has nothing to protect — a list with no open
+ * editor — rather than calling the hook conditionally.
+ */
+export function useBackIntercept(intercept: BackIntercept | null): void {
+  const { registerBackIntercept } = useNavigation();
+  useEffect(() => {
+    if (intercept === null) {
+      return undefined;
+    }
+    return registerBackIntercept(intercept);
+  }, [intercept, registerBackIntercept]);
 }

@@ -21,6 +21,7 @@ import {
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
 import { useAdjustReputation, useReputation } from "../hooks/queries";
+import { useDiscardGuard } from "../hooks/useDiscardGuard";
 import { hapticResult } from "../telegram/sdk";
 
 function nameOf(entry: ReputationEntry): string {
@@ -44,6 +45,17 @@ function Adjuster({
   const [delta, setDelta] = useState("");
   const parsed = Number.parseInt(delta, 10);
   const valid = Number.isFinite(parsed) && parsed !== 0;
+
+  // One field, so dirtiness is just "something is typed" — including a lone
+  // minus sign, which is not a valid delta but is a keystroke worth protecting.
+  const confirmDiscard = useDiscardGuard({ dirty: delta !== "", onClose: onDone });
+  const leave = (): void => {
+    void confirmDiscard().then((may) => {
+      if (may) {
+        onDone();
+      }
+    });
+  };
 
   return (
     <>
@@ -102,7 +114,7 @@ function Adjuster({
         {adjust.isError && (
           <p className="text-center text-label text-destructive">{adjust.error.message}</p>
         )}
-        <Button variant="secondary" disabled={adjust.isPending} onClick={onDone}>
+        <Button variant="secondary" disabled={adjust.isPending} onClick={leave}>
           {t("panel-cancel")}
         </Button>
       </div>

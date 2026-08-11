@@ -5,7 +5,7 @@
  * a multi-line reply; a sheet over the list would fight the keyboard on a phone,
  * and Telegram's back button already gives a pushed screen a way out.
  */
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import type { TriggerCreate, TriggerEntry } from "../api/client";
 import {
   Badge,
@@ -28,6 +28,7 @@ import {
   useTriggers,
   useUpdateTrigger,
 } from "../hooks/queries";
+import { useDiscardGuard } from "../hooks/useDiscardGuard";
 import { askConfirmation, hapticResult } from "../telegram/sdk";
 
 const MATCHES = ["exact", "contains", "regex"] as const;
@@ -96,22 +97,42 @@ function Editor({
   const create = useCreateTrigger(chatId);
   const update = useUpdateTrigger(chatId);
   const remove = useDeleteTrigger(chatId);
-  const [draft, setDraft] = useState<TriggerCreate>(
-    trigger === null
-      ? BLANK
-      : {
-          pattern: trigger.pattern,
-          response: trigger.response,
-          match: trigger.match,
-          case_sensitive: trigger.case_sensitive ?? false,
-          delete_trigger: trigger.delete_trigger ?? false,
-          enabled: trigger.enabled ?? true,
-        },
+  const initial = useMemo<TriggerCreate>(
+    () =>
+      trigger === null
+        ? BLANK
+        : {
+            pattern: trigger.pattern,
+            response: trigger.response,
+            match: trigger.match,
+            case_sensitive: trigger.case_sensitive ?? false,
+            delete_trigger: trigger.delete_trigger ?? false,
+            enabled: trigger.enabled ?? true,
+          },
+    [trigger],
   );
+  const [draft, setDraft] = useState<TriggerCreate>(initial);
 
   const pending = create.isPending || update.isPending || remove.isPending;
   const failure = create.error ?? update.error;
   const valid = draft.pattern.trim() !== "" && draft.response.trim() !== "";
+
+  /*
+   * Compared field by field against what the editor opened with, so typing a
+   * character and deleting it again leaves the form clean. A boolean flipped by
+   * the first `setDraft` would call that dirty and ask on the way out.
+   */
+  const dirty = (Object.keys(initial) as (keyof TriggerCreate)[]).some(
+    (key) => draft[key] !== initial[key],
+  );
+  const confirmDiscard = useDiscardGuard({ dirty, onClose: onDone });
+  const leave = (): void => {
+    void confirmDiscard().then((may) => {
+      if (may) {
+        onDone();
+      }
+    });
+  };
 
   const submit = (): void => {
     const handlers = {
@@ -215,7 +236,7 @@ function Editor({
             {t("panel-delete")}
           </Button>
         )}
-        <Button variant="secondary" disabled={pending} onClick={onDone}>
+        <Button variant="secondary" disabled={pending} onClick={leave}>
           {t("panel-cancel")}
         </Button>
       </div>

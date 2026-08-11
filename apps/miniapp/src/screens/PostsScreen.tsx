@@ -27,6 +27,7 @@ import {
 } from "../components/ui";
 import { useI18n, useT } from "../i18n/I18nProvider";
 import { useCreatePost, useDeletePost, usePosts, useUpdatePost } from "../hooks/queries";
+import { useDiscardGuard } from "../hooks/useDiscardGuard";
 import { askConfirmation, hapticResult } from "../telegram/sdk";
 
 const KINDS: readonly ScheduleKind[] = ["once", "daily", "cron"];
@@ -177,6 +178,29 @@ function Editor({
   const failure = create.error ?? update.error ?? remove.error;
   const valid = content.trim() !== "" && value.trim() !== "";
 
+  /*
+   * Every field against the value it opened with, so a change made and undone
+   * leaves the form clean. A new post starts dirty the moment anything is typed,
+   * which is what the blank defaults below compare against.
+   */
+  const dirty =
+    title !== (post?.title ?? "") ||
+    content !== (post?.content ?? "") ||
+    kind !== (post?.schedule_kind ?? "daily") ||
+    value !==
+      (post === null ? DEFAULTS.daily : toInput(post.schedule_kind, post.schedule_value)) ||
+    pin !== (post?.pin ?? false) ||
+    deletePrevious !== (post?.delete_previous ?? false) ||
+    enabled !== (post?.enabled ?? true);
+  const confirmDiscard = useDiscardGuard({ dirty, onClose: onDone });
+  const leave = (): void => {
+    void confirmDiscard().then((may) => {
+      if (may) {
+        onDone();
+      }
+    });
+  };
+
   /** Each kind speaks its own dialect, so switching kinds starts from a default. */
   const switchKind = (next: ScheduleKind): void => {
     setKind(next);
@@ -281,7 +305,7 @@ function Editor({
             {t("panel-delete")}
           </Button>
         )}
-        <Button variant="secondary" disabled={pending} onClick={onDone}>
+        <Button variant="secondary" disabled={pending} onClick={leave}>
           {t("panel-cancel")}
         </Button>
       </div>

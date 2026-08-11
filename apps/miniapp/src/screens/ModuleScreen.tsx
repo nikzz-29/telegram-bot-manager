@@ -22,6 +22,7 @@ import {
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
 import { useMeta, useModules, useResetModule, useSaveModule } from "../hooks/queries";
+import { useDiscardGuard } from "../hooks/useDiscardGuard";
 import { useNavigation } from "../navigation";
 import { FieldInput, groupFields, groupKey, outOfRange } from "../settings/fields";
 import { type Field, fieldsOf, readPath, writePath } from "../settings/schema";
@@ -56,6 +57,15 @@ export function ModuleScreen({
     () => groupFields(flatten(fieldsOf(spec?.config_schema ?? {}))),
     [spec?.config_schema],
   );
+
+  /*
+   * Above the early returns: hooks cannot be called after one. `draft` is null
+   * until the first edit, which makes it the dirty flag as well as the value.
+   *
+   * No `onClose` — this editor is the whole screen rather than a panel inside a
+   * list, so agreeing to lose the draft means leaving the route.
+   */
+  useDiscardGuard({ dirty: draft !== null });
 
   if (meta.isPending || modules.isPending) {
     return (
