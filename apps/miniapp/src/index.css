@@ -146,7 +146,7 @@ button,
 
   .tg-input {
     @apply w-full rounded-lg bg-ground px-3 py-2.5 text-[15px] outline-none
-           border border-separator transition-colors
+           border border-separator transition-colors disabled:opacity-50
            focus:border-accent focus:ring-1 focus:ring-accent;
     transition-duration: var(--panel-motion);
   }

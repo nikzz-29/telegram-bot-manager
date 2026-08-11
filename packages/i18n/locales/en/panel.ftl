@@ -71,6 +71,11 @@ field-messages-count = {$count ->
        *[other] {$count} messages
     }
 field-invalid-number = Enter a number between {$min} and {$max}.
+# List fields: the greeting's buttons, the level titles.
+field-add = Add
+field-remove = Remove
+field-list-empty = Nothing added yet.
+field-list-incomplete = Fill in every field of each entry — it cannot be saved otherwise.
 
 ## Settings — group headings
 #
@@ -150,6 +155,10 @@ setting-captcha-kick-on-timeout = Remove on timeout
 setting-greeting-enabled = Greet new members
 setting-greeting-text = Greeting
 setting-greeting-media-file-id = Image file_id
+setting-greeting-buttons = Buttons under the greeting
+setting-greeting-buttons-text = Label
+setting-greeting-buttons-url = Link
+setting-greeting-buttons-url-hint = Starts with https:// or tg://
 setting-greeting-delete-after-minutes = Delete the greeting after
 setting-rules-link = Rules link
 setting-autoban-new-accounts = Screen new accounts
@@ -175,6 +184,12 @@ setting-reputation-daily-limit = Points one member can give per day
 setting-reputation-cooldown-seconds = Pause between points
 setting-levels-enabled = Levels enabled
 setting-points-per-message = Points per message
+# Level/title pairs. The admin invents the keys, so this field labels both halves
+# of a row and says what a key may be.
+setting-level-titles = Level names
+setting-level-titles-key = Level
+setting-level-titles-value = Name
+setting-level-titles-key-hint = The key is a level number, from 1 up.
 setting-triggers-enabled = Triggers enabled
 setting-sample-rate = Share of messages checked
 setting-min-text-length = Minimum length to check

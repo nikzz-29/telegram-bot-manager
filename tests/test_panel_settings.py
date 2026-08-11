@@ -80,6 +80,8 @@ def _rendered(
         elif prop.get("type") == "array":
             if _deref(prop.get("items", {}), defs).get("type") == "string":
                 found.append((path, prop))
+            else:
+                found.extend(_entry_rows(prop, defs, path))
         elif prop.get("type") == "object" and prop.get("properties"):
             found.extend(_rendered(prop, defs, path))
         elif prop.get("type") == "object":
@@ -87,21 +89,58 @@ def _rendered(
     return found
 
 
+# The kinds a repeating group can draw for one of its entries, mirroring
+# `ENTRY_KINDS` in `apps/miniapp/src/settings/schema.ts`.
+_ENTRY_TYPES = frozenset({"string", "integer", "number"})
+
+
+def _entry_rows(
+    prop: dict[str, Any], defs: dict[str, Any], path: str
+) -> list[tuple[str, dict[str, Any]]]:
+    """A `list[SomeModel]`, as the label for the list plus one per entry field.
+
+    Only a flat entry qualifies: every field has to be a scalar the group can draw
+    inline, so an enum or a nested object anywhere in an entry makes the whole list
+    decline — no form, and so no labels to check either.
+
+    The entry fields hang off the list's own key (`setting-greeting-buttons-url`)
+    because their names are relative to an entry rather than paths into the config.
+    """
+    items = _deref(prop.get("items", {}), defs)
+    fields: list[tuple[str, dict[str, Any]]] = []
+    for name, raw in (items.get("properties") or {}).items():
+        unwrapped = _unwrap_optional(raw, defs)
+        if unwrapped is None:
+            return []
+        inner = _deref(unwrapped, defs)
+        if "enum" in inner or inner.get("type") not in _ENTRY_TYPES:
+            return []
+        fields.append((f"{path}.{name}", inner))
+    return [(path, prop), *fields] if fields else []
+
+
 def _map_rows(
     prop: dict[str, Any], defs: dict[str, Any], path: str
 ) -> list[tuple[str, dict[str, Any]]]:
-    """A `dict[SomeEnum, V]`, as the one row per key the panel draws for it.
+    """A `dict[K, V]`, as the rows the panel draws for it.
 
-    Only a closed key set qualifies: the panel needs to know every row before it
-    can render one, which `propertyNames.enum` is what tells it. An open-ended
-    map (`dict[str, str]`) has no generated form and no labels to check.
+    A closed key set (`dict[SomeEnum, V]`) becomes one row per key, which
+    `propertyNames.enum` is what tells the panel. An open-ended `dict[str, str]`
+    cannot: the keys are the admin's to invent, so it becomes a pair editor
+    instead, labelled by the field and by the two halves of a row.
+
+    A map constrained by neither has no generated form and no labels to check.
     """
-    keys = prop.get("propertyNames", {}).get("enum")
+    keys = prop.get("propertyNames", {})
     value = prop.get("additionalProperties")
-    if keys is None or not isinstance(value, dict):
+    if not isinstance(value, dict):
         return []
     resolved = _deref(value, defs)
-    return [(f"{path}.{key}", resolved) for key in keys]
+    if (members := keys.get("enum")) is not None:
+        return [(f"{path}.{key}", resolved) for key in members]
+    if resolved.get("type") == "string" and "pattern" in keys:
+        return [(path, prop), (f"{path}.key", keys), (f"{path}.value", resolved)]
+    return []
 
 
 def _all_fields() -> list[tuple[str, dict[str, Any]]]:
@@ -124,6 +163,21 @@ def _option_keys() -> set[str]:
     }
 
 
+def _hint_keys() -> set[str]:
+    """A field constrained by a regex draws `<label>-hint` under itself.
+
+    The panel can state a numeric bound after the fact, once a number falls
+    outside it — the input itself suggests what belongs there. A pattern cannot be
+    guessed at from an empty box, so the rule is the other way round: wherever the
+    schema names one, the form says up front what it wants.
+    """
+    return {
+        "setting-" + path.replace(".", "-").replace("_", "-") + "-hint"
+        for path, prop in _all_fields()
+        if "pattern" in prop
+    }
+
+
 @pytest.mark.parametrize("locale", _LOCALES)
 def test_every_generated_field_has_a_label(locale: str) -> None:
     missing = sorted(_setting_keys() - _panel_keys(locale))
@@ -135,6 +189,12 @@ def test_every_enum_choice_has_a_label(locale: str) -> None:
     """A dropdown of raw `delete_warn` values is a form nobody can fill in."""
     missing = sorted(_option_keys() - _panel_keys(locale))
     assert not missing, f"{locale}: enum choices without a label: {missing}"
+
+
+@pytest.mark.parametrize("locale", _LOCALES)
+def test_every_patterned_field_says_what_it_wants(locale: str) -> None:
+    missing = sorted(_hint_keys() - _panel_keys(locale))
+    assert not missing, f"{locale}: patterns with nothing explaining them: {missing}"
 
 
 @pytest.mark.parametrize("locale", _LOCALES)
@@ -184,6 +244,8 @@ def test_no_label_outlives_the_field_it_names() -> None:
     cannot tell which labels are live.
     """
     stale = sorted(
-        {key for key in _panel_keys("ru") if key.startswith("setting-")} - _setting_keys()
+        {key for key in _panel_keys("ru") if key.startswith("setting-")}
+        - _setting_keys()
+        - _hint_keys()
     )
     assert not stale, f"labels with no field: {stale}"

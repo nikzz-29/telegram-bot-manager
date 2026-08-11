@@ -6,6 +6,7 @@ Stage 7 and runs against testcontainers.
 
 from datetime import UTC, datetime, timedelta
 
+from pydantic import ValidationError
 import pytest
 from sqlalchemy.engine.default import DefaultDialect
 
@@ -29,6 +30,7 @@ from i18n.runtime import LOCALES_DIR, localization
 from shared.enums import ModuleName, Plan
 from shared.errors import InvalidDurationError
 from shared.plans import Feature
+from shared.schemas.module_configs import EngagementConfig, InlineButton
 
 NOW = datetime(2026, 8, 9, tzinfo=UTC)
 
@@ -121,6 +123,38 @@ def test_moderation_is_mandatory_and_on_by_default() -> None:
 def test_module_configs_validate_to_their_declared_model() -> None:
     for spec in registry:
         assert isinstance(spec.default_config(), spec.config_model)
+
+
+@pytest.mark.parametrize(
+    "url", ["https://t.me/devs", "http://example.com", "tg://resolve?domain=x"]
+)
+def test_a_greeting_button_takes_a_scheme_telegram_accepts(url: str) -> None:
+    assert InlineButton(text="Rules", url=url).url == url
+
+
+@pytest.mark.parametrize("url", ["t.me/devs", "example.com", "javascript:alert(1)", "/rules"])
+def test_a_greeting_button_refuses_a_url_telegram_would_reject(url: str) -> None:
+    """`sendMessage` rejects the whole keyboard over one bad button.
+
+    Which means a URL without a scheme does not cost the button, it costs the
+    greeting: nothing is sent at all. Refused here so the panel can say so before
+    saving, rather than the bot going quiet for every new member.
+    """
+    with pytest.raises(ValidationError):
+        InlineButton(text="Rules", url=url)
+
+
+def test_level_titles_drop_a_key_that_names_no_level() -> None:
+    """`level_title` looks a title up as `str(level)`, so anything else is unread.
+
+    Normalised away rather than rejected: a config hand-edited before the panel
+    could reach this field has to keep loading. `"0"` goes too — levels start at
+    one — and so do the digits `str()` cannot produce.
+    """
+    config = EngagementConfig(
+        level_titles={"1": "Новичок", "0": "", "05": "x", "silver": "Серебро", "٣": "y"}
+    )
+    assert config.level_titles == {"1": "Новичок"}
 
 
 def test_miniapp_sections_have_unique_ordered_keys() -> None:

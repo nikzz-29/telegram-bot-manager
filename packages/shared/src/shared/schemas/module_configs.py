@@ -126,7 +126,19 @@ class EntryConfig(ModuleConfig):
 
 class InlineButton(ModuleConfig):
     text: str = Field(min_length=1, max_length=64)
-    url: str = Field(min_length=1, max_length=2_048)
+    # A scheme Telegram will accept on an inline button. Without this the greeting
+    # takes "t.me/channel" without complaint and then fails to send at all —
+    # `sendMessage` rejects the whole keyboard, so one malformed button costs the
+    # greeting, not the button. The panel reads the same pattern off the schema
+    # and refuses to save before the round trip.
+    #
+    # Rejected rather than normalised away, unlike `level_titles` below: dropping
+    # the button the admin just typed would be a save that silently did something
+    # else. The cost is that a URL stored before this existed makes the whole
+    # `entry` config fall back to defaults on load — which is the tightened-range
+    # case `ModuleConfigService._validate` is already written for, and this field
+    # had no editor at all until now, so there is next to nothing out there to hit.
+    url: str = Field(min_length=1, max_length=2_048, pattern=r"^(?:https?|tg)://")
 
 
 class StatsConfig(ModuleConfig):
@@ -138,6 +150,17 @@ class StatsConfig(ModuleConfig):
     timezone: str = "UTC"
 
 
+# The shape of a `level_titles` key, named in the schema so the panel can key its
+# editor by number instead of offering a free-text box.
+#
+# `core.reputation.level_title` looks a title up as `str(level)`, so a key that is
+# not a level number is a title the bot can never read. No upper bound: the level
+# curve's ceiling lives in `core`, and duplicating it across the layer boundary
+# would only give it somewhere to drift to — a title for an unreachable level is
+# inert, not wrong.
+_LEVEL_KEYS: Final[dict[str, Any]] = {"propertyNames": {"pattern": r"^[1-9][0-9]*$"}}
+
+
 class EngagementConfig(ModuleConfig):
     reputation_enabled: bool = False
     reputation_keywords: list[str] = Field(default_factory=lambda: ["+", "спасибо", "thanks"])
@@ -146,9 +169,26 @@ class EngagementConfig(ModuleConfig):
 
     levels_enabled: bool = False
     points_per_message: int = Field(default=1, ge=0, le=100)
-    level_titles: dict[str, str] = Field(default_factory=dict)
+    level_titles: dict[str, str] = Field(default_factory=dict, json_schema_extra=_LEVEL_KEYS)
 
     triggers_enabled: bool = False
+
+    @field_validator("level_titles")
+    @classmethod
+    def _level_numbers_only(cls, value: dict[str, str]) -> dict[str, str]:
+        """Drop a key that names no level, rather than store a title nothing reads.
+
+        Normalised away instead of rejected so that a config hand-edited before
+        the panel could reach this field still loads — the same reasoning as
+        `AiModerationConfig._drop_inert_ok`.
+        """
+        return {
+            key: title
+            for key, title in value.items()
+            # `isascii` as well as `isdigit`: the latter is true of "²" and of the
+            # Arabic-Indic digits, neither of which `str(level)` can ever produce.
+            if key.isascii() and key.isdigit() and not key.startswith("0")
+        }
 
 
 class AutopostConfig(ModuleConfig):

@@ -73,6 +73,11 @@ field-messages-count = {$count ->
        *[other] {$count} сообщений
     }
 field-invalid-number = Введите число от {$min} до {$max}.
+# Поля-списки: кнопки под приветствием, названия уровней.
+field-add = Добавить
+field-remove = Удалить
+field-list-empty = Пока ничего не добавлено.
+field-list-incomplete = Заполните все поля в каждой записи — иначе сохранить нельзя.
 
 ## Настройки — заголовки групп
 #
@@ -152,6 +157,10 @@ setting-captcha-kick-on-timeout = Исключать, если не ответи
 setting-greeting-enabled = Приветствовать новичков
 setting-greeting-text = Текст приветствия
 setting-greeting-media-file-id = file_id картинки
+setting-greeting-buttons = Кнопки под приветствием
+setting-greeting-buttons-text = Надпись
+setting-greeting-buttons-url = Ссылка
+setting-greeting-buttons-url-hint = Начинается с https:// или tg://
 setting-greeting-delete-after-minutes = Удалять приветствие через
 setting-rules-link = Ссылка на правила
 setting-autoban-new-accounts = Проверять новые аккаунты
@@ -177,6 +186,12 @@ setting-reputation-daily-limit = Сколько очков можно разда
 setting-reputation-cooldown-seconds = Пауза между очками
 setting-levels-enabled = Уровни включены
 setting-points-per-message = Очков за сообщение
+# Пары «уровень — название». Ключи придумывает админ, поэтому у поля свои
+# подписи для обеих половин строки и подсказка о том, что годится в ключ.
+setting-level-titles = Названия уровней
+setting-level-titles-key = Уровень
+setting-level-titles-value = Название
+setting-level-titles-key-hint = Ключ — номер уровня, начиная с 1.
 setting-triggers-enabled = Триггеры включены
 setting-sample-rate = Доля проверяемых сообщений
 setting-min-text-length = Минимальная длина для проверки
