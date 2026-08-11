@@ -17,6 +17,7 @@ import {
   invoice,
   miniApp,
   openLink,
+  popup,
   retrieveRawInitData,
   viewport,
 } from "@telegram-apps/sdk-react";
@@ -135,6 +136,64 @@ export async function openInvoice(url: string): Promise<InvoiceOutcome> {
     return status === "paid" ? "paid" : status === "cancelled" ? "cancelled" : "failed";
   } catch {
     return "failed";
+  }
+}
+
+/** What to put in a confirmation popup. Both labels come from the panel's own
+ * catalogue rather than from Telegram's `cancel` button type: the panel has its
+ * own locale switcher, and a client set to a different language would otherwise
+ * answer an English question with a Russian button. */
+export interface ConfirmRequest {
+  message: string;
+  confirmText: string;
+  cancelText: string;
+  title?: string;
+  /** Paints the confirm button red. On for anything that destroys data. */
+  destructive?: boolean;
+}
+
+// Telegram's own caps. A longer string is rejected outright, which would turn a
+// too-wordy translation into a delete button that silently does nothing.
+const POPUP_TITLE_LIMIT = 64;
+const POPUP_MESSAGE_LIMIT = 256;
+const CONFIRM_BUTTON_ID = "confirm";
+
+/**
+ * Ask the user to confirm, and resolve to what they chose.
+ *
+ * DECISION: a native popup rather than `window.confirm`. A Mini App is a webview
+ * whose host owns the modal layer — several clients suppress the browser dialog
+ * outright, and `window.confirm` returning `false` unprompted reads as "the user
+ * said no" to code that cannot tell the difference. `popup.show` is answered by
+ * the user or not at all.
+ *
+ * Dismissing the popup — tapping outside it or the close chevron — resolves to
+ * `null`, which is a no, same as the cancel button.
+ */
+export async function askConfirmation(request: ConfirmRequest): Promise<boolean> {
+  if (!popup.show.isAvailable()) {
+    // A plain browser during development, or a client older than Mini Apps 6.2.
+    // The browser dialog is the only thing left, and outside Telegram it works.
+    return window.confirm(request.message);
+  }
+  try {
+    const pressed = await popup.show({
+      title: request.title?.slice(0, POPUP_TITLE_LIMIT),
+      message: request.message.slice(0, POPUP_MESSAGE_LIMIT),
+      buttons: [
+        { id: "cancel", type: "default", text: request.cancelText },
+        {
+          id: CONFIRM_BUTTON_ID,
+          type: request.destructive === true ? "destructive" : "default",
+          text: request.confirmText,
+        },
+      ],
+    });
+    return pressed === CONFIRM_BUTTON_ID;
+  } catch {
+    // A popup already on screen, or a client that refused this one. Treating
+    // either as a yes would delete something nobody agreed to.
+    return false;
   }
 }
 

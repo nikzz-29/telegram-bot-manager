@@ -28,7 +28,7 @@ import {
   useTriggers,
   useUpdateTrigger,
 } from "../hooks/queries";
-import { hapticResult } from "../telegram/sdk";
+import { askConfirmation, hapticResult } from "../telegram/sdk";
 
 const MATCHES = ["exact", "contains", "regex"] as const;
 
@@ -193,8 +193,14 @@ function Editor({
           <Button
             variant="destructive"
             disabled={pending}
-            onClick={() => {
-              if (!window.confirm(t("panel-confirm-delete"))) {
+            onClick={async () => {
+              const confirmed = await askConfirmation({
+                message: t("panel-confirm-delete"),
+                confirmText: t("panel-delete"),
+                cancelText: t("panel-cancel"),
+                destructive: true,
+              });
+              if (!confirmed) {
                 return;
               }
               remove.mutate(trigger.id, {

@@ -30,7 +30,7 @@ import {
   usePlatformStats,
   useRevokeGlobalBan,
 } from "../hooks/queries";
-import { hapticResult } from "../telegram/sdk";
+import { askConfirmation, hapticResult } from "../telegram/sdk";
 
 const PLANS: readonly Plan[] = ["free", "pro", "business", "white_label"];
 
@@ -270,8 +270,16 @@ function Broadcast(): React.JSX.Element {
       <div className="mt-3 space-y-2">
         <Button
           disabled={text.trim() === "" || plans.length === 0 || broadcast.isPending}
-          onClick={() => {
-            if (!window.confirm(t("platform-broadcast-confirm"))) {
+          onClick={async () => {
+            const confirmed = await askConfirmation({
+              message: t("platform-broadcast-confirm"),
+              confirmText: t("platform-broadcast-send"),
+              cancelText: t("panel-cancel"),
+              // Not destructive — nothing is deleted — but it is irreversible
+              // and goes to every chat at once, so it still gets a gate.
+              destructive: false,
+            });
+            if (!confirmed) {
               return;
             }
             broadcast.mutate(

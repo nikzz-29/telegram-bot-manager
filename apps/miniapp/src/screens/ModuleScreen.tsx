@@ -25,7 +25,7 @@ import { useMeta, useModules, useResetModule, useSaveModule } from "../hooks/que
 import { useNavigation } from "../navigation";
 import { FieldInput, groupFields, groupKey, outOfRange } from "../settings/fields";
 import { type Field, fieldsOf, readPath, writePath } from "../settings/schema";
-import { hapticResult } from "../telegram/sdk";
+import { askConfirmation, hapticResult } from "../telegram/sdk";
 
 /** Nested objects render as part of their parent group, not as a row. */
 function flatten(fields: readonly Field[]): Field[] {
@@ -218,8 +218,14 @@ export function ModuleScreen({
             <Button
               variant="destructive"
               disabled={reset.isPending}
-              onClick={() => {
-                if (!window.confirm(t("module-reset-confirm"))) {
+              onClick={async () => {
+                const confirmed = await askConfirmation({
+                  message: t("module-reset-confirm"),
+                  confirmText: t("module-reset"),
+                  cancelText: t("panel-cancel"),
+                  destructive: true,
+                });
+                if (!confirmed) {
                   return;
                 }
                 reset.mutate(module, {

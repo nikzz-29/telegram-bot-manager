@@ -27,7 +27,7 @@ import {
 } from "../components/ui";
 import { useI18n, useT } from "../i18n/I18nProvider";
 import { useCreatePost, useDeletePost, usePosts, useUpdatePost } from "../hooks/queries";
-import { hapticResult } from "../telegram/sdk";
+import { askConfirmation, hapticResult } from "../telegram/sdk";
 
 const KINDS: readonly ScheduleKind[] = ["once", "daily", "cron"];
 
@@ -259,8 +259,14 @@ function Editor({
           <Button
             variant="destructive"
             disabled={pending}
-            onClick={() => {
-              if (!window.confirm(t("panel-confirm-delete"))) {
+            onClick={async () => {
+              const confirmed = await askConfirmation({
+                message: t("panel-confirm-delete"),
+                confirmText: t("panel-delete"),
+                cancelText: t("panel-cancel"),
+                destructive: true,
+              });
+              if (!confirmed) {
                 return;
               }
               remove.mutate(post.id, {
