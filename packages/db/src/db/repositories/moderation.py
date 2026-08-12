@@ -3,15 +3,23 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Final
 
-from sqlalchemy import func, select, update
+from sqlalchemy import desc, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import ModerationLog, Punishment, Warn
 from db.repositories._dml import execute_dml
 from shared.enums import PunishmentType
 from shared.time_utils import utc_now
+
+# `ModerationLog.moderator_tg_id` carries two shapes of "no human did this": a
+# NULL, written by the expiry job and by `ModerationService.log_action`, and the
+# `0` sentinel that `bot.enforcement.AUTOMATIC_MODERATOR` puts on an automatic
+# warn or mute. The constant is repeated here rather than imported because the
+# database layer must not depend on the bot process; both halves say why 0 is
+# safe — no Telegram account has a non-positive id.
+AUTOMATED_MODERATOR_ID: Final = 0
 
 
 class WarnRepository:
@@ -103,6 +111,21 @@ class WarnRepository:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def count_issued(self, chat_id: int, since: datetime) -> int:
+        """Warns handed out in a window, whether or not they still stand.
+
+        Deliberately not `count_active`: the personal report says what the
+        moderators did, and a warn that has since expired or been revoked was
+        still work someone did. Served by `ix_warns_chat_user` on its `chat_id`
+        prefix — one chat's rows, filtered by date in place.
+        """
+        result = await self._session.execute(
+            select(func.count())
+            .select_from(Warn)
+            .where(Warn.chat_id == chat_id, Warn.created_at >= since)
+        )
+        return int(result.scalar_one())
 
 
 class PunishmentRepository:
@@ -202,6 +225,21 @@ class PunishmentRepository:
         )
         return int(result.scalar_one())
 
+    async def count_issued_by_type(self, chat_id: int, since: datetime) -> dict[str, int]:
+        """Punishments handed out in a window, keyed by `PunishmentType` value.
+
+        Counts rows as issued rather than as currently in force: a mute that was
+        lifted early, and a re-mute that superseded an earlier one, are two
+        separate things a moderator did. Keys are plain strings so the caller can
+        look them up with either the enum member or its value.
+        """
+        result = await self._session.execute(
+            select(Punishment.type, func.count())
+            .where(Punishment.chat_id == chat_id, Punishment.created_at >= since)
+            .group_by(Punishment.type)
+        )
+        return {str(punishment_type): int(total) for punishment_type, total in result.all()}
+
 
 class ModerationLogRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -238,10 +276,84 @@ class ModerationLogRepository:
         )
         return list(result.scalars().all())
 
-    async def count_since(self, chat_id: int, since: datetime) -> int:
-        result = await self._session.execute(
+    async def count_since(
+        self, chat_id: int, since: datetime, *, until: datetime | None = None
+    ) -> int:
+        """Actions logged for a chat in a window.
+
+        `until` closes the window at the far end, which is what lets the personal
+        report compare this period against the one immediately before it.
+        """
+        stmt = (
             select(func.count())
             .select_from(ModerationLog)
             .where(ModerationLog.chat_id == chat_id, ModerationLog.created_at >= since)
         )
+        if until is not None:
+            stmt = stmt.where(ModerationLog.created_at < until)
+        result = await self._session.execute(stmt)
         return int(result.scalar_one())
+
+    async def count_by_action(
+        self, chat_id: int, since: datetime, *, limit: int = 20
+    ) -> list[tuple[str, int]]:
+        """Action → how many, largest group first: *what* the moderation was.
+
+        Grouping happens on the raw action string rather than on a fixed list of
+        kinds, so an action a later module starts writing shows up here instead of
+        quietly vanishing from the totals. Ties break on the name so the same
+        window renders the same way twice.
+        """
+        result = await self._session.execute(
+            select(ModerationLog.action, func.count().label("total"))
+            .where(ModerationLog.chat_id == chat_id, ModerationLog.created_at >= since)
+            .group_by(ModerationLog.action)
+            .order_by(desc("total"), ModerationLog.action)
+            .limit(limit)
+        )
+        return [(str(action), int(total)) for action, total in result.all()]
+
+    async def count_for_moderator(self, chat_id: int, moderator_tg_id: int, since: datetime) -> int:
+        """How much of a chat's moderation one person did in a window.
+
+        Runs on `ix_moderation_logs_moderator` — `(chat_id, moderator_tg_id,
+        created_at)`.
+
+        The automated sentinel is refused instead of queried: rows the bot wrote
+        by itself carry `moderator_tg_id` NULL or `0` (see
+        `AUTOMATED_MODERATOR_ID`), so answering for id 0 would credit a person
+        with every autoban, flood mute and expiry the software handled alone.
+        """
+        if moderator_tg_id <= AUTOMATED_MODERATOR_ID:
+            return 0
+        result = await self._session.execute(
+            select(func.count())
+            .select_from(ModerationLog)
+            .where(
+                ModerationLog.chat_id == chat_id,
+                ModerationLog.moderator_tg_id == moderator_tg_id,
+                ModerationLog.created_at >= since,
+            )
+        )
+        return int(result.scalar_one())
+
+    async def moderator_split(self, chat_id: int, since: datetime) -> dict[str, int]:
+        """Split a window's actions into the bot's own work and the humans'.
+
+        Both shapes of `AUTOMATED_MODERATOR_ID` count as automated, and neither
+        may enter the distinct-moderator count — a chat where the bot handled
+        everything has zero moderators at work, not one called "0". Two aggregates
+        over one index scan, because the report always prints them together.
+        """
+        automated = ModerationLog.moderator_tg_id.is_(None) | (
+            ModerationLog.moderator_tg_id <= AUTOMATED_MODERATOR_ID
+        )
+        by_human = ModerationLog.moderator_tg_id > AUTOMATED_MODERATOR_ID
+        result = await self._session.execute(
+            select(
+                func.count().filter(automated),
+                func.count(func.distinct(ModerationLog.moderator_tg_id)).filter(by_human),
+            ).where(ModerationLog.chat_id == chat_id, ModerationLog.created_at >= since)
+        )
+        automated_total, moderators = result.one()
+        return {"automated": int(automated_total), "moderators": int(moderators)}

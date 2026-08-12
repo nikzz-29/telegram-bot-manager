@@ -16,7 +16,7 @@ from html import escape
 from typing import Final
 
 from i18n.runtime import Translator
-from shared.schemas.api import StatsOverview
+from shared.schemas.api import StatsOverview, TopUser
 
 # Bars for the activity sparkline, lightest to heaviest.
 BLOCKS: Final = "▁▂▃▄▅▆▇█"
@@ -40,19 +40,25 @@ def sparkline(values: list[int]) -> str:
     return "".join(BLOCKS[round(value / peak * span)] for value in trimmed)
 
 
+def top_user_label(entry: TopUser) -> str:
+    """How a member is named on a top board, escaped for HTML.
+
+    Falls back through display name, `@username` and finally the raw id: the
+    statistics rollup keys on the Telegram id, so a member the bot has never seen
+    speak by name still has to be printable. Shared with the private-chat report,
+    which prints the same board under its own keys.
+    """
+    name = entry.display_name or (f"@{entry.username}" if entry.username else "")
+    return escape(name or str(entry.tg_user_id))
+
+
 def _top_lines(overview: StatsOverview, t: Translator) -> list[str]:
     if not overview.top_users:
         return []
     lines = [t("stats-top-title")]
     for place, entry in enumerate(overview.top_users[:TOP_LIMIT], start=1):
-        name = entry.display_name or (f"@{entry.username}" if entry.username else "")
         lines.append(
-            t(
-                "stats-top-row",
-                place=place,
-                user=escape(name or str(entry.tg_user_id)),
-                messages=entry.messages,
-            )
+            t("stats-top-row", place=place, user=top_user_label(entry), messages=entry.messages)
         )
     return lines
 
@@ -80,4 +86,4 @@ def format_overview(overview: StatsOverview, *, title: str, t: Translator) -> st
     return "\n".join(lines)
 
 
-__all__ = ["BLOCKS", "MAX_COLUMNS", "TOP_LIMIT", "format_overview", "sparkline"]
+__all__ = ["BLOCKS", "MAX_COLUMNS", "TOP_LIMIT", "format_overview", "sparkline", "top_user_label"]

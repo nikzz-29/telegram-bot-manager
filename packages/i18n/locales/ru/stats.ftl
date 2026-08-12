@@ -21,6 +21,10 @@ report-messages = 💬 Сообщений: <b>{ $count }</b>
 report-active = 👥 Активных участников: <b>{ $count }</b>
 report-flow = 📈 Пришло: <b>{ $joins }</b> · ушло: <b>{ $leaves }</b> · итог: <b>{ $growth }</b>
 report-chart = 📉 Активность: { $chart }
+# Дата в ISO: `08.11` и `11.08` — один и тот же день для разных читателей, а эту
+# строку цитируют в переписке.
+report-peak = 📅 Пик активности: <b>{ $date }</b> · { $count }
+report-chart-moderation = 🛡 Модерация по дням: { $chart }
 report-empty = Пока пусто — данные появятся, как только в чате начнётся жизнь.
 
 ## --- модерация ---
@@ -31,6 +35,34 @@ report-moderation-actions = Всего действий: <b>{ $count }</b>
 report-moderation-warns = Предупреждений выдано: <b>{ $count }</b>
 report-moderation-punishments = Мутов и банов: <b>{ $count }</b>
 report-moderation-mine = Из них ваших: <b>{ $count }</b>
+report-moderation-automated = Автоматически ботом: <b>{ $count }</b>
+report-moderation-moderators = { $count ->
+        [0] Люди не вмешивались — всё сделал бот
+        [one] Работал <b>{ $count }</b> модератор
+        [few] Работали <b>{ $count }</b> модератора
+       *[other] Работали <b>{ $count }</b> модераторов
+    }
+# `delta` приходит строкой со знаком: число Fluent отформатировал бы по локали и
+# «+» из него пропал бы.
+report-moderation-trend = 📐 Прошлый период: <b>{ $previous }</b> ({ $delta })
+
+## --- из чего сложились действия ---
+# Названия действий во множественном числе: это подписи к числам, а не заголовки
+# событий в журнале (те живут в main.ftl под префиксом `log-action-`).
+report-breakdown-title = 🧾 <b>Из чего сложилось</b>
+report-breakdown-row = • { $label } — <b>{ $count }</b>
+report-action-warn = Предупреждения
+report-action-unwarn = Снятые предупреждения
+report-action-mute = Муты
+report-action-unmute = Снятые муты
+report-action-ban = Баны
+report-action-unban = Разбаны
+report-action-kick = Исключения
+report-action-delete = Удалённые сообщения
+report-action-alert = Сигналы администраторам
+report-action-flagged = Зафиксировано без наказания
+report-action-auto-lift = Ограничения, снятые по сроку
+report-action-other = Прочее
 
 ## --- топ участников ---
 report-top-title = 🏆 <b>Самые активные</b>
