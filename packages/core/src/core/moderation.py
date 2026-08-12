@@ -20,7 +20,7 @@ from core import jobs
 from core.durations import clamp_restriction, expiry_from
 from core.jobs import JobName, job_id
 from db.uow import UnitOfWork
-from shared.enums import ModerationAction, PunishmentType, WarnPunishment
+from shared.enums import ModerationAction, PunishmentType, StatEventType, WarnPunishment
 from shared.logging import get_logger
 from shared.schemas.module_configs import ModerationConfig
 from shared.time_utils import utc_now
@@ -65,6 +65,38 @@ class ModerationService:
     def __init__(self, uow_factory: type[UnitOfWork] = UnitOfWork) -> None:
         self._uow_factory = uow_factory
 
+    async def _log(
+        self,
+        uow: UnitOfWork,
+        *,
+        chat_id: int,
+        action: str,
+        tg_user_id: int | None,
+        moderator_tg_id: int | None,
+        reason: str = "",
+        details: dict[str, Any] | None = None,
+    ) -> None:
+        """Persist one moderation action in the two places that read it back.
+
+        `moderation_logs` is the row the private report counts directly; a
+        `StatEventType.MODERATION` event is what the daily rollup folds into the
+        group `/stats` moderation-load chart. Both are written here, inside the
+        caller's transaction, so the two views of "how much moderation happened"
+        cannot drift — every logged action is one point on the chart, human or
+        automatic alike.
+        """
+        await uow.moderation_logs.add(
+            chat_id=chat_id,
+            action=action,
+            tg_user_id=tg_user_id,
+            moderator_tg_id=moderator_tg_id,
+            reason=reason,
+            details=details,
+        )
+        await uow.stats.add_event(
+            chat_id=chat_id, event_type=StatEventType.MODERATION, tg_user_id=tg_user_id
+        )
+
     # --- warns ----------------------------------------------------------------
     async def warn(
         self, target: ModerationTarget, *, reason: str, config: ModerationConfig
@@ -80,7 +112,8 @@ class ModerationService:
                 expires_at=expires_at,
             )
             count = await uow.warns.count_active(target.chat_id, target.tg_user_id)
-            await uow.moderation_logs.add(
+            await self._log(
+                uow,
                 chat_id=target.chat_id,
                 action="warn",
                 tg_user_id=target.tg_user_id,
@@ -139,7 +172,8 @@ class ModerationService:
                 target.chat_id, target.tg_user_id, moderator_tg_id=target.moderator_tg_id
             )
             if revoked is not None:
-                await uow.moderation_logs.add(
+                await self._log(
+                    uow,
                     chat_id=target.chat_id,
                     action="unwarn",
                     tg_user_id=target.tg_user_id,
@@ -187,7 +221,8 @@ class ModerationService:
             await uow.punishments.deactivate_for_user(
                 target.chat_id, target.tg_user_id, PunishmentType.KICK
             )
-            await uow.moderation_logs.add(
+            await self._log(
+                uow,
                 chat_id=target.chat_id,
                 action="kick",
                 tg_user_id=target.tg_user_id,
@@ -230,7 +265,8 @@ class ModerationService:
                 expires_at=expires_at,
                 arq_job_id=identifier,
             )
-            await uow.moderation_logs.add(
+            await self._log(
+                uow,
                 chat_id=target.chat_id,
                 action=punishment_type.value,
                 tg_user_id=target.tg_user_id,
@@ -268,7 +304,8 @@ class ModerationService:
             lifted = await uow.punishments.deactivate_for_user(
                 target.chat_id, target.tg_user_id, punishment_type
             )
-            await uow.moderation_logs.add(
+            await self._log(
+                uow,
                 chat_id=target.chat_id,
                 action=f"un{punishment_type.value}",
                 tg_user_id=target.tg_user_id,
@@ -327,7 +364,8 @@ class ModerationService:
         details: dict[str, Any] | None = None,
     ) -> None:
         async with self._uow_factory() as uow:
-            await uow.moderation_logs.add(
+            await self._log(
+                uow,
                 chat_id=target.chat_id,
                 action=action,
                 tg_user_id=target.tg_user_id,

@@ -15,7 +15,7 @@ import pytest
 
 from core import ai_moderation as ai_module
 from core import cache
-from core.ai_moderation import ai_moderation, text_hash
+from core.ai_moderation import AiDecision, ai_moderation, text_hash
 from core.ai_provider import (
     CircuitBreaker,
     ModerationContext,
@@ -23,7 +23,7 @@ from core.ai_provider import (
     Verdict,
     parse_verdict,
 )
-from shared.enums import AiVerdictLabel, ModerationAction
+from shared.enums import AiVerdictLabel, ModerationAction, StatEventType
 from shared.errors import ProviderUnavailableError
 from shared.schemas.module_configs import AiModerationConfig
 
@@ -344,6 +344,91 @@ async def test_a_provider_outage_degrades_instead_of_raising(
     assert not decision.should_act
     assert not verdict_cache.store, "a failure must not be cached as a verdict"
     assert not redis.counters, "a failed call must not be charged for"
+
+
+# --- the audit log: what record() writes --------------------------------------
+
+
+class FakeAiLogs:
+    """Captures every AI verdict handed to the audit log."""
+
+    def __init__(self) -> None:
+        self.rows: list[dict[str, Any]] = []
+
+    async def add(self, **kwargs: Any) -> None:
+        self.rows.append(kwargs)
+
+
+class FakeStats:
+    """Captures every stat event, as `(chat_id, type, tg_user_id)` tuples."""
+
+    def __init__(self) -> None:
+        self.events: list[tuple[int, StatEventType, int | None]] = []
+
+    async def add_event(
+        self,
+        *,
+        chat_id: int,
+        event_type: StatEventType,
+        tg_user_id: int | None = None,
+        payload: Any = None,
+    ) -> None:
+        self.events.append((chat_id, event_type, tg_user_id))
+
+
+class FakeUow:
+    """The two repositories `record()` writes to, plus a commit counter."""
+
+    def __init__(self) -> None:
+        self.ai_logs = FakeAiLogs()
+        self.stats = FakeStats()
+        self.commits = 0
+
+    async def __aenter__(self) -> FakeUow:
+        return self
+
+    async def __aexit__(self, *exc: object) -> bool:
+        return False
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+
+async def test_a_checked_verdict_is_logged_and_counted_as_one_stat_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The audit row and the `AI_CHECK` event are written together, so the daily
+    rollup can never disagree with the AI log about how many checks ran."""
+    uow = FakeUow()
+    monkeypatch.setattr(ai_module, "UnitOfWork", lambda: uow)
+    decision = AiDecision(
+        verdict=Verdict(label=AiVerdictLabel.SCAM, confidence=0.95, reason="bait"),
+        action=ModerationAction.DELETE,
+        checked=True,
+        text_hash="abc123",
+    )
+
+    await ai_moderation.record(decision, ctx=context())
+
+    assert len(uow.ai_logs.rows) == 1
+    assert uow.ai_logs.rows[0]["label"] is AiVerdictLabel.SCAM
+    assert uow.stats.events == [(1, StatEventType.AI_CHECK, 7)]
+    assert uow.commits == 1
+
+
+async def test_an_unchecked_decision_writes_nothing_at_all(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`SKIPPED` never ran the model, so it must leave no audit row and no event —
+    otherwise a sampled-out message would inflate the AI-check count."""
+    uow = FakeUow()
+    monkeypatch.setattr(ai_module, "UnitOfWork", lambda: uow)
+
+    await ai_moderation.record(ai_module.SKIPPED, ctx=context())
+
+    assert uow.ai_logs.rows == []
+    assert uow.stats.events == []
+    assert uow.commits == 0
 
 
 # --- the config model: what the panel draws ------------------------------------

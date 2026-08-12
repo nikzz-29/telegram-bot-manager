@@ -37,7 +37,7 @@ from core.ai_provider import (
 from core.redis_client import get_redis
 from db.uow import UnitOfWork
 from shared.config import get_settings
-from shared.enums import AiVerdictLabel, ModerationAction, Plan
+from shared.enums import AiVerdictLabel, ModerationAction, Plan, StatEventType
 from shared.errors import ProviderUnavailableError
 from shared.logging import get_logger
 from shared.plans import limits_for_plan
@@ -227,6 +227,15 @@ class AiModerationService:
                     confidence=decision.verdict.confidence,
                     action=decision.action.value,
                     text_hash=decision.text_hash,
+                )
+                # The same check, as a stat event: it rolls into the day's
+                # `metrics` so the count exists from the moment AI moderation runs,
+                # not from the day a screen first asks for it. One event per logged
+                # verdict keeps it in step with the AI audit log beside it.
+                await uow.stats.add_event(
+                    chat_id=ctx.chat_id,
+                    event_type=StatEventType.AI_CHECK,
+                    tg_user_id=ctx.tg_user_id,
                 )
                 await uow.commit()
         except Exception:
