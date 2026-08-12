@@ -24,7 +24,7 @@ from typing import Any
 import pytest
 
 from core.registry import registry
-from i18n.runtime import LOCALES_DIR, SUPPORTED_LOCALES, translator
+from i18n.runtime import BOT_CATALOGUES, LOCALES_DIR, SUPPORTED_LOCALES, translator
 from shared.enums import PaymentStatus, Plan, ScheduleKind, TriggerMatch
 from shared.plans import Feature
 
@@ -42,9 +42,12 @@ def _panel_keys(locale: str) -> set[str]:
 
 
 def _catalogue_keys(locale: str) -> set[str]:
-    """Both files the panel merges: it renders bot keys and panel keys alike."""
-    main = (LOCALES_DIR / locale / "main.ftl").read_text(encoding="utf-8")
-    return _panel_keys(locale) | {match.group(1) for match in _MESSAGE.finditer(main)}
+    """Every file the panel merges: it renders bot keys and panel keys alike."""
+    keys = _panel_keys(locale)
+    for catalogue in BOT_CATALOGUES:
+        source = (LOCALES_DIR / locale / catalogue).read_text(encoding="utf-8")
+        keys |= {match.group(1) for match in _MESSAGE.finditer(source)}
+    return keys
 
 
 def _deref(schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, Any]:

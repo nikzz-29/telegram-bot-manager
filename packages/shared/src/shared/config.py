@@ -1,6 +1,7 @@
 """Application settings loaded from the environment (pydantic-settings)."""
 
 from functools import lru_cache
+import re
 from typing import Final
 
 from pydantic import model_validator
@@ -11,6 +12,8 @@ MIN_JWT_SECRET_BYTES: Final = 32
 # Long enough to satisfy the RFC and pyjwt's key-length warning, so development
 # runs quiet; the production validator below still rejects it by exact match.
 PLACEHOLDER_JWT_SECRET: Final = "change-me-in-production-this-is-not-a-secret"
+# Used when `PANEL_COMMAND` is unset or is not something Telegram would accept.
+DEFAULT_PANEL_COMMAND: Final = "console"
 
 
 class Settings(BaseSettings):
@@ -79,6 +82,13 @@ class Settings(BaseSettings):
 
     # --- platform operators ---
     superadmin_ids: str = ""
+    # The command that hands the creator a button into the Mini App. Kept in
+    # configuration and out of `setMyCommands` so the panel has no discoverable
+    # entrance: everyone else sees a menu of moderation commands, and this one
+    # only answers the ids in `superadmin_ids`. Renaming it is not a security
+    # boundary — the id check is — but an unlisted name keeps curious members
+    # from finding a door to rattle. Stored without the leading slash.
+    panel_command: str = DEFAULT_PANEL_COMMAND
     global_ban_chat_threshold: int = 3
 
     # --- module defaults ---
@@ -96,6 +106,22 @@ class Settings(BaseSettings):
     def superadmin_id_list(self) -> tuple[int, ...]:
         raw = (self.superadmin_ids or "").replace(";", ",")
         return tuple(int(part) for part in raw.split(",") if part.strip().lstrip("-").isdigit())
+
+    @property
+    def panel_command_name(self) -> str:
+        """`PANEL_COMMAND` as aiogram's `Command` filter needs it.
+
+        Normalised rather than trusted: the natural thing to put in `.env` is
+        `/console`, and a leading slash there would make the filter look for
+        `//console` and never fire — a silent failure whose only symptom is the
+        creator's command doing nothing. Telegram itself allows only
+        `[a-z0-9_]{1,32}`, so anything outside that could never be typed as a
+        command anyway and falls back to the default.
+        """
+        candidate = (self.panel_command or "").strip().lstrip("/").lower()
+        if candidate and len(candidate) <= 32 and re.fullmatch(r"[a-z0-9_]+", candidate):
+            return candidate
+        return DEFAULT_PANEL_COMMAND
 
     @property
     def cors_origin_list(self) -> list[str]:

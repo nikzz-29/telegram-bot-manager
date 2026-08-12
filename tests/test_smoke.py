@@ -5,6 +5,7 @@ Stage 7 and runs against testcontainers.
 """
 
 from datetime import UTC, datetime, timedelta
+import re
 
 from pydantic import ValidationError
 import pytest
@@ -26,7 +27,8 @@ from core.stop_words import StopWordMatcher, matcher_for, normalize
 from db import models
 from db.base import Base
 from db.types import StrEnumType
-from i18n.runtime import LOCALES_DIR, localization
+from i18n.runtime import BOT_CATALOGUES, LOCALES_DIR, localization
+from shared.config import DEFAULT_PANEL_COMMAND, Settings
 from shared.enums import ModuleName, Plan
 from shared.errors import InvalidDurationError
 from shared.plans import Feature
@@ -293,6 +295,31 @@ def test_rate_limiter_reset_clears_history() -> None:
     assert limiter.is_allowed("1:2", policy, NOW)
 
 
+# --- configuration ------------------------------------------------------------
+def test_the_panel_command_is_normalised_the_way_the_filter_needs_it() -> None:
+    """`/console` in `.env` is the natural thing to write and the broken one.
+
+    aiogram's `Command` filter takes the name without a prefix, so a leading
+    slash left in place would have it match `//console` — the creator's command
+    would simply do nothing, with no error anywhere to explain why.
+    """
+    assert Settings(panel_command="/Console", _env_file=None).panel_command_name == "console"
+    assert Settings(panel_command="  hatch_23 ", _env_file=None).panel_command_name == "hatch_23"
+
+
+@pytest.mark.parametrize("value", ["", "  ", "two words", "dash-es", "x" * 33, "привет"])
+def test_a_panel_command_telegram_could_not_accept_falls_back(value: str) -> None:
+    """Telegram allows `[a-z0-9_]{1,32}` and nothing else in a command.
+
+    Anything outside that could never be typed as one, so the alternative to a
+    fallback is a console with no entrance at all — and the operator would have
+    no way to tell that from the command being secret and working.
+    """
+    assert Settings(panel_command=value, _env_file=None).panel_command_name == (
+        DEFAULT_PANEL_COMMAND
+    )
+
+
 # --- i18n ---------------------------------------------------------------------
 # DECISION: these assert that a key *resolves*, not what it says. Pinning the
 # exact copy made every wording change a test failure, which trains people to
@@ -315,12 +342,20 @@ def test_unknown_locale_falls_back_to_english() -> None:
 
 
 def test_locales_define_the_same_keys() -> None:
-    """A key present in one locale and missing in the other is a silent fallback."""
+    """Every catalogue the bot loads has the same keys in both locales.
+
+    Asserted here over the *bundle* rather than over the files: `tests/test_i18n.py`
+    already diffs the sources per catalogue, and what this adds is that the keys
+    survive the load — a file missing from `BOT_CATALOGUES`, or one whose parse
+    dropped an entry, is a key the bot cannot render even though both `.ftl` files
+    agree it exists.
+    """
+    key = re.compile(r"^([a-z][a-z0-9_-]*)\s*=", re.MULTILINE)
     keys = {
         lang: {
-            line.split("=", 1)[0].strip()
-            for line in (LOCALES_DIR / lang / "main.ftl").read_text("utf-8").splitlines()
-            if "=" in line and not line.lstrip().startswith("#")
+            name
+            for catalogue in BOT_CATALOGUES
+            for name in key.findall((LOCALES_DIR / lang / catalogue).read_text("utf-8"))
         }
         for lang in ("ru", "en")
     }
@@ -328,6 +363,10 @@ def test_locales_define_the_same_keys() -> None:
         "ru_only": sorted(keys["ru"] - keys["en"]),
         "en_only": sorted(keys["en"] - keys["ru"]),
     }
+    for lang, names in keys.items():
+        bundle = localization(lang)
+        unresolved = sorted(name for name in names if bundle.format_value(name) == name)
+        assert not unresolved, (lang, unresolved)
 
 
 def test_every_module_title_key_resolves_in_both_locales() -> None:

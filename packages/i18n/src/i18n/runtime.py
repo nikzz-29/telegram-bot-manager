@@ -24,6 +24,27 @@ SUPPORTED_LOCALES: Final[tuple[str, ...]] = ("ru", "en")
 DEFAULT_LOCALE: Final = "ru"
 FALLBACK_LOCALE: Final = "en"
 
+# The catalogues the bot, the worker and the API read, in load order.
+#
+# DECISION: copy is split by surface rather than kept in one file. `main.ftl` is
+# what the bot says in groups and changes with the modules; `dm.ftl` is the
+# private-chat dialogue; `guide.ftl` is the manual, which is long and nearly
+# static. One file meant every change to any of the three landed in the same
+# three hundred lines.
+#
+# The split is a filing decision only — the bundle is flat, so a key defined in
+# two catalogues resolves to whichever loads first and the other wording silently
+# never ships. `tests/test_i18n.py` checks that no key is defined twice.
+BOT_CATALOGUES: Final[tuple[str, ...]] = ("main.ftl", "dm.ftl", "guide.ftl")
+
+# The Mini App's own copy. Python never loads it: nothing server-side renders a
+# panel string, and parsing it per process would be dead weight. The panel bundles
+# it together with the files above (see `apps/miniapp/src/i18n/bundles.ts`).
+PANEL_CATALOGUES: Final[tuple[str, ...]] = ("panel.ftl",)
+
+# Every catalogue that ships, for the tests that check parity across all of them.
+CATALOGUES: Final[tuple[str, ...]] = BOT_CATALOGUES + PANEL_CATALOGUES
+
 
 def normalize_locale(locale: str | None) -> str:
     """Map a Telegram `language_code` onto a locale we actually ship."""
@@ -39,7 +60,7 @@ def localization(locale: str) -> FluentLocalization:
     selected = normalize_locale(locale)
     chain = [selected] if selected == FALLBACK_LOCALE else [selected, FALLBACK_LOCALE]
     resource_loader = FluentResourceLoader(str(LOCALES_DIR / "{locale}"))
-    return FluentLocalization(chain, ["main.ftl"], resource_loader, use_isolating=False)
+    return FluentLocalization(chain, list(BOT_CATALOGUES), resource_loader, use_isolating=False)
 
 
 class Translator:
@@ -72,9 +93,12 @@ def translator(locale: str | None = None) -> Translator:
 
 
 __all__ = [
+    "BOT_CATALOGUES",
+    "CATALOGUES",
     "DEFAULT_LOCALE",
     "FALLBACK_LOCALE",
     "LOCALES_DIR",
+    "PANEL_CATALOGUES",
     "SUPPORTED_LOCALES",
     "Translator",
     "localization",

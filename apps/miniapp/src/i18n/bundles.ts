@@ -14,11 +14,18 @@
  * `panel.ftl`. Keys the bot already has — plan names, module titles, error
  * messages the API returns by key — are reused verbatim rather than translated a
  * second time, which is what keeps the panel and the chat saying the same words.
+ * `dm.ftl` and `guide.ftl` come along for the same reason: they are the bot's
+ * other two catalogues, and `i18n.runtime.BOT_CATALOGUES` is the list this must
+ * mirror. A key defined in two of them resolves to whichever loads first here.
  */
 import { FluentBundle, FluentResource } from "@fluent/bundle";
 import { negotiateLanguages } from "@fluent/langneg";
+import enDm from "@locales/en/dm.ftl?raw";
+import enGuide from "@locales/en/guide.ftl?raw";
 import enMain from "@locales/en/main.ftl?raw";
 import enPanel from "@locales/en/panel.ftl?raw";
+import ruDm from "@locales/ru/dm.ftl?raw";
+import ruGuide from "@locales/ru/guide.ftl?raw";
 import ruMain from "@locales/ru/main.ftl?raw";
 import ruPanel from "@locales/ru/panel.ftl?raw";
 
@@ -27,8 +34,8 @@ export type Locale = (typeof LOCALES)[number];
 export const DEFAULT_LOCALE: Locale = "en";
 
 const SOURCES: Record<Locale, readonly string[]> = {
-  en: [enMain, enPanel],
-  ru: [ruMain, ruPanel],
+  en: [enMain, enDm, enGuide, enPanel],
+  ru: [ruMain, ruDm, ruGuide, ruPanel],
 };
 
 /** Values a Fluent message can be given. `Date` is formatted by the bundle. */

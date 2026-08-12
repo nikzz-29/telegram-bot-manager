@@ -15,7 +15,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Final
 
-from aiogram.methods import SendMessage
+from aiogram.methods import EditMessageText, SendMessage
 from aiogram.types import InlineKeyboardMarkup, Message
 
 from core import jobs
@@ -70,6 +70,43 @@ async def send(
     return sent
 
 
+async def edit(
+    tg_chat_id: int,
+    message_id: int,
+    text: str,
+    *,
+    keyboard: InlineKeyboardMarkup | None = None,
+    priority: SendPriority = SendPriority.REPLY,
+) -> None:
+    """Replace the text and keyboard of a message the bot already sent.
+
+    DECISION: the private-chat menu edits one message instead of sending a new one
+    per tap. A DM that grows by a screen every time someone opens a submenu is
+    unnavigable within a minute, and Telegram gives no way to collapse it
+    afterwards. Editing keeps the menu where the user's thumb already is.
+
+    Fire-and-forget through the same queue as everything else: nothing reads the
+    result, and the two ways this fails are both non-events. "message is not
+    modified" means the user tapped the button for the screen they are on, and
+    "message to edit not found" means they scrolled up to a menu from last week —
+    `sender._process` drops both as `TelegramBadRequest` and logs them.
+
+    Passing no keyboard removes the one that is there, which is what closing a
+    menu means; there is no way to say "leave the buttons alone" and no caller
+    that wants one.
+    """
+    sender.enqueue(
+        EditMessageText(
+            chat_id=tg_chat_id,
+            message_id=message_id,
+            text=text,
+            reply_markup=keyboard,
+        ),
+        chat_id=tg_chat_id,
+        priority=priority,
+    )
+
+
 async def notify(ctx: ChatContext, text: str, *, ephemeral: bool = True) -> None:
     """An automatic rule explaining itself to the chat."""
     await send(
@@ -91,4 +128,4 @@ async def answer(message: Message, text: str, *, ttl: timedelta | None = None) -
     )
 
 
-__all__ = ["NOTICE_TTL", "answer", "notify", "send"]
+__all__ = ["NOTICE_TTL", "answer", "edit", "notify", "send"]

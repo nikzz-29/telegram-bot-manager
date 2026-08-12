@@ -17,9 +17,10 @@ from aiogram.exceptions import (
     TelegramRetryAfter,
     TelegramServerError,
 )
-from aiogram.methods import SendMessage
+from aiogram.methods import EditMessageText, SendMessage
 import pytest
 
+from bot import replies
 from core.jobs import JobName, job_id
 from core.rate_limit import BucketResult, BucketSpec, chat_bucket, global_bucket
 from core.sender import MAX_ATTEMPTS, MessageSender, SendPriority, SendResult
@@ -57,6 +58,9 @@ class FakeBot:
 
     def __init__(self, script: dict[str, list[Exception]] | None = None) -> None:
         self.calls: list[str] = []
+        # The methods themselves, for the few tests that care what was built and
+        # not just that something was sent.
+        self.methods: list[Any] = []
         self.script = script or {}
 
     async def __call__(self, method: Any) -> str:
@@ -65,6 +69,7 @@ class FakeBot:
         if queued:
             raise queued.pop(0)
         self.calls.append(text)
+        self.methods.append(method)
         return f"sent::{text}"
 
 
@@ -287,3 +292,31 @@ def test_job_id_without_parts_is_the_bare_name() -> None:
 def test_every_job_name_is_unique() -> None:
     values = [member.value for member in JobName]
     assert len(values) == len(set(values))
+
+
+# --- outbound helpers ---------------------------------------------------------
+#
+# `replies.edit` exists so the private-chat menu can be one message the user taps
+# through instead of a new screen per tap. What is worth pinning is that it is not
+# a shortcut around the queue: an edit is a Bot API call like any other and counts
+# against the same ceilings, so it goes through the sender or the rate limiter is
+# wrong about how much this bot is saying.
+async def test_editing_a_message_goes_through_the_queue_like_a_send(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    bot = FakeBot()
+    sender = _sender(bot)
+    monkeypatch.setattr(replies, "sender", sender)
+    await replies.edit(USER_CHAT, 4242, "menu")
+
+    await sender.start()
+    await _drain(sender)
+    await sender.stop()
+
+    assert bot.calls == ["menu"]
+    assert bot.methods and isinstance(bot.methods[0], EditMessageText)
+    edited = bot.methods[0]
+    assert (edited.chat_id, edited.message_id) == (USER_CHAT, 4242)
+    # No keyboard passed means no keyboard left behind — that is what closing a
+    # submenu looks like, and `None` is what Telegram reads as "remove it".
+    assert edited.reply_markup is None

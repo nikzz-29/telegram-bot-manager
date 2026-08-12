@@ -13,12 +13,13 @@ the panel's fallback is just as silent as the bot's.
 
 from __future__ import annotations
 
+from itertools import combinations
 from pathlib import Path
 import re
 
 import pytest
 
-from i18n.runtime import LOCALES_DIR, SUPPORTED_LOCALES, translator
+from i18n.runtime import BOT_CATALOGUES, CATALOGUES, LOCALES_DIR, SUPPORTED_LOCALES, translator
 
 # `key = value` at the start of a line. Fluent attributes (`    .label = ...`)
 # and comments are indented or prefixed, so this matches messages only.
@@ -32,13 +33,18 @@ _MESSAGE = re.compile(r"^([a-z][a-z0-9_-]*)\s*=\s*(.+)$", re.MULTILINE)
 # `{$placeholder}` — every argument a message expects from its caller.
 _PLACEABLE = re.compile(r"\{\s*\$([a-zA-Z_][a-zA-Z0-9_]*)\s*\}")
 
-# `main.ftl` is the bot's and the API's; `panel.ftl` is the Mini App's alone.
-CATALOGUES = ("main.ftl", "panel.ftl")
 
-
-def _messages(locale: str, catalogue: str = "main.ftl") -> dict[str, str]:
+def _messages(locale: str, catalogue: str) -> dict[str, str]:
     source = (LOCALES_DIR / locale / catalogue).read_text(encoding="utf-8")
     return {match.group(1): match.group(2) for match in _MESSAGE.finditer(source)}
+
+
+def _bot_messages(locale: str) -> dict[str, str]:
+    """Every key the bot can render, across the catalogues it loads."""
+    merged: dict[str, str] = {}
+    for catalogue in BOT_CATALOGUES:
+        merged.update(_messages(locale, catalogue))
+    return merged
 
 
 @pytest.mark.parametrize("catalogue", CATALOGUES)
@@ -75,23 +81,26 @@ def test_locales_agree_on_placeholders(catalogue: str) -> None:
             assert set(_PLACEABLE.findall(value)) == reference[key], f"{locale}/{key}"
 
 
-def test_panel_keys_do_not_collide_with_the_bot_catalogue() -> None:
-    """The Mini App merges both files into one bundle, first definition winning.
+@pytest.mark.parametrize(("left", "right"), list(combinations(CATALOGUES, 2)))
+def test_no_key_is_defined_in_two_catalogues(left: str, right: str) -> None:
+    """The split into files is filing, not scoping: the bundle is flat.
 
-    `addResource` reports a duplicate id as an error and keeps the entry already
-    in the bundle, so a key defined in both resolves to `main.ftl` — the bot's
-    wording, in a panel that asked for its own. Invisible until the two drift.
+    Both the bot (`FluentLocalization` over `BOT_CATALOGUES`) and the panel
+    (`addResource` per file) keep the definition that loads *first* and discard
+    the later one — `addResource` even reports it as an error nobody reads. So a
+    key defined twice silently ships one of the two wordings, and which one
+    depends on load order rather than on anything a reader can see.
     """
     for locale in SUPPORTED_LOCALES:
-        shared = set(_messages(locale, "main.ftl")) & set(_messages(locale, "panel.ftl"))
-        assert not shared, f"{locale} defines in both catalogues: {sorted(shared)}"
+        shared = set(_messages(locale, left)) & set(_messages(locale, right))
+        assert not shared, f"{locale}: {left} and {right} both define {sorted(shared)}"
 
 
 @pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
 def test_every_key_renders(locale: str) -> None:
     """Nothing resolves to its own key, and nothing leaks an unfilled placeable."""
     t = translator(locale)
-    for key, value in _messages(locale).items():
+    for key, value in _bot_messages(locale).items():
         args = dict.fromkeys(_PLACEABLE.findall(value), 1)
         rendered = t(key, **args)
         assert rendered != key, f"{locale}/{key} did not resolve"
@@ -107,7 +116,7 @@ def test_code_only_uses_keys_that_exist() -> None:
     """
     root = Path(__file__).resolve().parents[1]
     call = re.compile(r"""\bt\(\s*["']([a-z][a-z0-9_-]*)["']""")
-    defined = set(_messages("ru"))
+    defined = set(_bot_messages("ru"))
 
     missing: set[str] = set()
     for path in (*(root / "apps").rglob("*.py"), *(root / "packages").rglob("*.py")):

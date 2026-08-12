@@ -15,7 +15,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from i18n.runtime import LOCALES_DIR
+from i18n.runtime import CATALOGUES, LOCALES_DIR
 
 _ROOT = Path(__file__).resolve().parents[1]
 _MINIAPP = _ROOT / "apps" / "miniapp"
@@ -101,7 +101,7 @@ def test_panel_only_uses_keys_that_exist() -> None:
     """
     call = re.compile(r"""\bt\(\s*["']([a-z][a-z0-9_-]*)["']""")
     defined: set[str] = set()
-    for catalogue in ("main.ftl", "panel.ftl"):
+    for catalogue in CATALOGUES:
         source = (LOCALES_DIR / "ru" / catalogue).read_text(encoding="utf-8")
         # Underscores are legal in Fluent identifiers (`plan-white_label`), so
         # the character class must include them or the regex would miss keys.
