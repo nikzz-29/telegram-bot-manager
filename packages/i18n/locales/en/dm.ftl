@@ -74,3 +74,19 @@ dm-term-button = {$months ->
         [one] {$months} month
        *[other] {$months} months
     } — {$stars} Stars
+
+## Private chat — navigation and sections
+# Button labels are plain text, not HTML: Telegram renders them verbatim, so
+# {$chat} and {$period} here are neither escaped nor marked up.
+dm-menu = <b>Main menu</b>
+
+    Profile, your chats, statistics, plans and the guide — all below.
+dm-home-button = 🏠 Menu
+dm-back-button = ‹ Back
+dm-stats-button = 📊 Statistics
+dm-guide-button = 📖 Guide
+dm-guide-contents-button = 📖 Contents
+dm-chat-report-button = 📊 {$chat}
+dm-chats-setup-button = 🚀 How to connect a chat
+dm-chat-unavailable = That chat is no longer available. Open the chat list and start again.
+dm-stats-period-current = • {$period} •

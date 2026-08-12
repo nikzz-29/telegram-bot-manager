@@ -79,3 +79,19 @@ dm-term-button = {$months ->
         [few] {$months} месяца
        *[other] {$months} месяцев
     } — {$stars} Stars
+
+## Личные сообщения — навигация и разделы
+# Подписи кнопок — обычный текст, не HTML: Telegram рисует их как есть, поэтому
+# {$chat} и {$period} здесь не экранируются и не размечаются.
+dm-menu = <b>Главное меню</b>
+
+    Профиль, ваши чаты, статистика, тарифы и справочник — всё ниже.
+dm-home-button = 🏠 В меню
+dm-back-button = ‹ Назад
+dm-stats-button = 📊 Статистика
+dm-guide-button = 📖 Справочник
+dm-guide-contents-button = 📖 К оглавлению
+dm-chat-report-button = 📊 {$chat}
+dm-chats-setup-button = 🚀 Как подключить чат
+dm-chat-unavailable = Этот чат больше не доступен. Откройте список чатов и начните заново.
+dm-stats-period-current = • {$period} •
