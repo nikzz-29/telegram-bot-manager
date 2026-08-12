@@ -99,6 +99,20 @@ def _left(event: ChatMemberUpdated) -> bool:
     }
 
 
+def _is_organic_leave(event: ChatMemberUpdated) -> bool:
+    """True when a human member left on their own — the churn a `LEAVE` counts.
+
+    DECISION: a ban (`KICKED`) is deliberately excluded. It is already an admin
+    action in the moderation feed, and folding it into "leaves" too would
+    double-count the removal and bury the voluntary-departure signal an owner
+    actually reads. Bots never counted as members, so their leaving is not churn.
+    """
+    if not _left(event):
+        return False
+    member = event.new_chat_member
+    return member.status == ChatMemberStatus.LEFT and not member.user.is_bot
+
+
 def callback_data(tg_user_id: int, token: str) -> str:
     """`cap:<user id>:<token>` — 64-byte limit, so keep the token short.
 
@@ -393,13 +407,16 @@ def build_router() -> Router:
         if ctx is None:
             return
         if _left(event):
+            member = event.new_chat_member.user
             # Retire an abandoned challenge so a rejoin starts clean and the
             # pending marker stops holding their next message.
             await captcha.discard(
                 chat_id=ctx.chat_id,
                 tg_chat_id=ctx.tg_chat_id,
-                tg_user_id=event.new_chat_member.user.id,
+                tg_user_id=member.id,
             )
+            if _is_organic_leave(event):
+                await _record(ctx, StatEventType.LEAVE, member.id)
             return
         if not _joined(event):
             return

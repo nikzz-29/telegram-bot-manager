@@ -6,9 +6,14 @@ screening and captcha logic was kept free of I/O.
 """
 
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from typing import cast
 
+from aiogram.enums import ChatMemberStatus
+from aiogram.types import ChatMemberUpdated
 import pytest
 
+from bot.modules.entry import _is_organic_leave
 from core.captcha import (
     EMOJI_CHOICES,
     EMOJI_POOL,
@@ -226,3 +231,41 @@ def test_greeting_is_truncated_to_a_sendable_length() -> None:
 def test_uses_placeholder_detects_references() -> None:
     assert uses_placeholder("Hi {name}", "name")
     assert not uses_placeholder("Hi {name}", "rules_link")
+
+
+# --- organic-leave detection ----------------------------------------------------
+def _transition(
+    *, was: ChatMemberStatus, now: ChatMemberStatus, is_bot: bool = False
+) -> ChatMemberUpdated:
+    """A `ChatMemberUpdated` stripped to the three fields `_is_organic_leave` reads."""
+    return cast(
+        ChatMemberUpdated,
+        SimpleNamespace(
+            old_chat_member=SimpleNamespace(status=was),
+            new_chat_member=SimpleNamespace(status=now, user=SimpleNamespace(is_bot=is_bot)),
+        ),
+    )
+
+
+def test_a_member_leaving_on_their_own_is_organic_churn() -> None:
+    event = _transition(was=ChatMemberStatus.MEMBER, now=ChatMemberStatus.LEFT)
+    assert _is_organic_leave(event)
+
+
+def test_a_ban_is_not_counted_as_a_leave() -> None:
+    """A KICKED transition is already an admin action in the moderation feed;
+    counting it as churn too would double-count the removal and bury the
+    voluntary-departure signal an owner actually reads."""
+    event = _transition(was=ChatMemberStatus.MEMBER, now=ChatMemberStatus.KICKED)
+    assert not _is_organic_leave(event)
+
+
+def test_a_bot_leaving_is_not_member_churn() -> None:
+    """Bots never counted as members, so their departure is not a leave."""
+    event = _transition(was=ChatMemberStatus.MEMBER, now=ChatMemberStatus.LEFT, is_bot=True)
+    assert not _is_organic_leave(event)
+
+
+def test_a_join_is_not_mistaken_for_a_leave() -> None:
+    event = _transition(was=ChatMemberStatus.LEFT, now=ChatMemberStatus.MEMBER)
+    assert not _is_organic_leave(event)
