@@ -28,14 +28,15 @@ FALLBACK_LOCALE: Final = "en"
 #
 # DECISION: copy is split by surface rather than kept in one file. `main.ftl` is
 # what the bot says in groups and changes with the modules; `dm.ftl` is the
-# private-chat dialogue; `guide.ftl` is the manual, which is long and nearly
-# static. One file meant every change to any of the three landed in the same
-# three hundred lines.
+# private-chat dialogue; `stats.ftl` is the personal report inside it, which is
+# numbers and nothing else; `guide.ftl` is the manual, which is long and nearly
+# static. One file meant every change to any of them landed in the same three
+# hundred lines.
 #
 # The split is a filing decision only — the bundle is flat, so a key defined in
 # two catalogues resolves to whichever loads first and the other wording silently
 # never ships. `tests/test_i18n.py` checks that no key is defined twice.
-BOT_CATALOGUES: Final[tuple[str, ...]] = ("main.ftl", "dm.ftl", "guide.ftl")
+BOT_CATALOGUES: Final[tuple[str, ...]] = ("main.ftl", "dm.ftl", "stats.ftl", "guide.ftl")
 
 # The Mini App's own copy. Python never loads it: nothing server-side renders a
 # panel string, and parsing it per process would be dead weight. The panel bundles
