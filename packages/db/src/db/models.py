@@ -54,6 +54,9 @@ class Chat(TimestampMixin, Base):
         Index("ix_chats_plan_expires", "plan", "plan_expires_at"),
         Index("ix_chats_settings_gin", "settings", postgresql_using="gin"),
         Index("ix_chats_owner", "owner_tg_id"),
+        # Growth is counted by signup date over a window, and the operator console
+        # asks for that on every dashboard load.
+        Index("ix_chats_created", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -375,6 +378,9 @@ class Payment(TimestampMixin, Base):
         UniqueConstraint("provider", "provider_payment_id", name="uq_payment_provider_id"),
         Index("ix_payments_chat_created", "chat_id", "created_at"),
         Index("ix_payments_status", "status"),
+        # The operator console reads revenue across *all* chats by day, which
+        # `ix_payments_chat_created` cannot serve: its leading column is the chat.
+        Index("ix_payments_created", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -393,6 +399,14 @@ class Payment(TimestampMixin, Base):
     period_start: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     raw: Mapped[JsonDict] = mapped_column(JSONB, default=dict, nullable=False)
+
+    # A refund is recorded here rather than as a second, negative row: the money
+    # that moved is the same transaction, and `status` is what every read already
+    # filters on. Who pressed the button and why is audit trail an operator
+    # console cannot do without.
+    refunded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    refunded_by: Mapped[int | None] = mapped_column(BigInteger)
+    refund_reason: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
 
 class AiCheckLog(Base):
@@ -417,7 +431,13 @@ class ModerationLog(Base):
     """Every moderation action, mirrored to the chat's log channel."""
 
     __tablename__ = "moderation_logs"
-    __table_args__ = (Index("ix_moderation_logs_chat_created", "chat_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_moderation_logs_chat_created", "chat_id", "created_at"),
+        # Per-moderator reporting ("who acted, how often, in what window") filters
+        # on the moderator inside one chat, which the chat/created index can only
+        # serve by scanning the whole chat's history.
+        Index("ix_moderation_logs_moderator", "chat_id", "moderator_tg_id", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     chat_id: Mapped[int] = mapped_column(ForeignKey("chats.id", ondelete="CASCADE"), nullable=False)
@@ -431,6 +451,31 @@ class ModerationLog(Base):
     )
 
 
+class PlanOverride(TimestampMixin, Base):
+    """Operator-set price and feature set for one plan.
+
+    The shipped matrix in `shared.plans` stays the default and the fallback; a row
+    here only names the parts the operator changed, so a plan with a new price but
+    the stock feature list carries `features IS NULL` rather than a copy that
+    would silently freeze at whatever shipped that day.
+
+    One row per plan: an override is a current setting, not a history. What it
+    used to be is recoverable from `updated_at`/`updated_by` plus the audit log,
+    and a versioned table would make the read path a window function for no
+    benefit to the console.
+    """
+
+    __tablename__ = "plan_overrides"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    plan: Mapped[Plan] = mapped_column(StrEnumType(Plan), unique=True, nullable=False)
+    stars: Mapped[int | None] = mapped_column(Integer)
+    usd: Mapped[str | None] = mapped_column(String(16))
+    features: Mapped[list[str] | None] = mapped_column(JSONB)
+    updated_by: Mapped[int | None] = mapped_column(BigInteger)
+    note: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+
 __all__ = [
     "AdminUser",
     "AiCheckLog",
@@ -441,6 +486,7 @@ __all__ = [
     "GlobalBanReport",
     "ModerationLog",
     "Payment",
+    "PlanOverride",
     "Punishment",
     "Reputation",
     "ScheduledPost",

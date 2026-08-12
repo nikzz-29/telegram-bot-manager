@@ -21,6 +21,8 @@ from db.repositories import (
     ModerationLogRepository,
     ModuleConfigRepository,
     PaymentRepository,
+    PlanOverrideRepository,
+    PlatformRepository,
     PunishmentRepository,
     ReputationRepository,
     ScheduledPostRepository,
@@ -44,6 +46,8 @@ class UnitOfWork:
     module_configs: ModuleConfigRepository
     moderation_logs: ModerationLogRepository
     payments: PaymentRepository
+    plan_overrides: PlanOverrideRepository
+    platform: PlatformRepository
     posts: ScheduledPostRepository
     punishments: PunishmentRepository
     reputation: ReputationRepository
@@ -78,6 +82,8 @@ class UnitOfWork:
         self.module_configs = ModuleConfigRepository(session)
         self.moderation_logs = ModerationLogRepository(session)
         self.payments = PaymentRepository(session)
+        self.plan_overrides = PlanOverrideRepository(session)
+        self.platform = PlatformRepository(session)
         self.posts = ScheduledPostRepository(session)
         self.punishments = PunishmentRepository(session)
         self.reputation = ReputationRepository(session)

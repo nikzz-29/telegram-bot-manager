@@ -11,6 +11,7 @@ from db.repositories.chats import ChatRepository, ModuleConfigRepository
 from db.repositories.global_bans import GlobalBanRepository
 from db.repositories.moderation import ModerationLogRepository, PunishmentRepository, WarnRepository
 from db.repositories.payments import PaymentRepository
+from db.repositories.platform import PlanOverrideRepository, PlatformRepository
 from db.repositories.posts import ScheduledPostRepository
 from db.repositories.reputation import ReputationRepository
 from db.repositories.stats import StatsRepository
@@ -26,6 +27,8 @@ __all__ = [
     "ModerationLogRepository",
     "ModuleConfigRepository",
     "PaymentRepository",
+    "PlanOverrideRepository",
+    "PlatformRepository",
     "PunishmentRepository",
     "ReputationRepository",
     "ScheduledPostRepository",

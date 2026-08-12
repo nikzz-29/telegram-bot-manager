@@ -6,11 +6,12 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.models import Payment
+from db.repositories._dml import execute_dml
 from shared.enums import PaymentProvider, PaymentStatus, Plan
 
 
@@ -28,6 +29,9 @@ class PaymentRepository:
             )
         )
         return result.scalar_one_or_none()
+
+    async def get_by_id(self, payment_id: int) -> Payment | None:
+        return await self._session.get(Payment, payment_id)
 
     async def get_by_payload(self, payload: str) -> Payment | None:
         result = await self._session.execute(
@@ -112,3 +116,33 @@ class PaymentRepository:
             select(func.count()).select_from(Payment).where(Payment.status == PaymentStatus.PAID)
         )
         return int(result.scalar_one())
+
+    async def mark_refunded(
+        self,
+        payment_id: int,
+        *,
+        refunded_at: datetime,
+        refunded_by: int | None,
+        reason: str = "",
+    ) -> bool:
+        """Flip a paid payment to refunded. True only for the call that did it.
+
+        The `status == PAID` clause in the WHERE is the idempotency guard: a second
+        press of the console's refund button updates nothing and gets False back,
+        so the caller can report "already refunded" instead of revoking the plan a
+        second time — which for a chat that has since renewed would take away a
+        term it paid for.
+        """
+        return bool(
+            await execute_dml(
+                self._session,
+                update(Payment)
+                .where(Payment.id == payment_id, Payment.status == PaymentStatus.PAID)
+                .values(
+                    status=PaymentStatus.REFUNDED,
+                    refunded_at=refunded_at,
+                    refunded_by=refunded_by,
+                    refund_reason=reason,
+                ),
+            )
+        )
