@@ -129,7 +129,10 @@ services:
     # whenever this container is recreated.
     image: cloudflare/cloudflared:latest
     profiles: ["tunnel"]
-    command: ["tunnel", "--no-autoupdate", "--url", "http://web:80"]
+    # QUIC is faster when UDP is stable, but some desktop/VPN networks silently
+    # expire the datagram flow and leave a quick tunnel returning 502 or no DNS
+    # answer. HTTP/2 uses the TCP path verified by cloudflared's own pre-checks.
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", "http://web:80"]
     restart: unless-stopped
     depends_on:
       web: {condition: service_healthy}
