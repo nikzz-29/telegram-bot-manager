@@ -22,6 +22,10 @@ export type MetaResponse = Schemas["MetaResponse"];
 export type ModuleMeta = Schemas["ModuleMeta"];
 export type PlanMeta = Schemas["PlanMeta"];
 export type AuthUser = Schemas["AuthUser"];
+export type UserProfile = Schemas["UserProfile"];
+export type UserDashboard = Schemas["UserDashboard"];
+export type DashboardTotals = Schemas["DashboardTotals"];
+export type DashboardModeration = Schemas["DashboardModeration"];
 export type Problem = Schemas["Problem"];
 export type Plan = Schemas["Plan"];
 export type TriggerEntry = Schemas["TriggerEntry"];
@@ -104,11 +108,15 @@ const authMiddleware: Middleware = {
     request.headers.set("Accept-Language", currentLocale);
     return request;
   },
-  async onResponse({ response }) {
-    if (response.status === 401 && sessionToken) {
-      // The token outlived its TTL mid-session: drop it so the shell can trade
-      // the launch `initData` for a new one instead of showing an error.
-      sessionToken = null;
+  async onResponse({ request, response }) {
+    if (
+      response.status === 401 &&
+      sessionToken &&
+      !request.url.endsWith("/auth/refresh")
+    ) {
+      // Keep the token in place while the shell decides what to do. Clearing it
+      // here made `/auth/refresh` run without Authorization and guaranteed a
+      // second 401, even when the original token was still refreshable.
       onSessionLost?.();
     }
     return response;

@@ -177,6 +177,54 @@ button,
     @apply rounded bg-hint-tint;
     animation: tg-pulse 1.4s ease-in-out infinite;
   }
+
+  .tg-metric-card {
+    @apply rounded-card border border-card-border bg-card px-4 py-3;
+    box-shadow: var(--panel-shadow-card);
+    transition: border-color var(--panel-motion) var(--panel-ease),
+      background-color var(--panel-motion) var(--panel-ease),
+      transform var(--panel-motion) var(--panel-ease);
+  }
+
+  .tg-metric-card:active {
+    transform: translateY(1px);
+  }
+
+  .tg-metric-card-active {
+    border-color: var(--tg-accent);
+    background: var(--tg-accent-tint);
+  }
+
+  .dashboard-chart {
+    animation: dashboard-chart-enter 280ms var(--panel-ease) both;
+    overflow: visible;
+  }
+
+  .dashboard-chart-bar {
+    transform-origin: center bottom;
+    transition: y 260ms var(--panel-ease), height 260ms var(--panel-ease),
+      opacity 160ms ease;
+  }
+
+  .tg-bottom-nav {
+    @apply fixed inset-x-0 bottom-0 z-30 border-t border-separator bg-card;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    box-shadow: 0 -2px 12px rgb(0 0 0 / 5%);
+  }
+
+  .tg-bottom-nav-item {
+    @apply flex min-h-[58px] flex-col items-center justify-center gap-0.5 px-1 text-caption font-medium;
+    transition: color var(--panel-motion) var(--panel-ease),
+      transform var(--panel-motion) var(--panel-ease);
+  }
+
+  .tg-bottom-nav-item:active {
+    transform: translateY(1px);
+  }
+
+  .tg-bottom-nav-icon {
+    @apply flex h-7 w-10 items-center justify-center rounded-full;
+  }
 }
 
 @keyframes tg-pulse {
@@ -186,5 +234,16 @@ button,
   }
   50% {
     opacity: 0.85;
+  }
+}
+
+@keyframes dashboard-chart-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }

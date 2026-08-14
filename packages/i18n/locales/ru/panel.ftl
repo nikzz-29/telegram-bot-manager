@@ -211,6 +211,7 @@ setting-contribute-bans = Передавать баны в сеть
 ## Статистика
 stats-screen-title = Статистика
 stats-range = Период
+stats-range-1 = Сегодня
 stats-range-7 = 7 дней
 stats-range-30 = 30 дней
 stats-range-90 = 90 дней
@@ -225,6 +226,81 @@ stats-retention-capped = Ваш тариф хранит {$days ->
         [few] {$days} дня
        *[other] {$days} дней
     } истории.
+
+## Глобальный кабинет пользователя
+nav-label = Навигация
+nav-dashboard = Обзор
+nav-stats = Статистика
+nav-chats = Мои чаты
+nav-plans = Тарифы
+nav-profile = Профиль
+chat-untitled = Без названия
+dashboard-title = Обзор
+dashboard-greeting = Добро пожаловать, {$name}
+dashboard-week-activity = Сообщения за неделю
+dashboard-analytics-on = Аналитика активна
+dashboard-analytics-locked = Нужен Pro
+dashboard-metric-messages = Сообщения
+dashboard-metric-active-users = Активные участники
+dashboard-metric-joins = Вступления
+dashboard-metric-leaves = Выходы
+dashboard-metric-moderation-actions = Модерация
+dashboard-your-space = Ваше пространство
+dashboard-chats = Чаты: {$count}
+dashboard-chat-roles = Владелец: {$owned} · администратор: {$admin}
+dashboard-members = Участники: {$count}
+dashboard-paid-chats = Платных чатов: {$count}
+dashboard-plans-action = Управление тарифами
+dashboard-plans-hint = Выберите чат и подключите нужные возможности.
+dashboard-quick-actions = Быстрые действия
+dashboard-open-stats = Открыть подробную статистику
+user-stats-title = Общая статистика
+user-stats-subtitle = Активность, рост и модерация во всех ваших чатах.
+stats-chat-filter = Чат
+stats-all-chats = Все чаты
+stats-period-summary = За последние {$days} дн.
+stats-growth-title = Рост аудитории
+stats-growth-net = Чистый прирост
+stats-growth-flow = Вступили: {$joins} · вышли: {$leaves}
+stats-change-vs-previous = К предыдущему периоду
+stats-change-new = Новый период
+stats-moderation-title = Модерация
+stats-moderation-total = Всего действий
+stats-moderation-mine = Сделано вами
+
+## Тарифы
+plans-title = Тарифы
+plans-subtitle = Все возможности платформы в одном сравнении.
+plans-chat-title = Для какого чата
+plans-no-chats = Сначала добавьте бота в группу и выдайте ему права администратора.
+plans-compare = Сравнение возможностей
+plans-current = Текущий
+plans-free-price = Бесплатно
+plans-price = {$stars} Stars · ${$usd}/мес.
+plans-choose = Подключить {$plan}
+plan-description-free = Базовая защита и автоматическая модерация.
+plan-description-pro = Аналитика, автоматизация и расширенные инструменты.
+plan-description-business = ИИ-модерация и функции для команд.
+plan-description-white_label = Максимальная персонализация под ваш бренд.
+
+## Профиль
+profile-title = Профиль
+profile-subtitle = Ваша учётная запись и настройки Mini App.
+profile-no-username = Username не указан
+profile-operator = Оператор платформы
+profile-account = Учётная запись
+profile-telegram-id = Telegram ID
+profile-language-code = Язык Telegram
+profile-first-seen = Впервые в системе
+profile-date-unknown = Пока нет данных
+profile-management = Управление чатами
+profile-chats-total = Всего чатов
+profile-chat-roles = Владелец: {$owned} · администратор: {$admin}
+profile-members-total = Всего участников
+profile-paid-chats = Чаты с платным тарифом
+profile-preferences = Настройки Mini App
+profile-click-sound = Звуки нажатий
+profile-click-sound-hint = Короткий щелчок подтверждает действие.
 
 ## Триггеры
 triggers-title = Триггеры

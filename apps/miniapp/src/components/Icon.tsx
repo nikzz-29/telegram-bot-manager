@@ -35,7 +35,9 @@ export type IconName =
   | "plus"
   | "trash"
   | "refresh"
-  | "alert";
+  | "alert"
+  | "user"
+  | "home";
 
 /** The `d` of each glyph, drawn on a 24×24 grid. */
 const PATHS: Record<IconName, readonly string[]> = {
@@ -64,6 +66,8 @@ const PATHS: Record<IconName, readonly string[]> = {
   trash: ["M3 6h18", "M8 6V4h8v2", "M19 6l-1 14H6L5 6", "M10 11v6", "M14 11v6"],
   refresh: ["M21 12a9 9 0 11-2.6-6.4", "M21 3v6h-6"],
   alert: ["M12 9v4", "M12 17h.01", "M12 3l9 16H3l9-16z"],
+  user: ["M12 12a4 4 0 100-8 4 4 0 000 8z", "M4.5 21a7.5 7.5 0 0115 0"],
+  home: ["M3 11.5L12 4l9 7.5", "M5.5 10.5V21h13V10.5", "M9.5 21v-6h5v6"],
 };
 
 export function Icon({

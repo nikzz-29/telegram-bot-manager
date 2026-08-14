@@ -210,6 +210,157 @@
         ]
       }
     },
+    "/api/me/profile": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "The caller's profile and managed-chat footprint",
+        "operationId": "getUserProfile",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
+    },
+    "/api/me/dashboard": {
+      "get": {
+        "tags": [
+          "account"
+        ],
+        "summary": "Activity and moderation across the caller's chats",
+        "operationId": "getUserDashboard",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                1,
+                7,
+                30,
+                90
+              ],
+              "type": "integer",
+              "description": "Dashboard period",
+              "default": 7,
+              "title": "Days"
+            },
+            "description": "Dashboard period"
+          },
+          {
+            "name": "chat_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Optional managed chat filter",
+              "title": "Chat Id"
+            },
+            "description": "Optional managed chat filter"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserDashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/chats": {
       "get": {
         "tags": [
@@ -3085,6 +3236,27 @@
             "type": "boolean",
             "title": "Is Superadmin",
             "default": false
+          },
+          "is_premium": {
+            "type": "boolean",
+            "title": "Is Premium",
+            "default": false
+          },
+          "has_photo": {
+            "type": "boolean",
+            "title": "Has Photo",
+            "default": false
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url"
           }
         },
         "type": "object",
@@ -3349,6 +3521,86 @@
         ],
         "title": "CommandMeta"
       },
+      "DashboardModeration": {
+        "properties": {
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "warns": {
+            "type": "integer",
+            "title": "Warns",
+            "default": 0
+          },
+          "restrictions": {
+            "type": "integer",
+            "title": "Restrictions",
+            "default": 0
+          },
+          "mine": {
+            "type": "integer",
+            "title": "Mine",
+            "default": 0
+          },
+          "automated": {
+            "type": "integer",
+            "title": "Automated",
+            "default": 0
+          },
+          "moderators": {
+            "type": "integer",
+            "title": "Moderators",
+            "default": 0
+          },
+          "breakdown": {
+            "items": {
+              "$ref": "#/components/schemas/ModerationBreakdownEntry"
+            },
+            "type": "array",
+            "title": "Breakdown"
+          }
+        },
+        "type": "object",
+        "title": "DashboardModeration"
+      },
+      "DashboardTotals": {
+        "properties": {
+          "messages": {
+            "type": "integer",
+            "title": "Messages",
+            "default": 0
+          },
+          "active_users": {
+            "type": "integer",
+            "title": "Active Users",
+            "default": 0
+          },
+          "joins": {
+            "type": "integer",
+            "title": "Joins",
+            "default": 0
+          },
+          "leaves": {
+            "type": "integer",
+            "title": "Leaves",
+            "default": 0
+          },
+          "net_growth": {
+            "type": "integer",
+            "title": "Net Growth",
+            "default": 0
+          },
+          "moderation_actions": {
+            "type": "integer",
+            "title": "Moderation Actions",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "DashboardTotals",
+        "description": "Totals for one dashboard window, across one or more chats."
+      },
       "GlobalBanCreate": {
         "properties": {
           "tg_user_id": {
@@ -3494,6 +3746,24 @@
         },
         "type": "object",
         "title": "MetaResponse"
+      },
+      "ModerationBreakdownEntry": {
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action",
+          "count"
+        ],
+        "title": "ModerationBreakdownEntry"
       },
       "ModuleConfigResponse": {
         "properties": {
@@ -4665,6 +4935,135 @@
         },
         "type": "object",
         "title": "TriggerUpdate"
+      },
+      "UserDashboard": {
+        "properties": {
+          "period_days": {
+            "type": "integer",
+            "title": "Period Days"
+          },
+          "selected_chat_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Chat Id"
+          },
+          "analytics_available": {
+            "type": "boolean",
+            "title": "Analytics Available",
+            "default": false
+          },
+          "totals": {
+            "$ref": "#/components/schemas/DashboardTotals"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/DashboardTotals"
+          },
+          "deltas_percent": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Deltas Percent"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/StatPoint"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "moderation": {
+            "$ref": "#/components/schemas/DashboardModeration"
+          },
+          "top_users": {
+            "items": {
+              "$ref": "#/components/schemas/TopUser"
+            },
+            "type": "array",
+            "title": "Top Users"
+          },
+          "chats": {
+            "items": {
+              "$ref": "#/components/schemas/ChatSummary"
+            },
+            "type": "array",
+            "title": "Chats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "period_days"
+        ],
+        "title": "UserDashboard",
+        "description": "Aggregated user dashboard for the global Mini App shell."
+      },
+      "UserProfile": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/AuthUser"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "first_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Seen At"
+          },
+          "chats_total": {
+            "type": "integer",
+            "title": "Chats Total",
+            "default": 0
+          },
+          "chats_owned": {
+            "type": "integer",
+            "title": "Chats Owned",
+            "default": 0
+          },
+          "chats_admin": {
+            "type": "integer",
+            "title": "Chats Admin",
+            "default": 0
+          },
+          "paid_chats": {
+            "type": "integer",
+            "title": "Paid Chats",
+            "default": 0
+          },
+          "total_members": {
+            "type": "integer",
+            "title": "Total Members",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "user",
+          "display_name"
+        ],
+        "title": "UserProfile",
+        "description": "The user-facing profile shown outside a chat editor."
       }
     },
     "securitySchemes": {

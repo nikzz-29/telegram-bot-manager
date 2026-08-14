@@ -22,6 +22,72 @@ import {
   viewport,
 } from "@telegram-apps/sdk-react";
 
+const SOUND_STORAGE_KEY = "tgm.sound.v1";
+let clickAudio: AudioContext | null = null;
+
+function readSoundPreference(): boolean {
+  try {
+    return localStorage.getItem(SOUND_STORAGE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
+
+let soundEnabled = readSoundPreference();
+
+/** Whether the short click feedback is enabled for this device. */
+export function isSoundEnabled(): boolean {
+  return soundEnabled;
+}
+
+/** Persist the sound preference without tying it to the Telegram session. */
+export function setSoundEnabled(enabled: boolean): void {
+  soundEnabled = enabled;
+  try {
+    localStorage.setItem(SOUND_STORAGE_KEY, enabled ? "on" : "off");
+  } catch {
+    // Private browsing can reject storage; the in-memory preference still works.
+  }
+}
+
+/**
+ * A tiny synthesized click: a sharp high-frequency transient with a very short
+ * decay. It loads instantly, has no media file to cache, and is created only
+ * after a user gesture so browser autoplay policies are respected.
+ */
+export function playClick(): void {
+  if (!soundEnabled || typeof window === "undefined" || !window.AudioContext) {
+    return;
+  }
+  try {
+    clickAudio ??= new window.AudioContext();
+    if (clickAudio.state === "suspended") {
+      void clickAudio.resume();
+    }
+    const now = clickAudio.currentTime;
+    const oscillator = clickAudio.createOscillator();
+    const gain = clickAudio.createGain();
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(980, now);
+    oscillator.frequency.exponentialRampToValueAtTime(420, now + 0.035);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+    oscillator.connect(gain);
+    gain.connect(clickAudio.destination);
+    oscillator.start(now);
+    oscillator.stop(now + 0.05);
+  } catch {
+    // Audio is an enhancement; a restricted browser must not break navigation.
+  }
+}
+
+/** Shared tactile + audible feedback for a committed tap. */
+export function pressFeedback(style: "light" | "medium" | "heavy" = "light"): void {
+  haptic(style);
+  playClick();
+}
+
 let started = false;
 
 /**
@@ -103,15 +169,24 @@ export function setBackHandler(handler: (() => void) | null): () => void {
 
 /** A short tap on save, delete and other committed actions. */
 export function haptic(style: "light" | "medium" | "heavy" = "light"): void {
-  if (hapticFeedback.impactOccurred.isAvailable()) {
-    hapticFeedback.impactOccurred(style);
+  try {
+    if (hapticFeedback.impactOccurred.isAvailable()) {
+      hapticFeedback.impactOccurred(style);
+    }
+  } catch {
+    // Launch parameters can be present in preview tooling without Telegram's
+    // native bridge. Feedback must never block the action that triggered it.
   }
 }
 
 /** The success/failure buzz, for anything the user is waiting on. */
 export function hapticResult(ok: boolean): void {
-  if (hapticFeedback.notificationOccurred.isAvailable()) {
-    hapticFeedback.notificationOccurred(ok ? "success" : "error");
+  try {
+    if (hapticFeedback.notificationOccurred.isAvailable()) {
+      hapticFeedback.notificationOccurred(ok ? "success" : "error");
+    }
+  } catch {
+    // Notifications are optional and unavailable in plain browser previews.
   }
 }
 

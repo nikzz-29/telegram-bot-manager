@@ -27,6 +27,8 @@ import {
   type TriggerCreate,
   type TriggerEntry,
   type TriggerUpdate,
+  type UserDashboard,
+  type UserProfile,
   client,
   setSessionToken,
   unwrap,
@@ -49,6 +51,21 @@ export async function authenticate(initData: string): Promise<{
 /** The caller behind the current session token. */
 export async function fetchCurrentUser(): Promise<AuthUser> {
   return unwrap(await client.GET("/api/auth/me", {}));
+}
+
+export async function fetchUserProfile(): Promise<UserProfile> {
+  return unwrap(await client.GET("/api/me/profile", {}));
+}
+
+export async function fetchUserDashboard(
+  days: 1 | 7 | 30 | 90,
+  chatId?: number,
+): Promise<UserDashboard> {
+  return unwrap(
+    await client.GET("/api/me/dashboard", {
+      params: { query: { days, chat_id: chatId } },
+    }),
+  );
 }
 
 /**

@@ -10,6 +10,7 @@
  */
 import React, { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BottomNav, isRootRoute } from "./components/BottomNav";
 import { Card, EmptyState, ErrorState, Screen, SkeletonRows } from "./components/ui";
 import { I18nProvider, useT } from "./i18n/I18nProvider";
 import { useSession } from "./hooks/useSession";
@@ -17,12 +18,16 @@ import { type Route, NavigationProvider, useNavigation } from "./navigation";
 import { BillingScreen } from "./screens/BillingScreen";
 import { ChatListScreen } from "./screens/ChatListScreen";
 import { ChatScreen } from "./screens/ChatScreen";
+import { DashboardScreen } from "./screens/DashboardScreen";
 import { ModuleScreen } from "./screens/ModuleScreen";
+import { PlansScreen } from "./screens/PlansScreen";
 import { PlatformScreen } from "./screens/PlatformScreen";
+import { ProfileScreen } from "./screens/ProfileScreen";
 import { PostsScreen } from "./screens/PostsScreen";
 import { ReputationScreen } from "./screens/ReputationScreen";
 import { StatsScreen } from "./screens/StatsScreen";
 import { TriggersScreen } from "./screens/TriggersScreen";
+import { UserStatsScreen } from "./screens/UserStatsScreen";
 import { UserProvider } from "./session";
 import { bindTheme } from "./telegram/theme";
 import { setBackHandler } from "./telegram/sdk";
@@ -40,8 +45,16 @@ const queryClient = new QueryClient({
 
 function ScreenFor({ route }: { route: Route }): React.JSX.Element {
   switch (route.name) {
+    case "dashboard":
+      return <DashboardScreen />;
+    case "userStats":
+      return <UserStatsScreen />;
     case "chats":
       return <ChatListScreen />;
+    case "plans":
+      return <PlansScreen />;
+    case "profile":
+      return <ProfileScreen />;
     case "chat":
       return <ChatScreen chatId={route.chatId} />;
     case "module":
@@ -71,7 +84,12 @@ function Stack(): React.JSX.Element {
     return setBackHandler(atRoot ? null : requestPop);
   }, [atRoot, requestPop]);
 
-  return <ScreenFor route={route} />;
+  return (
+    <>
+      <ScreenFor route={route} />
+      {isRootRoute(route) && <BottomNav active={route.name} />}
+    </>
+  );
 }
 
 function Shell(): React.JSX.Element {
@@ -107,7 +125,7 @@ function Shell(): React.JSX.Element {
 
   return (
     <UserProvider user={session.user}>
-      <NavigationProvider initial={{ name: "chats" }}>
+      <NavigationProvider initial={{ name: "dashboard" }}>
         <Stack />
       </NavigationProvider>
     </UserProvider>

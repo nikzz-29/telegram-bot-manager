@@ -18,7 +18,11 @@ import React, {
 } from "react";
 
 export type Route =
+  | { name: "dashboard" }
+  | { name: "userStats" }
   | { name: "chats" }
+  | { name: "plans" }
+  | { name: "profile" }
   | { name: "chat"; chatId: number }
   | { name: "module"; chatId: number; module: string }
   | { name: "triggers"; chatId: number }

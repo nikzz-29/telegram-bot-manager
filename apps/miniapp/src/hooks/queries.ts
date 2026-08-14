@@ -35,12 +35,17 @@ import type {
   TriggerCreate,
   TriggerEntry,
   TriggerUpdate,
+  UserDashboard,
+  UserProfile,
 } from "../api/client";
 import * as api from "../api/operations";
 
 /** One place to spell the keys, so an invalidation cannot miss a query. */
 export const keys = {
   meta: ["meta"] as const,
+  profile: ["me", "profile"] as const,
+  dashboard: (days: number, chatId?: number) =>
+    ["me", "dashboard", days, chatId ?? "all"] as const,
   chats: ["chats"] as const,
   chat: (id: number) => ["chat", id] as const,
   modules: (id: number) => ["chat", id, "modules"] as const,
@@ -57,6 +62,20 @@ export const keys = {
 /** The catalog changes on deploy, not during a session. */
 export function useMeta(): UseQueryResult<MetaResponse> {
   return useQuery({ queryKey: keys.meta, queryFn: api.fetchMeta, staleTime: Infinity });
+}
+
+export function useUserProfile(): UseQueryResult<UserProfile> {
+  return useQuery({ queryKey: keys.profile, queryFn: api.fetchUserProfile });
+}
+
+export function useUserDashboard(
+  days: 1 | 7 | 30 | 90,
+  chatId?: number,
+): UseQueryResult<UserDashboard> {
+  return useQuery({
+    queryKey: keys.dashboard(days, chatId),
+    queryFn: () => api.fetchUserDashboard(days, chatId),
+  });
 }
 
 export function useChats(): UseQueryResult<ChatSummary[]> {

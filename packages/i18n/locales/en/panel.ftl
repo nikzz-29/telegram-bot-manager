@@ -209,6 +209,7 @@ setting-contribute-bans = Report bans to the network
 ## Statistics
 stats-screen-title = Statistics
 stats-range = Period
+stats-range-1 = Today
 stats-range-7 = 7 days
 stats-range-30 = 30 days
 stats-range-90 = 90 days
@@ -222,6 +223,81 @@ stats-retention-capped = Your plan keeps {$days ->
         [one] {$days} day
        *[other] {$days} days
     } of history.
+
+## Global user dashboard
+nav-label = Navigation
+nav-dashboard = Overview
+nav-stats = Statistics
+nav-chats = My chats
+nav-plans = Plans
+nav-profile = Profile
+chat-untitled = Untitled
+dashboard-title = Overview
+dashboard-greeting = Welcome, {$name}
+dashboard-week-activity = Messages this week
+dashboard-analytics-on = Analytics active
+dashboard-analytics-locked = Pro required
+dashboard-metric-messages = Messages
+dashboard-metric-active-users = Active members
+dashboard-metric-joins = Joins
+dashboard-metric-leaves = Leaves
+dashboard-metric-moderation-actions = Moderation
+dashboard-your-space = Your workspace
+dashboard-chats = Chats: {$count}
+dashboard-chat-roles = Owner: {$owned} · admin: {$admin}
+dashboard-members = Members: {$count}
+dashboard-paid-chats = Paid chats: {$count}
+dashboard-plans-action = Manage plans
+dashboard-plans-hint = Choose a chat and unlock the tools it needs.
+dashboard-quick-actions = Quick actions
+dashboard-open-stats = Open detailed statistics
+user-stats-title = Overall statistics
+user-stats-subtitle = Activity, growth and moderation across your chats.
+stats-chat-filter = Chat
+stats-all-chats = All chats
+stats-period-summary = Last {$days} days
+stats-growth-title = Audience growth
+stats-growth-net = Net growth
+stats-growth-flow = Joined: {$joins} · left: {$leaves}
+stats-change-vs-previous = Compared with previous period
+stats-change-new = New period
+stats-moderation-title = Moderation
+stats-moderation-total = Total actions
+stats-moderation-mine = Done by you
+
+## Plans
+plans-title = Plans
+plans-subtitle = Compare every platform capability in one place.
+plans-chat-title = For which chat
+plans-no-chats = Add the bot to a group and grant it administrator rights first.
+plans-compare = Compare capabilities
+plans-current = Current
+plans-free-price = Free
+plans-price = {$stars} Stars · ${$usd}/mo
+plans-choose = Enable {$plan}
+plan-description-free = Essential protection and automatic moderation.
+plan-description-pro = Analytics, automation and advanced tools.
+plan-description-business = AI moderation and team features.
+plan-description-white_label = Full personalisation for your brand.
+
+## Profile
+profile-title = Profile
+profile-subtitle = Your account and Mini App preferences.
+profile-no-username = No username set
+profile-operator = Platform operator
+profile-account = Account
+profile-telegram-id = Telegram ID
+profile-language-code = Telegram language
+profile-first-seen = First seen
+profile-date-unknown = No data yet
+profile-management = Chat management
+profile-chats-total = Total chats
+profile-chat-roles = Owner: {$owned} · admin: {$admin}
+profile-members-total = Total members
+profile-paid-chats = Chats on a paid plan
+profile-preferences = Mini App preferences
+profile-click-sound = Tap sounds
+profile-click-sound-hint = A short click confirms an action.
 
 ## Triggers
 triggers-title = Triggers

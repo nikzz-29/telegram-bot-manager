@@ -115,6 +115,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/me/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's profile and managed-chat footprint */
+        get: operations["getUserProfile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/me/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activity and moderation across the caller's chats */
+        get: operations["getUserDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/chats": {
         parameters: {
             query?: never;
@@ -604,6 +638,18 @@ export interface components {
              * @default false
              */
             is_superadmin: boolean;
+            /**
+             * Is Premium
+             * @default false
+             */
+            is_premium: boolean;
+            /**
+             * Has Photo
+             * @default false
+             */
+            has_photo: boolean;
+            /** Photo Url */
+            photo_url?: string | null;
         };
         /** BroadcastRequest */
         BroadcastRequest: {
@@ -700,6 +746,77 @@ export interface components {
              */
             admin_only: boolean;
         };
+        /** DashboardModeration */
+        DashboardModeration: {
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Warns
+             * @default 0
+             */
+            warns: number;
+            /**
+             * Restrictions
+             * @default 0
+             */
+            restrictions: number;
+            /**
+             * Mine
+             * @default 0
+             */
+            mine: number;
+            /**
+             * Automated
+             * @default 0
+             */
+            automated: number;
+            /**
+             * Moderators
+             * @default 0
+             */
+            moderators: number;
+            /** Breakdown */
+            breakdown?: components["schemas"]["ModerationBreakdownEntry"][];
+        };
+        /**
+         * DashboardTotals
+         * @description Totals for one dashboard window, across one or more chats.
+         */
+        DashboardTotals: {
+            /**
+             * Messages
+             * @default 0
+             */
+            messages: number;
+            /**
+             * Active Users
+             * @default 0
+             */
+            active_users: number;
+            /**
+             * Joins
+             * @default 0
+             */
+            joins: number;
+            /**
+             * Leaves
+             * @default 0
+             */
+            leaves: number;
+            /**
+             * Net Growth
+             * @default 0
+             */
+            net_growth: number;
+            /**
+             * Moderation Actions
+             * @default 0
+             */
+            moderation_actions: number;
+        };
         /** GlobalBanCreate */
         GlobalBanCreate: {
             /** Tg User Id */
@@ -759,6 +876,13 @@ export interface components {
             plans?: components["schemas"]["PlanMeta"][];
             /** Locales */
             locales?: string[];
+        };
+        /** ModerationBreakdownEntry */
+        ModerationBreakdownEntry: {
+            /** Action */
+            action: string;
+            /** Count */
+            count: number;
         };
         /** ModuleConfigResponse */
         ModuleConfigResponse: {
@@ -1237,6 +1361,70 @@ export interface components {
             /** Enabled */
             enabled?: boolean | null;
         };
+        /**
+         * UserDashboard
+         * @description Aggregated user dashboard for the global Mini App shell.
+         */
+        UserDashboard: {
+            /** Period Days */
+            period_days: number;
+            /** Selected Chat Id */
+            selected_chat_id?: number | null;
+            /**
+             * Analytics Available
+             * @default false
+             */
+            analytics_available: boolean;
+            totals?: components["schemas"]["DashboardTotals"];
+            previous?: components["schemas"]["DashboardTotals"];
+            /** Deltas Percent */
+            deltas_percent?: {
+                [key: string]: number | null;
+            };
+            /** Series */
+            series?: components["schemas"]["StatPoint"][];
+            moderation?: components["schemas"]["DashboardModeration"];
+            /** Top Users */
+            top_users?: components["schemas"]["TopUser"][];
+            /** Chats */
+            chats?: components["schemas"]["ChatSummary"][];
+        };
+        /**
+         * UserProfile
+         * @description The user-facing profile shown outside a chat editor.
+         */
+        UserProfile: {
+            user: components["schemas"]["AuthUser"];
+            /** Display Name */
+            display_name: string;
+            /** First Seen At */
+            first_seen_at?: string | null;
+            /**
+             * Chats Total
+             * @default 0
+             */
+            chats_total: number;
+            /**
+             * Chats Owned
+             * @default 0
+             */
+            chats_owned: number;
+            /**
+             * Chats Admin
+             * @default 0
+             */
+            chats_admin: number;
+            /**
+             * Paid Chats
+             * @default 0
+             */
+            paid_chats: number;
+            /**
+             * Total Members
+             * @default 0
+             */
+            total_members: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -1406,6 +1594,105 @@ export interface operations {
             };
             /** @description Session token missing, malformed or expired. */
             401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getUserProfile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserProfile"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getUserDashboard: {
+        parameters: {
+            query?: {
+                /** @description Dashboard period */
+                days?: 1 | 7 | 30 | 90;
+                /** @description Optional managed chat filter */
+                chat_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserDashboard"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

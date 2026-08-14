@@ -14,7 +14,7 @@
 import React from "react";
 import { Icon, IconTile } from "./Icon";
 import { useT } from "../i18n/I18nProvider";
-import { haptic } from "../telegram/sdk";
+import { pressFeedback } from "../telegram/sdk";
 
 export { Icon, IconTile };
 
@@ -172,7 +172,7 @@ export function Row({
           hasTrailing ? "-ml-4 pl-4 pr-3" : "-mx-4 px-4"
         }`}
         onClick={() => {
-          haptic();
+          pressFeedback();
           onClick();
         }}
       >
@@ -213,7 +213,7 @@ export function SegmentedControl<T extends string | number>({
           aria-pressed={option.value === value}
           disabled={disabled}
           onClick={() => {
-            haptic();
+            pressFeedback();
             onChange(option.value);
           }}
           className={`flex-1 rounded-[7px] px-3 py-1.5 text-label font-medium transition-colors duration-[--panel-motion] ease-panel disabled:opacity-50 ${
@@ -390,7 +390,7 @@ export function Toggle({
         disabled={disabled}
         aria-label={label}
         onChange={(event) => {
-          haptic();
+          pressFeedback();
           onChange(event.target.checked);
         }}
       />
@@ -425,7 +425,7 @@ export function Button({
       onClick={
         onClick &&
         (() => {
-          haptic();
+          pressFeedback();
           onClick();
         })
       }
