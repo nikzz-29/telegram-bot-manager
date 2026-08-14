@@ -39,6 +39,8 @@ from bot.commands.private import (
     CB_PAGE,
     CB_PLANS,
     CB_PROFILE,
+    CHATS_PAGE_SIZE,
+    DM_COMMANDS,
     PROFILE_CHAT_PREVIEW,
     TERMS,
     _authorized_chat,
@@ -47,6 +49,10 @@ from bot.commands.private import (
     _chats_text,
     _choose_chat_screen,
     _choose_term_screen,
+    _commands_reply_keyboard,
+    _commands_screen,
+    _commands_text,
+    _decorate_lines,
     _digest_screen,
     _display_name,
     _guide_index_screen,
@@ -54,6 +60,7 @@ from bot.commands.private import (
     _help_screen,
     _menu_screen,
     _notice_screen,
+    _parse_chats_page,
     _parse_plan,
     _period_options,
     _plan_options,
@@ -67,6 +74,7 @@ from bot.commands.private import (
 from bot.guide import PAGES
 from core.billing import MAX_MONTHS
 from core.dm_stats import DEFAULT_PERIOD, PERIODS, period_for
+from core.registry import registry
 from db.models import Chat
 from i18n.runtime import SUPPORTED_LOCALES, translator
 from shared.config import get_settings
@@ -244,10 +252,10 @@ def test_every_published_dm_command_is_described_in_both_locales(locale: str) ->
 
 
 def test_the_operator_console_is_answered_but_never_listed() -> None:
-    """The Mini App's door is unlisted on purpose: only its name guards it.
+    """The operator shortcut stays unlisted while the user Mini App is global.
 
     It must be a real handler (so an operator who knows the name gets in) and it
-    must be absent from the published menu (so nobody else is even shown it).
+    must be absent from the published command list.
     """
     console = get_settings().panel_command_name
     assert console in _answered_command_names()
@@ -257,11 +265,9 @@ def test_the_operator_console_is_answered_but_never_listed() -> None:
 async def test_the_console_hands_an_operator_the_panel_and_a_stranger_silence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The id check is the boundary; the silence is what keeps it unadvertised.
+    """The operator-only shortcut remains silent for ordinary accounts.
 
-    A refusal would confirm the command exists to anyone who guessed its name, so
-    a stranger's tap has to produce no send at all — not an error, not a "not for
-    you". This exercises the handler body, where that decision lives.
+    The public Mini App button does not use this handler or this access gate.
     """
     settings = get_settings().model_copy(update={"superadmin_ids": str(OPERATOR_ID)})
     monkeypatch.setattr(access, "get_settings", lambda: settings)
@@ -363,6 +369,26 @@ def test_profile_of_a_user_with_no_chats_still_renders() -> None:
     assert "{" not in text  # no placeable leaked out of the plural selector
 
 
+def test_profile_summarizes_identity_roles_plans_members_and_expiry() -> None:
+    chats = [
+        make_chat(1, members_count=120),
+        make_chat(
+            2,
+            owner_tg_id=STRANGER_ID,
+            plan=Plan.PRO,
+            plan_expires_at=NOW,
+            members_count=80,
+        ),
+    ]
+    text = _profile_text(make_user(), chats, RU)
+    assert "@ada" in text
+    assert "RU" in text
+    assert "200" in ungrouped(text)
+    assert "10.08.2026" in text
+    assert RU("plan-free") in text
+    assert RU("plan-pro") in text
+
+
 # --- chats ----------------------------------------------------------------------
 def test_chats_shows_the_renewal_date_only_for_a_paid_plan() -> None:
     paid = make_chat(1, plan=Plan.PRO, plan_expires_at=NOW, title="Paid")
@@ -397,14 +423,59 @@ def test_a_chat_title_with_markup_is_escaped_in_the_body() -> None:
     assert "&lt;b&gt;evil&lt;/b&gt;" in text
 
 
+def test_chats_are_paginated_in_text_and_keyboard() -> None:
+    chats = [make_chat(index) for index in range(1, CHATS_PAGE_SIZE + 3)]
+    first = _chats_screen(chats, RU, page=0, viewer_tg_id=OPERATOR_ID)
+    second = _chats_screen(chats, RU, page=1, viewer_tg_id=OPERATOR_ID)
+
+    for chat in chats[:CHATS_PAGE_SIZE]:
+        assert chat.title in first.text
+    for chat in chats[CHATS_PAGE_SIZE:]:
+        assert chat.title not in first.text
+        assert chat.title in second.text
+
+    assert f"{CB_CHATS}:1" in screen_data(first)
+    assert f"{CB_CHATS}:0" in screen_data(second)
+    assert _parse_chats_page(CB_CHATS) == 0
+    assert _parse_chats_page(f"{CB_CHATS}:12") == 12
+    assert _parse_chats_page(f"{CB_CHATS}:nope") is None
+
+
+def test_chat_rows_include_role_address_members_and_subscription_state() -> None:
+    chat = make_chat(
+        1,
+        username="team_chat",
+        members_count=321,
+        plan=Plan.BUSINESS,
+        plan_expires_at=NOW,
+    )
+    text = _chats_text([chat], RU, viewer_tg_id=OPERATOR_ID)
+    assert RU("dm-chat-role-owner") in text
+    assert "@team_chat" in text
+    assert "321" in ungrouped(text)
+    assert RU("plan-business") in text
+    assert "10.08.2026" in text
+
+
 # --- plans ----------------------------------------------------------------------
-def test_plans_quotes_every_purchasable_plan_and_no_other() -> None:
+def test_plans_describes_free_and_quotes_every_purchasable_plan() -> None:
     text = _plans_text(RU)
+    assert RU("plan-free") in text
     for plan in PURCHASABLE_PLANS:
         assert str(PLAN_PRICES[plan].stars) in ungrouped(text)
         assert PLAN_PRICES[plan].usd in text
-    assert RU("plan-free") not in text  # Free is not for sale
     assert str(MAX_MONTHS) in text
+
+
+@pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
+def test_every_plan_lists_its_effective_features_and_limits(locale: str) -> None:
+    t = translator(locale)
+    text = _plans_text(t)
+    for plan in Plan:
+        assert t(f"plan-{plan.value}") in text
+    assert t("dm-feature-moderation") in text
+    assert t("dm-feature-white-label") in text
+    assert t("dm-limit-stop-words", count=100) in text
 
 
 def test_free_is_never_offered_as_something_to_buy() -> None:
@@ -412,6 +483,71 @@ def test_free_is_never_offered_as_something_to_buy() -> None:
     assert _parse_plan("nonsense") is None
     for plan in PURCHASABLE_PLANS:
         assert _parse_plan(plan.value) is plan
+
+
+# --- persistent command keyboard and catalogue ---------------------------------
+@pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
+def test_the_command_reply_keyboard_is_persistent_and_localized(locale: str) -> None:
+    t = translator(locale)
+    keyboard = _commands_reply_keyboard(t)
+    assert keyboard.is_persistent is True
+    assert keyboard.resize_keyboard is True
+    assert keyboard.one_time_keyboard is False
+    assert keyboard.keyboard[0][0].text == t("dm-commands-reply-button")
+    assert keyboard.input_field_placeholder == t("dm-commands-placeholder")
+
+
+@pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
+def test_the_command_catalogue_is_generated_from_the_live_registry(locale: str) -> None:
+    t = translator(locale)
+    text = _commands_text(t)
+    for name, description_key in DM_COMMANDS:
+        assert f"/{name}" in text
+        assert t(description_key) in text
+    for spec in registry.all():
+        for command in spec.commands:
+            assert f"/{command.name}" in text
+            assert t(command.description_key) in text
+    assert _help_screen(t).text == _commands_screen(t).text
+
+
+async def test_installing_the_command_keyboard_uses_the_normal_sender(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent: list[Any] = []
+
+    async def fake_send(*args: Any, **kwargs: Any) -> None:
+        sent.append((args, kwargs))
+
+    monkeypatch.setattr(private, "send", fake_send)
+    message = cast(Message, SimpleNamespace(chat=SimpleNamespace(id=7)))
+    await private._install_commands_keyboard(message, RU)
+    assert sent[0][0] == (7, RU("dm-commands-keyboard-ready"))
+    keyboard = sent[0][1]["keyboard"]
+    assert keyboard.is_persistent is True
+
+
+async def test_start_installs_the_reply_keyboard_before_the_inline_menu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sent: list[tuple[str, Any]] = []
+
+    async def fake_send(_chat_id: int, text: str, **kwargs: Any) -> None:
+        sent.append((text, kwargs.get("keyboard")))
+
+    monkeypatch.setattr(private, "send", fake_send)
+    handler = _handler_answering("start")
+    assert handler is not None
+    message = cast(
+        Message,
+        SimpleNamespace(chat=SimpleNamespace(id=7), from_user=make_user()),
+    )
+    await handler(message)
+
+    assert len(sent) == 2
+    assert sent[0][0] == RU("dm-commands-keyboard-ready")
+    assert sent[0][1].is_persistent is True
+    assert isinstance(sent[1][1], private.InlineKeyboardMarkup)
 
 
 # --- the purchase, followed the way a user walks it -----------------------------
@@ -588,3 +724,24 @@ def test_no_dm_screen_leaks_a_placeable_in_either_locale(locale: str) -> None:
     for screen in screens:
         assert "{" not in screen, (locale, screen)
         assert "}" not in screen, (locale, screen)
+
+
+@pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
+def test_every_visible_dm_line_has_an_emoji_prefix(locale: str) -> None:
+    t = translator(locale)
+    chats = [
+        make_chat(1, members_count=12),
+        make_chat(2, plan=Plan.PRO, plan_expires_at=NOW, members_count=34),
+    ]
+    texts = [
+        _profile_screen(make_user(), chats, t).text,
+        _chats_screen(chats, t, viewer_tg_id=OPERATOR_ID).text,
+        _plans_screen(t).text,
+        _menu_screen(t).text,
+        _help_screen(t).text,
+        _guide_index_screen(t).text,
+        _guide_page_screen(PAGES[0], t).text,
+        _notice_screen(t("dm-chat-unavailable"), t).text,
+    ]
+    for text in texts:
+        assert _decorate_lines(text) == text, (locale, text)

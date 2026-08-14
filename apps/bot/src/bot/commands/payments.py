@@ -31,12 +31,6 @@ from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
-# Shown in Telegram's own error sheet when the bot declines a checkout, so it is
-# deliberately vague: the payer can act on "try again from the panel", and a
-# stranger probing invoice payloads learns nothing from it.
-DECLINE_MESSAGE = "This invoice is no longer valid. Please reopen it from the panel."
-
-
 def _locale(user_language: str | None) -> str:
     """Receipts are addressed to the payer, so they follow the payer's locale."""
     return normalize_locale(user_language)
@@ -48,6 +42,7 @@ def build_router() -> Router:
 
     @router.pre_checkout_query()
     async def approve_checkout(query: PreCheckoutQuery) -> None:
+        t = translator(_locale(query.from_user.language_code))
         try:
             payload = InvoicePayload.decode(query.invoice_payload)
         except PaymentError as error:
@@ -56,14 +51,14 @@ def build_router() -> Router:
                 error=str(error),
                 user_id=query.from_user.id,
             )
-            await query.answer(ok=False, error_message=DECLINE_MESSAGE)
+            await query.answer(ok=False, error_message=t("billing-invoice-expired"))
             return
 
         async with UnitOfWork() as uow:
             chat = await uow.chats.get_by_id(payload.chat_id)
         if chat is None:
             logger.warning("payments.pre_checkout_orphan", chat_id=payload.chat_id)
-            await query.answer(ok=False, error_message=DECLINE_MESSAGE)
+            await query.answer(ok=False, error_message=t("billing-invoice-expired"))
             return
 
         logger.info(
@@ -106,11 +101,12 @@ def build_router() -> Router:
             return
 
         until = recorded.period_end
+        t = translator(locale)
         await send(
             message.chat.id,
-            translator(locale)(
+            t(
                 "billing-payment-received",
-                plan=recorded.plan.value.upper(),
+                plan=t(f"plan-{recorded.plan.value}"),
                 until=until.strftime("%Y-%m-%d") if until else "",
             ),
             priority=SendPriority.REPLY,
@@ -120,4 +116,4 @@ def build_router() -> Router:
     return router
 
 
-__all__ = ["DECLINE_MESSAGE", "build_router"]
+__all__ = ["build_router"]

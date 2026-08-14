@@ -28,7 +28,7 @@ from aiogram.filters import Command, CommandObject
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from bot.facts import facts_from, mention
-from bot.filters import IsChatAdmin
+from bot.filters import InGroup, IsChatAdmin
 from bot.replies import answer, send
 from core import actions
 from core.context import ChatContext, chat_context
@@ -214,6 +214,7 @@ async def _names_for(tg_user_ids: list[int]) -> dict[int, str]:
 def build_router() -> Router:
     """The engagement router. Gated by `ModuleGateMiddleware` in `bot.modules`."""
     router = Router(name="engagement")
+    router.message.filter(InGroup())
 
     @router.message(Command("rep"))
     async def rep_command(message: Message, command: CommandObject, ctx: ChatContext) -> None:

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Final
+import unicodedata
 
 from i18n.runtime import Translator
 
@@ -98,19 +99,54 @@ def position(page: GuidePage) -> tuple[int, int]:
     return PAGES.index(page) + 1, len(PAGES)
 
 
+def _starts_with_emoji(line: str) -> bool:
+    """Recognise the symbol-led lines already authored in the catalogues."""
+    content = line.lstrip()
+    return bool(content) and unicodedata.category(content[0]) in {"So", "Sk"}
+
+
+def _decorate_body(body: str) -> str:
+    """Give every visible manual line a small semantic visual anchor.
+
+    Guide copy is translated prose, so requiring translators to remember a
+    prefix on every wrapped line is brittle. The renderer keeps explicit icons,
+    then applies stable markers to headings, commands, lists and prose. This
+    also covers new language files without changing their words.
+    """
+    decorated: list[str] = []
+    for raw_line in body.splitlines():
+        line = raw_line.strip()
+        if not line:
+            decorated.append("")
+        elif _starts_with_emoji(line):
+            decorated.append(line)
+        elif line.startswith("<b>"):
+            decorated.append(f"📌 {line}")
+        elif line.startswith("•"):
+            decorated.append(f"▫️ {line[1:].lstrip()}")
+        elif line.startswith(("/", "<code>")):
+            decorated.append(f"⌨️ {line}")
+        elif line[0].isdigit():
+            decorated.append(f"🔢 {line}")
+        else:
+            decorated.append(f"💡 {line}")
+    return "\n".join(decorated)
+
+
 def render(page: GuidePage, t: Translator) -> str:
     """The message body for one page: heading, then prose.
 
     Nothing is escaped here and nothing needs to be: every character comes from
     the catalogue, which is ours and which deliberately contains HTML tags.
     """
-    return f"{page.icon} <b>{t(page.title_key)}</b>\n\n{t(page.body_key)}"
+    return f"{page.icon} <b>{t(page.title_key)}</b>\n\n{_decorate_body(t(page.body_key))}"
 
 
 __all__ = [
     "MAX_PAGE_CHARS",
     "PAGES",
     "GuidePage",
+    "_decorate_body",
     "neighbours",
     "page_for",
     "position",

@@ -21,6 +21,7 @@ from aiogram import Bot, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 
+from bot.filters import InGroup
 from bot.replies import answer
 from bot.targets import ResolvedTarget, resolve, split_argument
 from core.audit import audit
@@ -55,6 +56,7 @@ async def _target_or_explain(
 def build_router() -> Router:
     """The operator router. Attached ungated — see the module docstring."""
     router = Router(name="crossban")
+    router.message.filter(InGroup())
 
     @router.message(Command("gban"))
     async def gban_command(

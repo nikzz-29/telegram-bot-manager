@@ -194,8 +194,8 @@ error-invalid-pattern = Неверное регулярное выражение
 error-invalid-schedule = Неверное расписание.
 error-target-not-found = Не удалось определить участника. Ответьте на его сообщение или укажите @username — я знаю только тех, кто уже писал в чате.
 error-self-action = Это действие нельзя применить к себе или к боту.
-error-provider-unavailable = Платёжный провайдер недоступен. Попробуйте позже.
-error-payment = Платёж не прошёл.
+error-provider-unavailable = ⚠️ Платёжный провайдер недоступен. Попробуйте позже.
+error-payment = ❌ Платёж не прошёл. Обратитесь в поддержку, указав время операции.
 
 ## Описания команд для меню Telegram
 # Групповые команды берут ключ из core.registry; личные перечислены в
@@ -260,14 +260,15 @@ plan-pro = Pro
 plan-business = Business
 plan-white_label = White Label
 
-billing-invoice-title = Подписка {$plan}
-billing-invoice-description = Тариф {$plan} для этого чата на {$months ->
+billing-invoice-title = 💳 Подписка {$plan}
+billing-invoice-description = 📦 Тариф {$plan} для этого чата на {$months ->
         [one] {$months} месяц
         [few] {$months} месяца
        *[other] {$months} месяцев
     }.
 billing-payment-received = ✅ Платёж получен. Тариф {$plan} активен до {$until}.
-billing-payment-replayed = Этот платёж уже был зачтён — подписка не изменилась.
+billing-payment-replayed = ℹ️ Этот платёж уже был зачтён — подписка не изменилась.
+billing-invoice-expired = ⚠️ Счёт больше не действует. Откройте тарифы в Mini App и создайте новый.
 
 billing-reminder-title = ⏳ Подписка скоро закончится
 billing-reminder-body = Тариф {$plan} в чате «{$chat}» закончится {$until} — это через {$days ->

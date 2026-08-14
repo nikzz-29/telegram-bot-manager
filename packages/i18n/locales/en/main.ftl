@@ -195,8 +195,8 @@ error-invalid-pattern = Invalid regular expression.
 error-invalid-schedule = Invalid schedule.
 error-target-not-found = I could not identify that member. Reply to their message or use @username — I only know people who have posted in this chat.
 error-self-action = This action cannot be applied to yourself or to the bot.
-error-provider-unavailable = The payment provider is unavailable. Please try again later.
-error-payment = The payment did not go through.
+error-provider-unavailable = ⚠️ The payment provider is unavailable. Please try again later.
+error-payment = ❌ The payment could not be recorded. Contact support and include the operation time.
 
 ## Command descriptions for the Telegram menu
 # Group commands take their key from core.registry; the private ones are listed
@@ -261,13 +261,14 @@ plan-pro = Pro
 plan-business = Business
 plan-white_label = White Label
 
-billing-invoice-title = {$plan} subscription
-billing-invoice-description = {$plan} plan for this chat, {$months ->
+billing-invoice-title = 💳 {$plan} subscription
+billing-invoice-description = 📦 {$plan} plan for this chat, {$months ->
         [one] {$months} month
        *[other] {$months} months
     }.
 billing-payment-received = ✅ Payment received. {$plan} is active until {$until}.
-billing-payment-replayed = This payment was already credited — nothing changed.
+billing-payment-replayed = ℹ️ This payment was already credited — nothing changed.
+billing-invoice-expired = ⚠️ This invoice has expired. Open plans in the Mini App and create a new one.
 
 billing-reminder-title = ⏳ Your subscription ends soon
 billing-reminder-body = The {$plan} plan for "{$chat}" ends on {$until}, in {$days ->

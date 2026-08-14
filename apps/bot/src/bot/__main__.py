@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 from typing import Final
+from urllib.parse import urlparse
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -24,6 +25,8 @@ from aiogram.types import (
     BotCommandScopeAllChatAdministrators,
     BotCommandScopeAllPrivateChats,
     MenuButtonCommands,
+    MenuButtonWebApp,
+    WebAppInfo,
 )
 
 from bot import middlewares, modules
@@ -59,18 +62,18 @@ LIVE_MODULES: Final[tuple[ModuleName, ...]] = (
 # commands rather than any module's, so they are written here instead of derived
 # from the registry — `bot.commands.private` is the only file that answers them.
 #
-# DECISION: `/admin` is listed even though almost nobody may use it. Telegram has
-# no per-user command scope short of `BotCommandScopeChat` set per account, and
-# publishing per-account would mean one API call per operator on every start; the
-# gate that matters is in the handler, and a listed command that answers "not for
-# you" is not a leak — the operator list is not a secret, the panel's data is,
-# and that is guarded by `initData` on every API call.
+# DECISION: the operator console is deliberately absent from this list. Its
+# command name comes from `PANEL_COMMAND` and only the ids in `SUPERADMIN_IDS`
+# may use it, so publishing it here would put a door in every user's menu that
+# answers nothing for all but a handful of accounts. `bot.commands.private`
+# answers it with silence for everyone else, and leaving it out of
+# `setMyCommands` is the other half of keeping it unadvertised — the name is the
+# one thing a curious member does not already have.
 PRIVATE_COMMANDS: Final[tuple[tuple[str, str], ...]] = (
     ("profile", "cmd-profile"),
     ("chats", "cmd-chats"),
     ("plans", "cmd-plans"),
     ("help", "cmd-help"),
-    ("admin", "cmd-admin"),
 )
 
 
@@ -101,11 +104,10 @@ async def _publish_commands(bot: Bot) -> None:
     open to everyone but putting it in the all-members menu invites a whole chat
     to poke at the bot; anyone who knows to type it still gets an answer.
 
-    DECISION: the chat menu button opens the command list, not the Mini App. The
-    panel is an operator surface reached through `/admin`; a Web App button on
-    every user's keyboard advertises it to everyone who ever opened the bot, and
-    they would all land on a panel that has nothing in it for them. Pointing the
-    button at the commands makes it useful to the people who actually see it.
+    DECISION: the chat menu button opens the Mini App for every user. The API
+    still derives permissions from signed Telegram init data, so exposing the
+    entrance does not expose another user's chats. Telegram only accepts HTTPS
+    Web App URLs; local development therefore falls back to the command menu.
     """
     # The menu is global, so it can only be in one language; the per-chat
     # `language` setting still governs every reply the bot actually sends.
@@ -120,12 +122,30 @@ async def _publish_commands(bot: Bot) -> None:
         BotCommand(command=name, description=t(description_key))
         for name, description_key in PRIVATE_COMMANDS
     ]
+
     try:
         await bot.set_my_commands(group_commands, scope=BotCommandScopeAllChatAdministrators())
-        await bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
-        await bot.set_chat_menu_button(menu_button=MenuButtonCommands())
     except TelegramAPIError as exc:
-        logger.warning("bot.commands_publish_failed", error=str(exc))
+        logger.warning("bot.commands_publish_failed", operation="group", error=str(exc))
+
+    try:
+        await bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
+    except TelegramAPIError as exc:
+        logger.warning("bot.commands_publish_failed", operation="private", error=str(exc))
+
+    url = get_settings().webapp_url.strip()
+    parsed = urlparse(url)
+    menu_button = (
+        MenuButtonWebApp(text=t("open-miniapp"), web_app=WebAppInfo(url=url))
+        if parsed.scheme == "https" and bool(parsed.netloc)
+        else MenuButtonCommands()
+    )
+    if isinstance(menu_button, MenuButtonCommands):
+        logger.warning("bot.webapp_menu_fallback", webapp_url=url or None)
+    try:
+        await bot.set_chat_menu_button(menu_button=menu_button)
+    except TelegramAPIError as exc:
+        logger.warning("bot.commands_publish_failed", operation="menu_button", error=str(exc))
 
 
 async def run() -> None:

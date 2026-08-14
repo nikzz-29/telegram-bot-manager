@@ -8,10 +8,9 @@ plans, and the manual for all of it.
 
 DECISION: settings are still not editable from chat. Spec §6 puts the whole
 control surface in the Mini App; a second, divergent way to change the same
-values is how "the button says X but the bot does Y" bugs are born. What lives
-here is everything that is *not* a setting — identity, status and buying — which
-is exactly the part a user cannot reach from the panel, because the panel is for
-operators.
+values is how "the button says X but the bot does Y" bugs are born. The DM keeps
+the same user-facing overview for people who prefer commands, while the Mini App
+is the richer way to inspect and configure the same chats.
 
 DECISION: no `/language`. The bot already answers in the account's Telegram
 language, and a second stored preference would be a setting — the thing this
@@ -36,17 +35,17 @@ DECISION: every screen offers a way out — its parent, the root menu, or both.
 A screen whose only exit is scrolling back through the conversation is a dead
 end, and the conversation is exactly what editing in place stopped keeping.
 
-DECISION: the Mini App has one entrance and it is unlisted. `PANEL_COMMAND`
-names it, `bot.__main__.PRIVATE_COMMANDS` deliberately does not, and no screen
-below links to it: the panel is an operator surface, and every DM here belongs
-to someone who is not an operator.
+DECISION: the global Telegram menu button is the normal Mini App entrance. The
+unlisted `PANEL_COMMAND` below remains only as an operator-console shortcut and
+is not the access boundary for the user-facing Mini App.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from html import escape
-from typing import Final
+import re
+from typing import Final, cast
 
 from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
@@ -54,7 +53,9 @@ from aiogram.types import (
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    KeyboardButton,
     Message,
+    ReplyKeyboardMarkup,
     User,
     WebAppInfo,
 )
@@ -64,15 +65,16 @@ from bot.guide import PAGES, GuidePage, neighbours, page_for, position, render
 from bot.replies import edit, send
 from core.billing import MAX_MONTHS, billing
 from core.dm_stats import DEFAULT_PERIOD, PERIODS, StatsPeriod, dm_stats, period_for
+from core.registry import registry
 from core.sender import SendPriority
 from db.models import Chat
 from db.uow import UnitOfWork
-from i18n.runtime import Translator, normalize_locale, translator
+from i18n.runtime import SUPPORTED_LOCALES, Translator, normalize_locale, translator
 from shared.config import get_settings
-from shared.enums import PaymentProvider, Plan
+from shared.enums import ModuleName, PaymentProvider, Plan
 from shared.errors import DomainError
 from shared.logging import get_logger
-from shared.plans import PLAN_PRICES, PURCHASABLE_PLANS
+from shared.plans import PLAN_FEATURES, PLAN_LIMITS, PLAN_PRICES, PURCHASABLE_PLANS, Feature
 
 logger = get_logger(__name__)
 
@@ -100,9 +102,55 @@ TERMS: Final[tuple[int, ...]] = (1, 3, 12)
 # stay one screen tall, and `/chats` is the full list.
 PROFILE_CHAT_PREVIEW: Final = 3
 
+# A five-chat page stays comfortably below Telegram's 4096-character text limit
+# even when titles, usernames and translated plan names are all long. It also
+# keeps the inline keyboard within one phone viewport.
+CHATS_PAGE_SIZE: Final = 5
+
+DM_COMMANDS: Final[tuple[tuple[str, str], ...]] = (
+    ("profile", "cmd-profile"),
+    ("chats", "cmd-chats"),
+    ("plans", "cmd-plans"),
+    ("help", "cmd-help"),
+)
+
+MODULE_ICONS: Final[dict[ModuleName, str]] = {
+    ModuleName.MODERATION: "🛡️",
+    ModuleName.ENTRY: "🚪",
+    ModuleName.STATS: "📊",
+    ModuleName.ENGAGEMENT: "💬",
+    ModuleName.AUTOPOST: "📅",
+    ModuleName.AI_MODERATION: "🤖",
+    ModuleName.CROSSBAN: "🌐",
+}
+
+PLAN_ICONS: Final[dict[Plan, str]] = {
+    Plan.FREE: "🆓",
+    Plan.PRO: "🚀",
+    Plan.BUSINESS: "🏢",
+    Plan.WHITE_LABEL: "✨",
+}
+
+# Covers the pictographs and symbol blocks Telegram renders as emoji. Lines
+# without a purpose-specific icon receive a neutral detail marker; this catches
+# long guide and statistics text assembled outside this module too.
+_EMOJI_PREFIX = re.compile(r"^[\U0001F000-\U0001FAFF\u2300-\u27BF]")
+
 # The manual page shown to someone whose chat list is empty: that screen's only
 # real question is "how do I get a chat in here", and the answer is a page.
 SETUP_PAGE: Final = "setup"
+
+
+def _decorate_lines(text: str) -> str:
+    """Give every visible DM line an icon without duplicating existing ones."""
+    decorated: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or _EMOJI_PREFIX.match(stripped):
+            decorated.append(line)
+        else:
+            decorated.append(f"▫️ {stripped}")
+    return "\n".join(decorated)
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,6 +164,9 @@ class Screen:
 
     text: str
     keyboard: InlineKeyboardMarkup | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "text", _decorate_lines(self.text))
 
 
 # One keyboard, as rows of buttons, before it is wrapped in a markup object.
@@ -163,53 +214,190 @@ async def _chats_for(tg_user_id: int) -> list[Chat]:
 
 
 def _profile_text(user: User, chats: list[Chat], t: Translator) -> str:
+    owners = sum(chat.owner_tg_id == user.id for chat in chats)
+    paid = sum(chat.plan is not Plan.FREE for chat in chats)
+    known_members = [chat.members_count for chat in chats if chat.members_count is not None]
+    plan_counts = [
+        t(
+            "dm-profile-plan-count",
+            plan=t(f"plan-{plan.value}"),
+            count=sum(chat.plan is plan for chat in chats),
+        )
+        for plan in (Plan.FREE, *PURCHASABLE_PLANS)
+        if any(chat.plan is plan for chat in chats)
+    ]
+    expiries = [
+        chat.plan_expires_at
+        for chat in chats
+        if chat.plan is not Plan.FREE and chat.plan_expires_at is not None
+    ]
     lines = [
         # The display name is escaped for the same reason a chat title is: it is
         # whatever the account owner typed, and it lands inside a <b> tag.
         t("dm-profile-header", name=escape(_display_name(user, t))),
+        t(
+            "dm-profile-username",
+            username=f"@{escape(user.username)}" if user.username else t("dm-value-not-set"),
+        ),
         # DECISION: the id goes in as a string. Fluent formats a bare number for
         # the locale — `111 222 333` in ru, `111,222,333` in en — which is right
         # for a price and wrong for an identifier sitting in a <code> block that
         # exists to be copied and pasted back to support.
         t("dm-profile-id", id=str(user.id)),
+        t(
+            "dm-profile-language",
+            language=escape(user.language_code.upper())
+            if user.language_code
+            else t("dm-value-unknown"),
+        ),
         "",
         t("dm-profile-chats", count=len(chats)),
     ]
-    lines.extend(f"• {_title_text(chat, t)}" for chat in chats[:PROFILE_CHAT_PREVIEW])
+    if chats:
+        lines.extend(
+            (
+                t("dm-profile-roles", owners=owners, admins=len(chats) - owners),
+                t("dm-profile-subscriptions", free=len(chats) - paid, paid=paid),
+                t("dm-profile-plans", plans=" · ".join(plan_counts)),
+                t("dm-profile-members", count=sum(known_members))
+                if known_members
+                else t("dm-profile-members-unknown"),
+                t(
+                    "dm-profile-next-expiry",
+                    until=min(expiries).strftime("%d.%m.%Y"),
+                )
+                if expiries
+                else t("dm-profile-no-expiry"),
+                t("dm-profile-preview-title"),
+            )
+        )
+    lines.extend(
+        t(
+            "dm-profile-chat-preview",
+            chat=_title_text(chat, t),
+            plan=t(f"plan-{chat.plan.value}"),
+        )
+        for chat in chats[:PROFILE_CHAT_PREVIEW]
+    )
     if len(chats) > PROFILE_CHAT_PREVIEW:
         lines.append(t("dm-profile-more", count=len(chats) - PROFILE_CHAT_PREVIEW))
     return "\n".join(lines)
 
 
-def _chats_text(chats: list[Chat], t: Translator) -> str:
-    """One line per chat: its title, its plan, and when that plan lapses."""
+def _chat_page(chats: list[Chat], page: int) -> tuple[list[Chat], int, int]:
+    pages = max(1, (len(chats) + CHATS_PAGE_SIZE - 1) // CHATS_PAGE_SIZE)
+    current = min(max(page, 0), pages - 1)
+    start = current * CHATS_PAGE_SIZE
+    return chats[start : start + CHATS_PAGE_SIZE], current, pages
+
+
+def _chats_text(
+    chats: list[Chat], t: Translator, *, page: int = 0, viewer_tg_id: int | None = None
+) -> str:
+    """A bounded chat page with role, reach, address and subscription state."""
     if not chats:
         return t("dm-chats-empty")
-    lines = [t("dm-chats-header", count=len(chats)), ""]
-    for chat in chats:
+    visible, current, pages = _chat_page(chats, page)
+    lines = [t("dm-chats-header", count=len(chats))]
+    if pages > 1:
+        lines.append(t("dm-chats-page", page=current + 1, pages=pages))
+    lines.append("")
+    for chat in visible:
         plan = t(f"plan-{chat.plan.value}")
-        if chat.plan is Plan.FREE or chat.plan_expires_at is None:
-            lines.append(t("dm-chats-row-free", chat=_title_text(chat, t), plan=plan))
-        else:
-            lines.append(
+        role = t(
+            "dm-chat-role-owner"
+            if viewer_tg_id is not None and chat.owner_tg_id == viewer_tg_id
+            else "dm-chat-role-admin"
+        )
+        username = f"@{escape(chat.username)}" if chat.username else t("dm-chat-private")
+        members = (
+            t("dm-chat-members", count=chat.members_count)
+            if chat.members_count is not None
+            else t("dm-chat-members-unknown")
+        )
+        lines.extend(
+            (
                 t(
                     "dm-chats-row",
+                    status="🟢" if chat.is_active else "⚪️",
                     chat=_title_text(chat, t),
+                    role=role,
+                ),
+                t(
+                    "dm-chats-row-meta",
                     plan=plan,
-                    until=chat.plan_expires_at.strftime("%d.%m.%Y"),
-                )
+                    members=members,
+                    username=username,
+                ),
             )
+        )
+        if chat.plan is Plan.FREE:
+            lines.append(t("dm-chats-row-free"))
+        elif chat.plan_expires_at is None:
+            lines.append(t("dm-chats-row-open-ended"))
+        else:
+            lines.append(t("dm-chats-row-until", until=chat.plan_expires_at.strftime("%d.%m.%Y")))
+        lines.append("")
+    while lines and not lines[-1]:
+        lines.pop()
     return "\n".join(lines)
 
 
 def _plans_text(t: Translator) -> str:
-    lines = [t("dm-plans-header"), ""]
-    for plan in PURCHASABLE_PLANS:
-        price = PLAN_PRICES[plan]
-        lines.append(
-            t("dm-plans-row", plan=t(f"plan-{plan.value}"), stars=price.stars, usd=price.usd)
+    lines = [t("dm-plans-header"), t("dm-plans-intro"), ""]
+    for plan in (Plan.FREE, *PURCHASABLE_PLANS):
+        if plan is Plan.FREE:
+            lines.append(
+                t(
+                    "dm-plans-row-free",
+                    icon=PLAN_ICONS[plan],
+                    plan=t(f"plan-{plan.value}"),
+                )
+            )
+        else:
+            price = PLAN_PRICES[plan]
+            lines.append(
+                t(
+                    "dm-plans-row",
+                    icon=PLAN_ICONS[plan],
+                    plan=t(f"plan-{plan.value}"),
+                    stars=price.stars,
+                    usd=price.usd,
+                )
+            )
+        features = [
+            t(f"dm-feature-{feature.value.replace('_', '-')}")
+            for feature in Feature
+            if feature in PLAN_FEATURES[plan]
+        ]
+        limits = PLAN_LIMITS[plan]
+        limit_labels = [
+            t("dm-limit-stop-words", count=limits.stop_words),
+            *([t("dm-limit-triggers", count=limits.triggers)] if limits.triggers else []),
+            *(
+                [t("dm-limit-posts", count=limits.scheduled_posts)]
+                if limits.scheduled_posts
+                else []
+            ),
+            *(
+                [t("dm-limit-ai", count=limits.ai_checks_per_day)]
+                if limits.ai_checks_per_day
+                else []
+            ),
+            *(
+                [t("dm-limit-stats", count=limits.stats_retention_days)]
+                if limits.stats_retention_days
+                else []
+            ),
+        ]
+        lines.extend(
+            (
+                t("dm-plans-features", features=", ".join(features)),
+                t("dm-plans-limits", limits=" · ".join(limit_labels)),
+                "",
+            )
         )
-    lines.extend(("", t("dm-plans-hint", months=MAX_MONTHS)))
+    lines.append(t("dm-plans-hint", months=MAX_MONTHS))
     return "\n".join(lines)
 
 
@@ -261,6 +449,40 @@ def _panel_keyboard(locale: str) -> InlineKeyboardMarkup | None:
             ]
         ]
     )
+
+
+def _commands_reply_keyboard(t: Translator) -> ReplyKeyboardMarkup:
+    """The one persistent bottom button replacing Telegram's command menu."""
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=t("dm-commands-reply-button"))]],
+        resize_keyboard=True,
+        is_persistent=True,
+        one_time_keyboard=False,
+        input_field_placeholder=t("dm-commands-placeholder"),
+    )
+
+
+def _commands_text(t: Translator) -> str:
+    """One catalogue assembled from DM entry points and the module registry."""
+    lines = [t("dm-commands-header"), t("dm-commands-intro"), "", t("dm-commands-dm-title")]
+    lines.extend(
+        t("dm-command-row-private", command=f"/{name}", description=t(description_key))
+        for name, description_key in DM_COMMANDS
+    )
+    for spec in registry.all():
+        if not spec.commands:
+            continue
+        lines.extend(("", f"{MODULE_ICONS[spec.name]} <b>{t(spec.title_key)}</b>"))
+        lines.extend(
+            t(
+                "dm-command-row-admin" if command.admin_only else "dm-command-row-public",
+                command=f"/{command.name}",
+                description=t(command.description_key),
+            )
+            for command in spec.commands
+        )
+    lines.extend(("", t("dm-commands-note")))
+    return "\n".join(lines)
 
 
 def _plan_options(t: Translator) -> Rows:
@@ -344,9 +566,13 @@ def _start_screen(t: Translator) -> Screen:
 
 
 def _help_screen(t: Translator) -> Screen:
-    """`/help`: the short version, with the long one one tap away."""
+    """`/help` and the persistent button share one command catalogue."""
+    return _commands_screen(t)
+
+
+def _commands_screen(t: Translator) -> Screen:
     return Screen(
-        t("help-text"),
+        _commands_text(t),
         InlineKeyboardMarkup(inline_keyboard=[[_button(t("dm-guide-button"), CB_GUIDE)], _nav(t)]),
     )
 
@@ -371,8 +597,11 @@ def _profile_screen(user: User, chats: list[Chat], t: Translator) -> Screen:
     )
 
 
-def _chats_screen(chats: list[Chat], t: Translator) -> Screen:
+def _chats_screen(
+    chats: list[Chat], t: Translator, *, page: int = 0, viewer_tg_id: int | None = None
+) -> Screen:
     """The chat list, where every row is also the way into that chat's report."""
+    visible, current, pages = _chat_page(chats, page)
     rows: Rows = [
         [
             _button(
@@ -380,15 +609,25 @@ def _chats_screen(chats: list[Chat], t: Translator) -> Screen:
                 f"{CB_REPORT}:{chat.id}:{DEFAULT_PERIOD.slug}",
             )
         ]
-        for chat in chats
+        for chat in visible
     ]
+    if pages > 1:
+        pagination: list[InlineKeyboardButton] = []
+        if current > 0:
+            pagination.append(_button(t("dm-page-prev-button"), f"{CB_CHATS}:{current - 1}"))
+        if current + 1 < pages:
+            pagination.append(_button(t("dm-page-next-button"), f"{CB_CHATS}:{current + 1}"))
+        rows.append(pagination)
     if chats:
         rows.append([_button(t("dm-plans-button-short"), CB_PLANS)])
     else:
         # An empty list asks exactly one question, and a manual page answers it.
         rows.append([_button(t("dm-chats-setup-button"), f"{CB_PAGE}:{SETUP_PAGE}")])
     rows.append(_nav(t))
-    return Screen(_chats_text(chats, t), InlineKeyboardMarkup(inline_keyboard=rows))
+    return Screen(
+        _chats_text(chats, t, page=current, viewer_tg_id=viewer_tg_id),
+        InlineKeyboardMarkup(inline_keyboard=rows),
+    )
 
 
 def _plans_screen(t: Translator) -> Screen:
@@ -529,6 +768,15 @@ def _parse_plan(raw: str) -> Plan | None:
     return plan if plan in PURCHASABLE_PLANS else None
 
 
+def _parse_chats_page(raw: str | None) -> int | None:
+    if raw == CB_CHATS:
+        return 0
+    if raw is None or not raw.startswith(f"{CB_CHATS}:"):
+        return None
+    page = raw.removeprefix(f"{CB_CHATS}:")
+    return int(page) if page.isdigit() else None
+
+
 # --- delivery ---------------------------------------------------------------
 
 
@@ -540,6 +788,20 @@ async def _reply(message: Message, screen: Screen) -> None:
         priority=SendPriority.REPLY,
         silent=False,
         keyboard=screen.keyboard,
+    )
+
+
+async def _install_commands_keyboard(message: Message, t: Translator) -> None:
+    """Seed Telegram's persistent reply keyboard before sending inline screens."""
+    # `bot.replies.send` accepts any Bot API reply markup at runtime; its narrow
+    # annotation documents the dominant inline use, so keep the cast local here.
+    keyboard = cast(InlineKeyboardMarkup, _commands_reply_keyboard(t))
+    await send(
+        message.chat.id,
+        t("dm-commands-keyboard-ready"),
+        priority=SendPriority.REPLY,
+        silent=False,
+        keyboard=keyboard,
     )
 
 
@@ -567,28 +829,35 @@ def build_router() -> Router:
     # filter is a guard against a button somehow surviving into a group rather
     # than a routing rule.
     router.callback_query.filter(F.message.chat.type == "private")
+    command_button_labels = {
+        translator(locale)("dm-commands-reply-button") for locale in SUPPORTED_LOCALES
+    }
 
     # --- entry points ------------------------------------------------------
     @router.message(CommandStart())
     async def start_command(message: Message) -> None:
-        await _reply(message, _start_screen(translator(_locale(message.from_user))))
+        t = translator(_locale(message.from_user))
+        await _install_commands_keyboard(message, t)
+        await _reply(message, _start_screen(t))
 
     @router.message(Command("help"))
     async def help_command(message: Message) -> None:
         await _reply(message, _help_screen(translator(_locale(message.from_user))))
 
+    @router.message(F.text.in_(command_button_labels))
+    async def commands_button(message: Message) -> None:
+        await _reply(message, _commands_screen(translator(_locale(message.from_user))))
+
     # --- the operator's console --------------------------------------------
     @router.message(Command(get_settings().panel_command_name))
     async def console_command(message: Message) -> None:
-        """The only entrance to the Mini App, for the ids in `SUPERADMIN_IDS`.
+        """An unlisted operator-console shortcut for ids in `SUPERADMIN_IDS`.
 
         DECISION: everybody else gets nothing at all — not a refusal, not an
         error. A "this is not for you" reply confirms the command exists, and the
-        name is the only thing keeping ordinary members from finding a door to
-        rattle: it is published in no menu, `bot.__main__` leaves it out of
-        `setMyCommands` on purpose, and no screen above links to it. The id check
-        is the boundary; the silence is what keeps the boundary from advertising
-        itself, and a curious member cannot tell it apart from a typo.
+        operator command is deliberately absent from `setMyCommands`. This gate
+        protects operator-only tooling; it does not govern the user Mini App,
+        whose global Telegram menu button is available to everyone.
 
         The name comes from `PANEL_COMMAND` at router build time, which is also
         when `setMyCommands` runs — a name changed in `.env` mid-process would
@@ -623,7 +892,14 @@ def build_router() -> Router:
         if message.from_user is None:
             return
         t = translator(_locale(message.from_user))
-        await _reply(message, _chats_screen(await _chats_for(message.from_user.id), t))
+        await _reply(
+            message,
+            _chats_screen(
+                await _chats_for(message.from_user.id),
+                t,
+                viewer_tg_id=message.from_user.id,
+            ),
+        )
 
     # `/pay` is the same screen as `/plans` reached from the other direction —
     # one wants to know the price, the other has already decided.
@@ -648,11 +924,22 @@ def build_router() -> Router:
         chats = await _chats_for(query.from_user.id)
         await _redraw(query, _profile_screen(query.from_user, chats, t))
 
-    @router.callback_query(F.data == CB_CHATS)
+    @router.callback_query((F.data == CB_CHATS) | F.data.startswith(f"{CB_CHATS}:"))
     async def chats_pressed(query: CallbackQuery) -> None:
         await query.answer()
+        page = _parse_chats_page(query.data)
+        if page is None:
+            return
         t = translator(_locale(query.from_user))
-        await _redraw(query, _chats_screen(await _chats_for(query.from_user.id), t))
+        await _redraw(
+            query,
+            _chats_screen(
+                await _chats_for(query.from_user.id),
+                t,
+                page=page,
+                viewer_tg_id=query.from_user.id,
+            ),
+        )
 
     @router.callback_query(F.data == CB_PLANS)
     async def plans_pressed(query: CallbackQuery) -> None:
