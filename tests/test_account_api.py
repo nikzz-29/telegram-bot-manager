@@ -6,9 +6,13 @@ from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
+from fastapi import FastAPI
+import httpx
 import pytest
 
+from api.deps import get_principal, get_uow
 from api.routers.account import get_user_dashboard, get_user_profile
+from api.routers.account import router as account_router
 from api.security import Principal
 from db.models import Chat
 from shared.enums import ChatType, Plan
@@ -194,3 +198,17 @@ async def test_dashboard_rejects_a_chat_outside_the_user_scope() -> None:
             days=7,
             chat_id=999,
         )
+
+
+async def test_dashboard_accepts_a_period_from_the_http_query_string() -> None:
+    app = FastAPI()
+    app.include_router(account_router, prefix="/api")
+    app.dependency_overrides[get_principal] = lambda: PRINCIPAL
+    app.dependency_overrides[get_uow] = FakeUow
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://api") as client:
+        response = await client.get("/api/me/dashboard?days=7")
+
+    assert response.status_code == 200
+    assert response.json()["period_days"] == 7

@@ -6,6 +6,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from typing import Annotated, Literal, TypedDict, cast
 
 from fastapi import APIRouter, Query, status
+from pydantic import BeforeValidator
 
 from api.deps import PrincipalDep, UowDep
 from api.errors import problem_responses
@@ -30,7 +31,15 @@ from shared.time_utils import utc_now
 
 logger = get_logger(__name__)
 
-StatsWindow = Literal[1, 7, 30, 90]
+
+def _parse_stats_window(value: object) -> object:
+    """Coerce HTTP query strings before validating the allowed integer values."""
+    if isinstance(value, str):
+        return int(value)
+    return value
+
+
+StatsWindow = Annotated[Literal[1, 7, 30, 90], BeforeValidator(_parse_stats_window)]
 
 
 class ActivityRow(TypedDict):
