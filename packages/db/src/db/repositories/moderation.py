@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Final
 
@@ -127,6 +128,16 @@ class WarnRepository:
         )
         return int(result.scalar_one())
 
+    async def count_issued_many(self, chat_ids: Sequence[int], since: datetime) -> int:
+        if not chat_ids:
+            return 0
+        result = await self._session.execute(
+            select(func.count())
+            .select_from(Warn)
+            .where(Warn.chat_id.in_(chat_ids), Warn.created_at >= since)
+        )
+        return int(result.scalar_one())
+
 
 class PunishmentRepository:
     def __init__(self, session: AsyncSession) -> None:
@@ -236,6 +247,18 @@ class PunishmentRepository:
         result = await self._session.execute(
             select(Punishment.type, func.count())
             .where(Punishment.chat_id == chat_id, Punishment.created_at >= since)
+            .group_by(Punishment.type)
+        )
+        return {str(punishment_type): int(total) for punishment_type, total in result.all()}
+
+    async def count_issued_by_type_many(
+        self, chat_ids: Sequence[int], since: datetime
+    ) -> dict[str, int]:
+        if not chat_ids:
+            return {}
+        result = await self._session.execute(
+            select(Punishment.type, func.count())
+            .where(Punishment.chat_id.in_(chat_ids), Punishment.created_at >= since)
             .group_by(Punishment.type)
         )
         return {str(punishment_type): int(total) for punishment_type, total in result.all()}
@@ -357,3 +380,61 @@ class ModerationLogRepository:
         )
         automated_total, moderators = result.one()
         return {"automated": int(automated_total), "moderators": int(moderators)}
+
+    async def dashboard_many(
+        self,
+        chat_ids: Sequence[int],
+        *,
+        since: datetime,
+        viewer_tg_id: int,
+        until: datetime | None = None,
+        breakdown_limit: int = 8,
+    ) -> dict[str, int | list[tuple[str, int]]]:
+        """Moderation counters for a user's dashboard in two flat queries."""
+        if not chat_ids:
+            return {
+                "total": 0,
+                "mine": 0,
+                "automated": 0,
+                "moderators": 0,
+                "breakdown": [],
+            }
+
+        automated = ModerationLog.moderator_tg_id.is_(None) | (
+            ModerationLog.moderator_tg_id <= AUTOMATED_MODERATOR_ID
+        )
+        by_human = ModerationLog.moderator_tg_id > AUTOMATED_MODERATOR_ID
+        filters = [
+            ModerationLog.chat_id.in_(chat_ids),
+            ModerationLog.created_at >= since,
+        ]
+        if until is not None:
+            filters.append(ModerationLog.created_at < until)
+
+        result = await self._session.execute(
+            select(
+                func.count(),
+                func.count().filter(ModerationLog.moderator_tg_id == viewer_tg_id),
+                func.count().filter(automated),
+                func.count(func.distinct(ModerationLog.moderator_tg_id)).filter(by_human),
+            ).where(*filters)
+        )
+        total, mine, automated_total, moderators = result.one()
+
+        breakdown: list[tuple[str, int]] = []
+        if breakdown_limit > 0:
+            grouped = await self._session.execute(
+                select(ModerationLog.action, func.count().label("total"))
+                .where(*filters)
+                .group_by(ModerationLog.action)
+                .order_by(desc("total"), ModerationLog.action)
+                .limit(breakdown_limit)
+            )
+            breakdown = [(str(action), int(count)) for action, count in grouped.all()]
+        return {
+            "total": int(total),
+            "mine": int(mine),
+            "automated": int(automated_total),
+            "moderators": int(moderators),
+            "breakdown": breakdown,
+        }

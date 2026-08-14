@@ -175,17 +175,21 @@ class StatsService:
             totals = await uow.stats.totals_since(chat_id=chat_id, start=start, end=last)
             leaders = await uow.stats.top_users(chat_id=chat_id, start=start, end=last, limit=10)
 
-        series = [
-            StatPoint(
-                date=row.date,
-                messages=row.messages,
-                active_users=row.active_users,
-                joins=row.joins,
-                leaves=row.leaves,
-                moderation_actions=row.moderation_actions,
+        by_day = {row.date: row for row in daily}
+        series = []
+        for offset in range(window):
+            day = start + timedelta(days=offset)
+            row = by_day.get(day)
+            series.append(
+                StatPoint(
+                    date=day,
+                    messages=row.messages if row is not None else 0,
+                    active_users=row.active_users if row is not None else 0,
+                    joins=row.joins if row is not None else 0,
+                    leaves=row.leaves if row is not None else 0,
+                    moderation_actions=row.moderation_actions if row is not None else 0,
+                )
             )
-            for row in daily
-        ]
         return StatsOverview(
             period_days=window,
             total_messages=totals["messages"],

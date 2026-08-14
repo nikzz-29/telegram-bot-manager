@@ -49,6 +49,7 @@ async def authenticate(payload: AuthRequest, settings: SettingsDep, uow: UowDep)
         first_name=identity.first_name,
         last_name=identity.last_name,
         language_code=identity.language_code or None,
+        has_photo=bool(identity.photo_url),
     )
     await uow.commit()
 

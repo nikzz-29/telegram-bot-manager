@@ -44,12 +44,28 @@ class AuthUser(ApiModel):
     last_name: str | None = None
     language_code: str = "en"
     is_superadmin: bool = False
+    is_premium: bool = False
+    has_photo: bool = False
+    photo_url: str | None = None
 
 
 class AuthResponse(ApiModel):
     access_token: str
     expires_in: int
     user: AuthUser
+
+
+class UserProfile(ApiModel):
+    """The user-facing profile shown outside a chat editor."""
+
+    user: AuthUser
+    display_name: str
+    first_seen_at: datetime | None = None
+    chats_total: int = 0
+    chats_owned: int = 0
+    chats_admin: int = 0
+    paid_chats: int = 0
+    total_members: int = 0
 
 
 # --------------------------------------------------------------------------
@@ -273,6 +289,49 @@ class StatsOverview(ApiModel):
     net_growth: int
     series: list[StatPoint] = Field(default_factory=list)
     top_users: list[TopUser] = Field(default_factory=list)
+
+
+class DashboardTotals(ApiModel):
+    """Totals for one dashboard window, across one or more chats."""
+
+    messages: int = 0
+    active_users: int = 0
+    joins: int = 0
+    leaves: int = 0
+    net_growth: int = 0
+    moderation_actions: int = 0
+
+
+class ModerationBreakdownEntry(ApiModel):
+    action: str
+    count: int
+
+
+class DashboardModeration(ApiModel):
+    total: int = 0
+    warns: int = 0
+    restrictions: int = 0
+    mine: int = 0
+    automated: int = 0
+    moderators: int = 0
+    breakdown: list[ModerationBreakdownEntry] = Field(default_factory=list)
+
+
+class UserDashboard(ApiModel):
+    """Aggregated user dashboard for the global Mini App shell."""
+
+    period_days: int
+    selected_chat_id: int | None = None
+    analytics_available: bool = False
+    totals: DashboardTotals = Field(default_factory=DashboardTotals)
+    previous: DashboardTotals = Field(default_factory=DashboardTotals)
+    # Percentage change for the same metric in `totals` vs `previous`.
+    # `None` means there is no meaningful denominator (a new metric).
+    deltas_percent: dict[str, float | None] = Field(default_factory=dict)
+    series: list[StatPoint] = Field(default_factory=list)
+    moderation: DashboardModeration = Field(default_factory=DashboardModeration)
+    top_users: list[TopUser] = Field(default_factory=list)
+    chats: list[ChatSummary] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------

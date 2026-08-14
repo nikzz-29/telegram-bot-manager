@@ -143,6 +143,41 @@ class StatsRepository:
         )
         return list(result.scalars().all())
 
+    async def daily_range_many(
+        self, *, chat_ids: Sequence[int], start: date, end: date
+    ) -> list[dict[str, int | date]]:
+        """Daily totals for several chats in one grouped query."""
+        if not chat_ids:
+            return []
+        result = await self._session.execute(
+            select(
+                StatDaily.date,
+                func.coalesce(func.sum(StatDaily.messages), 0),
+                func.coalesce(func.sum(StatDaily.active_users), 0),
+                func.coalesce(func.sum(StatDaily.joins), 0),
+                func.coalesce(func.sum(StatDaily.leaves), 0),
+                func.coalesce(func.sum(StatDaily.moderation_actions), 0),
+            )
+            .where(
+                StatDaily.chat_id.in_(chat_ids),
+                StatDaily.date >= start,
+                StatDaily.date <= end,
+            )
+            .group_by(StatDaily.date)
+            .order_by(StatDaily.date)
+        )
+        return [
+            {
+                "date": day,
+                "messages": int(messages),
+                "active_users": int(active_users),
+                "joins": int(joins),
+                "leaves": int(leaves),
+                "moderation_actions": int(actions),
+            }
+            for day, messages, active_users, joins, leaves, actions in result.all()
+        ]
+
     async def top_users(
         self, *, chat_id: int, start: date, end: date, limit: int = 10
     ) -> list[tuple[int, int]]:
@@ -155,6 +190,28 @@ class StatsRepository:
             )
             .group_by(StatUserDaily.tg_user_id)
             .order_by(desc("messages"))
+            .limit(limit)
+        )
+        return [(int(uid), int(messages)) for uid, messages in result.all()]
+
+    async def top_users_many(
+        self, *, chat_ids: Sequence[int], start: date, end: date, limit: int = 10
+    ) -> list[tuple[int, int]]:
+        """Leaderboard across the user's selected chats, without an N+1 loop."""
+        if not chat_ids:
+            return []
+        result = await self._session.execute(
+            select(
+                StatUserDaily.tg_user_id,
+                func.sum(StatUserDaily.messages).label("messages"),
+            )
+            .where(
+                StatUserDaily.chat_id.in_(chat_ids),
+                StatUserDaily.date >= start,
+                StatUserDaily.date <= end,
+            )
+            .group_by(StatUserDaily.tg_user_id)
+            .order_by(desc("messages"), StatUserDaily.tg_user_id)
             .limit(limit)
         )
         return [(int(uid), int(messages)) for uid, messages in result.all()]

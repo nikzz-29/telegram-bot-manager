@@ -45,6 +45,8 @@ class Principal:
     last_name: str | None = None
     language: str = "en"
     is_superadmin: bool = False
+    is_premium: bool = False
+    photo_url: str | None = None
 
     @classmethod
     def from_identity(cls, identity: WebAppIdentity) -> Principal:
@@ -56,6 +58,8 @@ class Principal:
             last_name=identity.last_name,
             language=normalize_locale(identity.language_code),
             is_superadmin=identity.tg_user_id in settings.superadmin_id_list,
+            is_premium=identity.is_premium,
+            photo_url=identity.photo_url,
         )
 
     def to_schema(self) -> AuthUser:
@@ -66,6 +70,9 @@ class Principal:
             last_name=self.last_name,
             language_code=self.language,
             is_superadmin=self.is_superadmin,
+            is_premium=self.is_premium,
+            has_photo=bool(self.photo_url),
+            photo_url=self.photo_url,
         )
 
 
@@ -89,6 +96,8 @@ def issue_token(
         "last_name": principal.last_name,
         "lang": principal.language,
         "sa": principal.is_superadmin,
+        "premium": principal.is_premium,
+        "photo": principal.photo_url,
     }
     token = jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
     return token, int(lifetime.total_seconds())
@@ -131,6 +140,8 @@ def decode_token(token: str) -> Principal:
         last_name=payload.get("last_name"),
         language=normalize_locale(payload.get("lang")),
         is_superadmin=tg_user_id in settings.superadmin_id_list,
+        is_premium=bool(payload.get("premium", False)),
+        photo_url=payload.get("photo"),
     )
 
 

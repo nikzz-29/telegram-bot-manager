@@ -57,6 +57,7 @@ class WebAppIdentity:
     last_name: str | None
     language_code: str
     is_premium: bool
+    photo_url: str | None
     is_bot: bool
     auth_date: datetime
     # The `hash` field itself — unique per Mini App session, so it doubles as the
@@ -122,6 +123,7 @@ def parse_identity(init_data: str) -> WebAppIdentity:
         last_name=user.get("last_name"),
         language_code=str(user.get("language_code") or ""),
         is_premium=bool(user.get("is_premium", False)),
+        photo_url=user.get("photo_url"),
         is_bot=bool(user.get("is_bot", False)),
         auth_date=auth_date,
         fingerprint=fields.get("hash", ""),

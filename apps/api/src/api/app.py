@@ -24,6 +24,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from api.errors import register_exception_handlers, use_problem_media_type
 from api.middleware import RequestContextMiddleware
 from api.routers import (
+    account,
     auth,
     billing,
     chats,
@@ -117,6 +118,7 @@ def create_app() -> FastAPI:
 
     app.include_router(system.router, prefix=API_PREFIX)
     app.include_router(auth.router, prefix=API_PREFIX)
+    app.include_router(account.router, prefix=API_PREFIX)
     app.include_router(chats.router, prefix=API_PREFIX)
     app.include_router(modules.router, prefix=API_PREFIX)
     app.include_router(triggers.router, prefix=API_PREFIX)
