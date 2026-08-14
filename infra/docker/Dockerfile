@@ -38,7 +38,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 COPY alembic alembic
 COPY alembic.ini ./
-COPY apps apps
+COPY apps/api apps/api
+COPY apps/bot apps/bot
+COPY apps/worker apps/worker
 COPY packages packages
 
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
@@ -74,3 +76,32 @@ CMD ["arq", "worker.settings.WorkerSettings"]
 # schema is never a race between three processes starting at once.
 FROM runtime AS migrate
 CMD ["alembic", "upgrade", "head"]
+
+
+# Build the browser-only application separately from the Python workspace. It
+# deliberately uses a same-origin API URL: Nginx below proxies `/api` to the API
+# container, so neither a tunnel hostname nor a production domain is compiled
+# into the JavaScript bundle.
+FROM node:20-alpine AS miniapp-builder
+
+ARG PNPM_VERSION=9.15.9
+RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+WORKDIR /app/apps/miniapp
+COPY apps/miniapp/package.json apps/miniapp/pnpm-lock.yaml apps/miniapp/pnpm-workspace.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+COPY apps/miniapp ./
+COPY packages/i18n/locales /app/packages/i18n/locales
+RUN pnpm run build
+
+
+# One public origin for both the Mini App and API. Cloudflare Tunnel (or a
+# regular TLS reverse proxy in production) points here, never at Vite directly.
+FROM nginx:1.27-alpine AS web
+
+COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY --from=miniapp-builder /app/apps/miniapp/dist /usr/share/nginx/html
+
+EXPOSE 80

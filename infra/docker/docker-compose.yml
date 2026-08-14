@@ -1,4 +1,5 @@
-# The full stack: Postgres, Redis, the migration gate, and the three services.
+# The full stack: Postgres, Redis, the migration gate, three Python services,
+# and Nginx serving the Mini App on the same origin as the API.
 #
 # DECISION: `migrate` runs as a one-shot service the other three wait on, rather
 # than as an entrypoint step in each image. Three processes racing `alembic
@@ -99,6 +100,39 @@ services:
       context: ../..
       dockerfile: infra/docker/Dockerfile
       target: worker
+
+  web:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      target: web
+    # This is the one local origin Cloudflare Tunnel should expose. Keeping it
+    # loopback-only prevents bypassing the tunnel on machines reachable over a
+    # LAN while still making `curl localhost:8080` useful for diagnostics.
+    ports: ["127.0.0.1:8080:80"]
+    restart: unless-stopped
+    depends_on:
+      api: {condition: service_healthy}
+    healthcheck:
+      # Use IPv4 explicitly: this probe must not reproduce the localhost
+      # IPv4/IPv6 ambiguity that the in-network tunnel is designed to avoid.
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  tunnel:
+    # Optional local-development profile. Running cloudflared inside Compose
+    # avoids every localhost/IPv4/IPv6 mismatch: its origin is the Docker DNS
+    # name `web`, not a port on the host. Quick tunnels still receive a new URL
+    # whenever this container is recreated.
+    image: cloudflare/cloudflared:latest
+    profiles: ["tunnel"]
+    command: ["tunnel", "--no-autoupdate", "--url", "http://web:80"]
+    restart: unless-stopped
+    depends_on:
+      web: {condition: service_healthy}
 
 volumes:
   postgres_data:

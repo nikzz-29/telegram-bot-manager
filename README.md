@@ -34,9 +34,27 @@ cp .env.example .env      # заполните BOT_TOKEN
 docker compose -f infra/docker/docker-compose.yml up -d --build
 ```
 
-API поднимется на `localhost:8000` (`/docs` — Swagger, `/api/health` — проба),
-бот начнёт long polling. Полная инструкция, включая webhook, Vercel и
-масштабирование, — в [`docs/deploy.md`](docs/deploy.md).
+Готовая Mini App через Nginx поднимется на `localhost:8080`, API отдельно
+останется доступен на `localhost:8000` (`/docs` — Swagger, `/api/health` —
+проба), а бот начнёт long polling. Для Telegram можно поднять quick tunnel
+внутри Compose:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml --profile tunnel up -d
+docker compose -f infra/docker/docker-compose.yml logs -f tunnel
+```
+
+Либо используйте установленный на хосте `cloudflared tunnel --url
+http://127.0.0.1:8080`. Полученный HTTPS URL нужно одинаково указать в
+`WEBAPP_URL`, `CORS_ORIGINS` и BotFather, затем перечитать `.env`, не перезапуская
+quick tunnel:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d --no-deps --force-recreate api bot
+```
+
+Полная инструкция, включая webhook, Vercel и масштабирование, — в
+[`docs/deploy.md`](docs/deploy.md).
 
 ## Разработка
 

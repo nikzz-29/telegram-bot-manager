@@ -9,6 +9,7 @@
 .venv
 node_modules
 dist
+*.tsbuildinfo
 __pycache__
 *.pyc
 .mypy_cache
@@ -17,8 +18,10 @@ __pycache__
 .coverage
 htmlcov
 
-# The panel is a static bundle deployed to Vercel, not part of any Python image.
-apps/miniapp
+# `node_modules` and `dist` above stay outside the context, but the Mini App
+# sources are needed by the Dockerfile's `web` target. The Python stages copy
+# only their three applications explicitly, so the panel is not baked into
+# those runtime images.
 
 PROMPT.md
 .vscode

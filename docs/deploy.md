@@ -1,8 +1,9 @@
 # Деплой
 
-Четыре процесса, два хранилища и статическая сборка. Бот общается с Telegram,
-API обслуживает Mini App, воркер выполняет всё отложенное, а `migrate`
-отрабатывает один раз перед стартом остальных трёх.
+Пять процессов, два хранилища и статическая сборка. Бот общается с Telegram,
+API обслуживает Mini App, воркер выполняет всё отложенное, Nginx отдаёт панель
+и проксирует единый origin, а `migrate` отрабатывает один раз перед стартом
+Python-сервисов.
 
 - [Требования](#требования)
 - [Первый деплой](#первый-деплой)
@@ -18,8 +19,9 @@ API обслуживает Mini App, воркер выполняет всё от
 
 - Docker с Compose v2 (`docker compose version` ≥ 2.20).
 - Токен бота от [@BotFather](https://t.me/BotFather).
-- Для webhook: домен с TLS-сертификатом и обратный прокси.
-- Для панели: проект на [Vercel](https://vercel.com) или любой статический хостинг.
+- Для webhook: публичный HTTPS URL — собственный домен или Cloudflare Tunnel.
+- Для внешнего хостинга панели вместо встроенного Nginx: проект на
+  [Vercel](https://vercel.com) или любой статический хостинг.
 
 Больше на хост ничего не ставится. Postgres и Redis поднимаются из compose-файла,
 а три сервиса используют один образ, собранный из корня репозитория.
@@ -27,7 +29,7 @@ API обслуживает Mini App, воркер выполняет всё от
 ## Первый деплой
 
 ```bash
-git clone <ваш-форк> && cd gateway
+git clone <ваш-форк> && cd tg-bot-manager
 cp .env.example .env
 $EDITOR .env                      # BOT_TOKEN, JWT_SECRET, CORS_ORIGINS, APP_ENV
 docker compose -f infra/docker/docker-compose.yml up -d --build
@@ -48,10 +50,37 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 ```bash
 docker compose -f infra/docker/docker-compose.yml ps
+curl -fsS localhost:8080 >/dev/null       # Mini App через Nginx
+curl -fsS localhost:8080/api/health       # API через тот же origin
 curl -fsS localhost:8000/api/health   # {"status":"ok",...}
 curl -fsS localhost:8000/api/ready    # 503, пока Redis недоступен
 docker compose -f infra/docker/docker-compose.yml logs -f bot
 ```
+
+Для локального открытия панели внутри Telegram проще всего запустить
+`cloudflared` в том же Compose. Он обращается к `web:80` по внутренней сети и
+поэтому не зависит от того, слушает ли хостовый Vite IPv4 или IPv6:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml --profile tunnel up -d
+docker compose -f infra/docker/docker-compose.yml logs -f tunnel
+```
+
+В логах появится `https://...trycloudflare.com`. Если `cloudflared` уже
+установлен на хосте, эквивалентная команда — `cloudflared tunnel --url
+http://127.0.0.1:8080`.
+
+Каждый новый quick tunnel получает новый адрес. Его нужно одновременно записать
+в `WEBAPP_URL`, `CORS_ORIGINS` и Web App URL в BotFather, после чего пересоздать
+`api` и `bot` следующей командой:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d --no-deps --force-recreate api bot
+```
+
+Не пересоздавайте при этом сервис `tunnel`: новый контейнер получит новый URL,
+и настройку придётся повторить. Пока используется Docker-сервис `web`, отдельно
+запускать `task miniapp` не нужно.
 
 `/health` — это liveness-проба, и она не опрашивает ничего: API, падающий по ней
 из-за недоступного Redis, был бы перезапущен оркестратором, а Redis это не
@@ -67,10 +96,10 @@ docker compose -f infra/docker/docker-compose.yml logs -f bot
 | Переменная | Почему важна |
 | --- | --- |
 | `APP_ENV` | `production` включает проверки безопасности при старте. |
-| `BOT_TOKEN` | От @BotFather. Нужен всем четырём процессам — воркер шлёт сообщения сам. |
+| `BOT_TOKEN` | От @BotFather. Нужен боту, API и воркеру — последние два тоже обращаются к Bot API. |
 | `JWT_SECRET` | Подписывает сессии панели. ≥32 байт и никогда не поставляемый плейсхолдер. |
 | `CORS_ORIGINS` | Точный origin панели. `*` в проде отклоняется. |
-| `WEBAPP_URL` | Где отдаётся Mini App. Должен совпадать с тем, что указан в BotFather, иначе проверка `initData` не пройдёт. |
+| `WEBAPP_URL` | HTTPS-адрес Mini App, который бот помещает в кнопку операторской панели. |
 | `SUPERADMIN_IDS` | Telegram-id через запятую, кому доступна платформенная консоль. Пусто — никому. |
 | `AI_API_KEY` | Необязателен. Без него ИИ-модерация деградирует в «выключено», а не роняет сообщения. |
 | `CRYPTOBOT_TOKEN` | Необязателен. Stars работают без него, криптоплатежи — нет. |
@@ -79,6 +108,11 @@ Compose передаёт `.env` каждому сервису через `env_fi
 `DATABASE_URL` и `REDIS_URL` на внутрисетевые имена. Значения в самом `.env`
 остаются указывать на `localhost:5433` / `localhost:6380`, чтобы `task api`
 продолжал работать на хосте — один файл обслуживает оба случая.
+
+Шаблон задаёт `WEBAPP_URL=http://localhost:8080`, потому что полный Compose
+отдаёт панель через Nginx. Для отдельного dev-сервера `task miniapp` замените
+его на `http://localhost:5173`; для Telegram в обоих случаях нужен публичный
+HTTPS origin туннеля или домена.
 
 `.env` перечислен в `.gitignore` и `.dockerignore`. В нём живой токен, а копия,
 запечённая в образ, переживает любой `docker rm`.
@@ -97,8 +131,18 @@ WEBHOOK_BASE_URL=https://bot.example.com   # https и доступен со ст
 WEBHOOK_SECRET=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
 ```
 
-Бот поднимет собственный эндпоинт на `WEBHOOK_PORT` (по умолчанию 8081), который
-compose публикует только на `127.0.0.1`. TLS терминируйте перед ним:
+Бот поднимет собственный эндпоинт на `WEBHOOK_PORT` (по умолчанию 8081).
+Встроенный сервис `web` уже проксирует стандартный путь
+`/telegram/webhook` на `bot:8081`, поэтому для полного Compose и Cloudflare
+Tunnel дополнительный Nginx не нужен. Оставьте `WEBHOOK_PATH` и `WEBHOOK_PORT`
+стандартными, укажите URL туннеля в `WEBHOOK_BASE_URL` и пересоздайте только бот:
+
+```bash
+docker compose -f infra/docker/docker-compose.yml up -d --no-deps --force-recreate bot
+```
+
+Если TLS завершает отдельный Nginx на хосте, Compose публикует порт бота только
+на `127.0.0.1`, и внешний прокси настраивается так:
 
 ```nginx
 location /telegram/webhook {
@@ -148,8 +192,12 @@ docker compose -f infra/docker/docker-compose.yml exec postgres \
 
 ## Mini App
 
-Панель — статическая сборка, и в Python-образах ей делать нечего:
-`.dockerignore` её исключает. Деплой на Vercel:
+В полном Compose панель собирается отдельной Node-стадией и попадает в небольшой
+Nginx-образ `web`; Node и исходники в финальном образе не остаются. Nginx отдаёт
+SPA и проксирует `/api`, поэтому клиент использует относительный same-origin URL
+и `VITE_API_BASE_URL` задавать не нужно.
+
+Vercel остаётся альтернативой встроенному Nginx:
 
 | Настройка | Значение |
 | --- | --- |
@@ -157,19 +205,19 @@ docker compose -f infra/docker/docker-compose.yml exec postgres \
 | Install command | `pnpm install` |
 | Build command | `pnpm run build` |
 | Output directory | `dist` |
-| `VITE_API_BASE_URL` | `https://api.example.com` |
+| `VITE_API_BASE_URL` | `https://api.example.com` — только если API на другом origin |
 
 Снимайте галку «Include source files outside of the Root Directory» только если
 уверены: сборка импортирует `.ftl` из `packages/i18n` через алиас `@locales` —
 так панель и бот читают один набор локалей. Чтобы этот импорт разрешился,
 Vercel нужен корень репозитория.
 
-Дальше три вещи обязаны совпадать, иначе проверка `initData` даст 401, который
-выглядит как баг:
+Дальше адрес панели должен быть согласован в трёх местах, иначе бот откроет
+старый origin или браузер заблокирует запросы к отдельному API:
 
-1. `WEBAPP_URL` в `.env` — origin, с которым сверяется API.
+1. `WEBAPP_URL` в `.env` — адрес, который бот помещает в Web App кнопку.
 2. Web App URL в BotFather (`/mybots` → Bot Settings → Menu Button).
-3. Адрес, по которому панель реально отдаётся с Vercel.
+3. Адрес, по которому панель реально отдаётся через Nginx, tunnel или Vercel.
 
 `CORS_ORIGINS` должен называть тот же origin в точности. Прод не принимает `*`.
 
@@ -191,6 +239,10 @@ Telegram; обработчик `pre_checkout_query` уже подключён.
 ```
 https://api.example.com/payments/cryptobot/webhook
 ```
+
+Встроенный Nginx проксирует именно этот стандартный путь. Если переопределить
+`CRYPTOBOT_WEBHOOK_PATH`, тот же маршрут нужно изменить в
+`infra/nginx/default.conf`.
 
 Этот маршрут намеренно исключён из OpenAPI-схемы — он не часть контракта
 панели. Он отвечает 200 на всё, что уже обработано или не разбирается, потому
@@ -293,7 +345,7 @@ docker compose -f infra/docker/docker-compose.yml exec postgres psql -U postgres
 | Симптом | Куда смотреть |
 | --- | --- |
 | Бот молчит, ошибок нет | При polling зарегистрирован webhook. `getWebhookInfo` через API — или просто перезапустите, бот его снимет. |
-| Панель отдаёт 401 | `WEBAPP_URL`, Web App URL в BotFather и реальный origin деплоя не совпадают. |
+| Панель отдаёт 401 | Проверьте свежесть Telegram `initData`, `BOT_TOKEN` API и время на хосте; URL панели сам по себе подпись не формирует. |
 | Панель показывает ошибку CORS | `CORS_ORIGINS` не называет точный origin панели. |
 | API отвечает 503 на `/ready` | Недоступен Redis. `/health` остаётся 200 — так и задумано. |
 | Отложенные действия не срабатывают | Воркер не поднят либо смотрит в другой Redis, не в тот, что бот. |
