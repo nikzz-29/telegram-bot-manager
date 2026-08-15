@@ -42,6 +42,7 @@ from api.deps import (
     get_module_configs,
     get_uow,
 )
+from api.routers import system as system_router
 from api.security import AUDIENCE, ISSUER, Principal, decode_token, issue_token
 from core import cache
 from core.configs import InvalidModuleConfigError
@@ -624,8 +625,11 @@ async def test_health_is_served_at_both_paths(bed: Bed) -> None:
         assert response.json()["status"] == "ok"
 
 
-async def test_meta_describes_every_module_and_plan(bed: Bed) -> None:
+async def test_meta_describes_every_module_and_plan(
+    bed: Bed, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The Mini App renders its sections from this, so it must be complete."""
+    monkeypatch.setattr(system_router, "get_settings", lambda: Settings(_env_file=None))
     response = await bed.client.get("/api/meta")
     assert response.status_code == 200
     body = response.json()
@@ -634,12 +638,40 @@ async def test_meta_describes_every_module_and_plan(bed: Bed) -> None:
     assert names == {spec.name.value for spec in registry}
     assert {plan["plan"] for plan in body["plans"]} == {plan.value for plan in Plan}
     assert set(body["locales"]) == {"ru", "en"}
+    assert body["capabilities"] == {
+        "payment_providers": [],
+        "ai_moderation_available": False,
+    }
 
     moderation = next(m for m in body["modules"] if m["name"] == "moderation")
     assert moderation["required_plan"] == Plan.FREE.value
     assert moderation["mandatory"] is True
     # The panel builds its form controls from this schema.
     assert "warn_limit" in moderation["config_schema"]["properties"]
+
+
+async def test_meta_reports_configured_integrations(
+    bed: Bed, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        system_router,
+        "get_settings",
+        lambda: Settings(
+            bot_token="configured",
+            cryptobot_token="configured",
+            ai_enabled=True,
+            ai_api_key="configured",
+            _env_file=None,
+        ),
+    )
+
+    response = await bed.client.get("/api/meta")
+
+    assert response.status_code == 200
+    assert response.json()["capabilities"] == {
+        "payment_providers": ["stars", "cryptobot"],
+        "ai_moderation_available": True,
+    }
 
 
 async def test_openapi_gives_every_operation_a_stable_id(bed: Bed) -> None:

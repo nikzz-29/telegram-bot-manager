@@ -16,9 +16,7 @@ def _has_symbol(line: str) -> bool:
 
 @pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
 @pytest.mark.parametrize("page", PAGES)
-def test_every_nonblank_manual_line_has_an_emoji_anchor(
-    locale: str, page: GuidePage
-) -> None:
+def test_every_nonblank_manual_line_has_an_emoji_anchor(locale: str, page: GuidePage) -> None:
     text = render(page, translator(locale))
     for line in text.splitlines():
         if not line.strip():

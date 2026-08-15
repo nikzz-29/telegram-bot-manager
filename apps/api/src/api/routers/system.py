@@ -15,8 +15,15 @@ from core import cache
 from core.registry import registry
 from i18n.runtime import SUPPORTED_LOCALES
 from shared.config import get_settings
+from shared.enums import PaymentProvider
 from shared.plans import PLAN_FEATURES, PLAN_LIMITS, PLAN_PRICES
-from shared.schemas.api import CommandMeta, MetaResponse, ModuleMeta, PlanMeta
+from shared.schemas.api import (
+    CommandMeta,
+    MetaResponse,
+    ModuleMeta,
+    PlanMeta,
+    PlatformCapabilities,
+)
 
 router = APIRouter(tags=["system"])
 
@@ -53,6 +60,7 @@ async def ready() -> JSONResponse:
     summary="Module catalog, plan matrix and shipped locales",
 )
 async def meta() -> MetaResponse:
+    settings = get_settings()
     modules = [
         ModuleMeta(
             name=spec.name.value,
@@ -92,7 +100,21 @@ async def meta() -> MetaResponse:
         )
         for plan, features in PLAN_FEATURES.items()
     ]
-    return MetaResponse(modules=modules, plans=plans, locales=list(SUPPORTED_LOCALES))
+    payment_providers: list[PaymentProvider] = []
+    if settings.bot_token:
+        payment_providers.append(PaymentProvider.STARS)
+    if settings.cryptobot_token:
+        payment_providers.append(PaymentProvider.CRYPTOBOT)
+
+    return MetaResponse(
+        modules=modules,
+        plans=plans,
+        locales=list(SUPPORTED_LOCALES),
+        capabilities=PlatformCapabilities(
+            payment_providers=payment_providers,
+            ai_moderation_available=settings.ai_enabled and bool(settings.ai_api_key),
+        ),
+    )
 
 
 __all__ = ["router"]

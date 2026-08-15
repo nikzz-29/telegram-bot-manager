@@ -54,6 +54,7 @@ module-enabled = Включён
 # Сам ключ `module-locked` лежит в main.ftl — бот говорит ту же фразу, когда
 # команда закрыта тарифом, а два текста для одной ситуации со временем разойдутся.
 module-locked-cta = Перейти на {$plan}
+module-integration-unavailable = ИИ-модерация временно недоступна: провайдер ещё не настроен оператором.
 module-reset = Сбросить настройки
 module-reset-confirm = Вернуть все настройки этого раздела к значениям по умолчанию?
 section-billing = Тариф
@@ -351,7 +352,7 @@ reputation-adjust-hint = Прибавка или убавка к текущим 
 ## Тариф и оплата
 billing-title = Тариф
 billing-current = Текущий тариф
-billing-expires = Продление {$date}
+billing-expires = Действует до {$date}
 billing-expired = Истёк {$date}
 billing-grace = Льготный период до {$date}
 billing-lifetime = Без ограничения по сроку
@@ -373,6 +374,7 @@ billing-invoice-paid = Платёж получен. Тариф активен.
 billing-invoice-cancelled = Оплата отменена.
 billing-invoice-failed = Не удалось открыть оплату. Деньги не списаны, попробуйте ещё раз.
 billing-invoice-unsupported = Этот клиент не умеет открывать ссылки оплаты. Откройте чат в Telegram и попробуйте снова.
+billing-provider-unavailable = Оплата временно недоступна: платёжный провайдер ещё не настроен.
 billing-choose-term = Срок
 billing-features = Что входит
 

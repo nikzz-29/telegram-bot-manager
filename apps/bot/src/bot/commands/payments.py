@@ -31,6 +31,7 @@ from shared.logging import get_logger
 
 logger = get_logger(__name__)
 
+
 def _locale(user_language: str | None) -> str:
     """Receipts are addressed to the payer, so they follow the payer's locale."""
     return normalize_locale(user_language)

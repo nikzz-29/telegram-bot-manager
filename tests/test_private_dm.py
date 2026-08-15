@@ -24,7 +24,7 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message, User
+from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message, User
 import pytest
 
 from bot import access
@@ -547,7 +547,7 @@ async def test_start_installs_the_reply_keyboard_before_the_inline_menu(
     assert len(sent) == 2
     assert sent[0][0] == RU("dm-commands-keyboard-ready")
     assert sent[0][1].is_persistent is True
-    assert isinstance(sent[1][1], private.InlineKeyboardMarkup)
+    assert isinstance(sent[1][1], InlineKeyboardMarkup)
 
 
 # --- the purchase, followed the way a user walks it -----------------------------

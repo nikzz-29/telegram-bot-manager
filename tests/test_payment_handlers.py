@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from bot.commands import payments
+from core.billing import billing
 from i18n.runtime import translator
 from shared.enums import Plan
 
@@ -36,9 +37,7 @@ async def test_invalid_invoice_is_declined_in_the_payers_language() -> None:
 
     await _pre_checkout_handler()(query)
 
-    assert answers == [
-        {"ok": False, "error_message": translator("ru")("billing-invoice-expired")}
-    ]
+    assert answers == [{"ok": False, "error_message": translator("ru")("billing-invoice-expired")}]
 
 
 @pytest.mark.asyncio
@@ -58,7 +57,7 @@ async def test_success_receipt_uses_the_localized_plan_name(
     async def send(chat_id: int, text: str, **_: Any) -> None:
         sent.append((chat_id, text))
 
-    monkeypatch.setattr(payments.billing, "settle_stars_payment", settle)
+    monkeypatch.setattr(billing, "settle_stars_payment", settle)
     monkeypatch.setattr(payments, "send", send)
     message = SimpleNamespace(
         successful_payment=SimpleNamespace(telegram_payment_charge_id="charge-1"),

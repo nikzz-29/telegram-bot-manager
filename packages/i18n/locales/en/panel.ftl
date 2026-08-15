@@ -53,6 +53,7 @@ module-enabled = Enabled
 # `module-locked` itself lives in main.ftl — the bot says the same sentence when
 # a command is gated, and two texts for one situation is how they drift.
 module-locked-cta = Upgrade to {$plan}
+module-integration-unavailable = AI moderation is temporarily unavailable because its provider is not configured.
 module-reset = Reset to defaults
 module-reset-confirm = Reset every setting in this section to its default?
 section-billing = Plan
@@ -348,7 +349,7 @@ reputation-adjust-hint = Added to or taken off the current score, not a new tota
 ## Billing
 billing-title = Plan
 billing-current = Current plan
-billing-expires = Renews {$date}
+billing-expires = Active until {$date}
 billing-expired = Expired {$date}
 billing-grace = Grace period ends {$date}
 billing-lifetime = No expiry
@@ -369,6 +370,7 @@ billing-invoice-paid = Payment received. Your plan is active.
 billing-invoice-cancelled = Payment cancelled.
 billing-invoice-failed = Couldn't open the payment. Nothing was charged, please try again.
 billing-invoice-unsupported = This client can't open payment links. Open the chat on Telegram and try again.
+billing-provider-unavailable = Payments are temporarily unavailable because no provider is configured.
 billing-choose-term = Term
 billing-features = Included
 

@@ -145,10 +145,22 @@ class PlanMeta(ApiModel):
     limits: dict[str, int] = Field(default_factory=dict)
 
 
+class PlatformCapabilities(ApiModel):
+    """Optional integrations that are actually usable on this deployment.
+
+    Keeping these server-derived prevents the Mini App from sending a customer
+    into a checkout or an AI setting which the deployment cannot fulfil.
+    """
+
+    payment_providers: list[PaymentProvider] = Field(default_factory=list)
+    ai_moderation_available: bool = False
+
+
 class MetaResponse(ApiModel):
     modules: list[ModuleMeta] = Field(default_factory=list)
     plans: list[PlanMeta] = Field(default_factory=list)
     locales: list[str] = Field(default_factory=list)
+    capabilities: PlatformCapabilities
 
 
 # --------------------------------------------------------------------------

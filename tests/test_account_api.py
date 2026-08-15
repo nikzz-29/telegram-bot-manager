@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 
 from fastapi import FastAPI
 import httpx
@@ -15,6 +15,7 @@ from api.routers.account import get_user_dashboard, get_user_profile
 from api.routers.account import router as account_router
 from api.security import Principal
 from db.models import Chat
+from db.uow import UnitOfWork
 from shared.enums import ChatType, Plan
 from shared.errors import ChatNotFoundError
 from shared.time_utils import utc_now
@@ -168,9 +169,9 @@ async def test_profile_contains_account_and_chat_footprint() -> None:
 
 async def test_dashboard_batches_paid_analytics_and_keeps_free_moderation() -> None:
     uow = FakeUow()
-    dashboard = await get_user_dashboard(  # type: ignore[arg-type]
+    dashboard = await get_user_dashboard(
         PRINCIPAL,
-        uow,
+        cast(UnitOfWork, uow),
         days=1,
         chat_id=None,
     )
@@ -192,9 +193,9 @@ async def test_dashboard_batches_paid_analytics_and_keeps_free_moderation() -> N
 
 async def test_dashboard_rejects_a_chat_outside_the_user_scope() -> None:
     with pytest.raises(ChatNotFoundError):
-        await get_user_dashboard(  # type: ignore[arg-type]
+        await get_user_dashboard(
             PRINCIPAL,
-            FakeUow(),
+            cast(UnitOfWork, FakeUow()),
             days=7,
             chat_id=999,
         )
