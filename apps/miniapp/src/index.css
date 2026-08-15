@@ -72,6 +72,14 @@
    */
   --panel-shadow-card: 0 1px 2px rgb(0 0 0 / 4%);
 
+  /* Theme-derived translucent layers used by the liquid-glass surface system. */
+  --glass-fill: rgb(255 255 255 / 72%);
+  --glass-fill-strong: rgb(255 255 255 / 90%);
+  --glass-fill-soft: rgb(244 244 245 / 56%);
+  --glass-edge: rgb(0 0 0 / 10%);
+  --glass-highlight: rgb(255 255 255 / 55%);
+  --glass-accent-wash: rgb(51 144 236 / 10%);
+
   /* One motion duration, one curve. Anything that animates uses these, so the
      whole panel moves at one speed instead of each component picking its own. */
   --panel-motion: 160ms;
@@ -86,7 +94,10 @@ body,
 
 body {
   margin: 0;
-  background: var(--panel-ground);
+  background:
+    linear-gradient(125deg, var(--glass-accent-wash) 0%, transparent 31%),
+    linear-gradient(320deg, var(--tg-hint-tint) 0%, transparent 36%),
+    var(--panel-ground);
   color: var(--tg-text);
   /* Telegram's own overscroll already bounces the webview; a second one inside
      the panel makes the whole sheet feel loose. */
@@ -95,6 +106,23 @@ body {
      approximates; these two keep text from looking heavier than the client's. */
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+body::before {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+  background-image: linear-gradient(115deg, transparent 0 49.7%, var(--glass-highlight) 50%, transparent 50.3%);
+  background-size: 100% 100%;
+  opacity: 0.35;
+  mix-blend-mode: soft-light;
+}
+
+#root {
+  position: relative;
+  isolation: isolate;
 }
 
 /* A tap on a row should feel like the row, not like a browser highlighting a
@@ -121,16 +149,75 @@ button,
 }
 
 @layer components {
+  .app-viewport {
+    position: relative;
+    min-height: 100%;
+  }
+
+  .app-atmosphere {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      linear-gradient(180deg, transparent 0%, var(--glass-accent-wash) 100%),
+      linear-gradient(90deg, transparent 0 28%, var(--glass-highlight) 50%, transparent 72%);
+    opacity: 0.35;
+    mask-image: linear-gradient(to bottom, black, transparent 88%);
+  }
+
+  .screen-shell {
+    animation: screen-enter 360ms var(--panel-ease) both;
+  }
+
+  .screen-shell > * {
+    animation: content-rise 420ms var(--panel-ease) both;
+  }
+
+  .screen-shell > *:nth-child(2) { animation-delay: 35ms; }
+  .screen-shell > *:nth-child(3) { animation-delay: 70ms; }
+  .screen-shell > *:nth-child(4) { animation-delay: 105ms; }
+  .screen-shell > *:nth-child(5) { animation-delay: 140ms; }
+  .screen-shell > *:nth-child(6) { animation-delay: 175ms; }
+
+  .screen-header {
+    position: relative;
+  }
+
+  .screen-header::after {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: 1px;
+    content: "";
+    background: linear-gradient(90deg, var(--tg-accent), transparent 58%);
+    opacity: 0.3;
+  }
+
+  .header-icon {
+    border: 1px solid var(--glass-edge);
+    background: var(--glass-accent-wash);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 22px rgb(0 0 0 / 7%);
+  }
+
   /* The list-row look Telegram uses everywhere: grouped rows on a card, hairline
      separators between them, nothing after the last one. */
   .tg-card {
-    @apply overflow-hidden rounded-card border border-card-border bg-card;
-    box-shadow: var(--panel-shadow-card);
+    @apply overflow-hidden rounded-card border border-card-border;
+    background: linear-gradient(145deg, var(--glass-fill-strong), var(--glass-fill));
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 14px 34px rgb(0 0 0 / 6%);
+    backdrop-filter: blur(22px) saturate(1.18);
+    -webkit-backdrop-filter: blur(22px) saturate(1.18);
   }
 
   .tg-row {
     @apply flex items-center gap-3 px-4 py-3 border-b border-separator last:border-b-0;
     min-height: 48px; /* the tap target Telegram itself uses for a settings cell */
+    background: linear-gradient(90deg, transparent, var(--glass-highlight));
+    background-size: 0% 100%;
+    background-repeat: no-repeat;
+    transition: background-size var(--panel-motion) var(--panel-ease);
   }
 
   /* Only rows that actually do something react to a press. */
@@ -142,12 +229,15 @@ button,
 
   .tg-row-pressable:active {
     background-color: var(--panel-press);
+    background-size: 100% 100%;
   }
 
   .tg-input {
-    @apply w-full rounded-lg bg-ground px-3 py-2.5 text-[15px] outline-none
+    @apply w-full rounded-control px-3 py-2.5 text-[15px] outline-none
            border border-separator transition-colors disabled:opacity-50
            focus:border-accent focus:ring-1 focus:ring-accent;
+    background: var(--glass-fill-soft);
+    backdrop-filter: blur(16px);
     transition-duration: var(--panel-motion);
   }
 
@@ -155,6 +245,7 @@ button,
     @apply w-full rounded-lg bg-accent px-4 py-3 text-[15px] font-medium
            text-accent-text transition-opacity disabled:opacity-50;
     transition-duration: var(--panel-motion);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 32%), 0 8px 20px var(--glass-accent-wash);
   }
 
   .tg-button:active:not(:disabled) {
@@ -179,8 +270,10 @@ button,
   }
 
   .tg-metric-card {
-    @apply rounded-card border border-card-border bg-card px-4 py-3;
-    box-shadow: var(--panel-shadow-card);
+    @apply rounded-card border border-card-border px-4 py-3;
+    background: linear-gradient(145deg, var(--glass-fill-strong), var(--glass-fill));
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 24px rgb(0 0 0 / 5%);
+    backdrop-filter: blur(18px) saturate(1.15);
     transition: border-color var(--panel-motion) var(--panel-ease),
       background-color var(--panel-motion) var(--panel-ease),
       transform var(--panel-motion) var(--panel-ease);
@@ -192,24 +285,56 @@ button,
 
   .tg-metric-card-active {
     border-color: var(--tg-accent);
-    background: var(--tg-accent-tint);
+    background: linear-gradient(145deg, var(--glass-accent-wash), var(--glass-fill));
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 10px 28px var(--glass-accent-wash);
   }
 
   .dashboard-chart {
-    animation: dashboard-chart-enter 280ms var(--panel-ease) both;
+    animation: chart-enter 520ms var(--panel-ease) both;
     overflow: visible;
   }
 
-  .dashboard-chart-bar {
-    transform-origin: center bottom;
-    transition: y 260ms var(--panel-ease), height 260ms var(--panel-ease),
-      opacity 160ms ease;
+  .chart-grid-line {
+    stroke: var(--tg-separator);
+    stroke-width: 1;
+    stroke-dasharray: 2 5;
+    opacity: 0.7;
+  }
+
+  .chart-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: chart-draw 750ms var(--panel-ease) 80ms forwards;
+  }
+
+  .chart-area {
+    animation: chart-area-in 520ms var(--panel-ease) 120ms both;
+  }
+
+  .chart-point {
+    opacity: 0;
+    animation: chart-point-in 260ms var(--panel-ease) forwards;
+  }
+
+  .chart-axis-label {
+    fill: var(--tg-hint);
+    font-size: 10px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+
+  .chart-empty {
+    border: 1px dashed var(--glass-edge);
+    border-radius: 8px;
+    background: var(--glass-fill-soft);
   }
 
   .tg-bottom-nav {
-    @apply fixed inset-x-0 bottom-0 z-30 border-t border-separator bg-card;
+    @apply fixed inset-x-0 bottom-0 z-30 border-t border-separator;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    box-shadow: 0 -2px 12px rgb(0 0 0 / 5%);
+    background: var(--glass-fill-strong);
+    box-shadow: 0 -10px 28px rgb(0 0 0 / 8%), inset 0 1px 0 var(--glass-highlight);
+    backdrop-filter: blur(24px) saturate(1.2);
+    -webkit-backdrop-filter: blur(24px) saturate(1.2);
   }
 
   .tg-bottom-nav-item {
@@ -224,6 +349,44 @@ button,
 
   .tg-bottom-nav-icon {
     @apply flex h-7 w-10 items-center justify-center rounded-full;
+    transition: transform 240ms var(--panel-ease), background-color 240ms var(--panel-ease);
+  }
+
+  .tg-bottom-nav-item[aria-current="page"] .tg-bottom-nav-icon {
+    transform: translateY(-2px) scale(1.08);
+    box-shadow: 0 5px 14px var(--glass-accent-wash);
+  }
+
+  .tg-segmented {
+    border: 1px solid var(--glass-edge);
+    background: var(--glass-fill-soft);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
+  }
+
+  .tg-segmented-active {
+    background: var(--glass-fill-strong);
+    box-shadow: inset 0 1px 0 var(--glass-highlight), 0 3px 10px rgb(0 0 0 / 6%);
+  }
+
+  .glass-recess {
+    border-top: 1px solid var(--glass-edge);
+    background: var(--glass-fill-soft);
+  }
+
+  .glass-button {
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 26%), 0 8px 22px var(--glass-accent-wash);
+    transition: transform 180ms var(--panel-ease), filter 180ms var(--panel-ease), opacity 180ms ease;
+  }
+
+  .glass-button:active:not(:disabled) {
+    transform: translateY(1px) scale(0.985);
+    filter: saturate(0.88);
+  }
+
+  .glass-button-secondary {
+    border: 1px solid var(--glass-edge);
+    background: var(--glass-fill);
+    box-shadow: inset 0 1px 0 var(--glass-highlight);
   }
 }
 
@@ -237,7 +400,17 @@ button,
   }
 }
 
-@keyframes dashboard-chart-enter {
+@keyframes screen-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes content-rise {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chart-enter {
   from {
     opacity: 0;
     transform: translateY(6px);
@@ -246,4 +419,18 @@ button,
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+@keyframes chart-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes chart-area-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes chart-point-in {
+  from { opacity: 0; transform: scale(0.4); transform-origin: center; }
+  to { opacity: 1; transform: scale(1); transform-origin: center; }
 }

@@ -1,5 +1,8 @@
 packages:
   - "."
 
+overrides:
+  valibot: ^1.2.0
+
 allowBuilds:
   esbuild: false

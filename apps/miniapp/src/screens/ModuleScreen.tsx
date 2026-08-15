@@ -108,7 +108,9 @@ export function ModuleScreen({
 
   const config = draft ?? state.config;
   const dirty = draft !== null;
-  const locked = !state.available;
+  const integrationUnavailable =
+    module === "ai_moderation" && !(meta.data?.capabilities.ai_moderation_available ?? false);
+  const locked = !state.available || integrationUnavailable;
   const plan = t(`plan-${spec.required_plan}`);
   // Save refuses a draft the schema's own constraints reject — a number outside
   // its bounds, a string against its pattern, an entry of a repeating group with
@@ -170,12 +172,18 @@ export function ModuleScreen({
            * the one screen offering no way to raise it, and "Upgrade to Pro" sat
            * there as an instruction with nothing behind it.
            */}
-          <EmptyState icon="shield" text={t("module-locked", { plan })} />
-          <div className="px-6 pb-8">
-            <Button onClick={() => navigation.push({ name: "billing", chatId })}>
-              {t("module-locked-cta", { plan })}
-            </Button>
-          </div>
+          {integrationUnavailable ? (
+            <EmptyState icon="alert" text={t("module-integration-unavailable")} />
+          ) : (
+            <>
+              <EmptyState icon="shield" text={t("module-locked", { plan })} />
+              <div className="px-6 pb-8">
+                <Button onClick={() => navigation.push({ name: "billing", chatId })}>
+                  {t("module-locked-cta", { plan })}
+                </Button>
+              </div>
+            </>
+          )}
         </Card>
       ) : (
         <>

@@ -3742,9 +3742,15 @@
             },
             "type": "array",
             "title": "Locales"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/PlatformCapabilities"
           }
         },
         "type": "object",
+        "required": [
+          "capabilities"
+        ],
         "title": "MetaResponse"
       },
       "ModerationBreakdownEntry": {
@@ -4098,6 +4104,25 @@
           "features"
         ],
         "title": "PlanOption"
+      },
+      "PlatformCapabilities": {
+        "properties": {
+          "payment_providers": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentProvider"
+            },
+            "type": "array",
+            "title": "Payment Providers"
+          },
+          "ai_moderation_available": {
+            "type": "boolean",
+            "title": "Ai Moderation Available",
+            "default": false
+          }
+        },
+        "type": "object",
+        "title": "PlatformCapabilities",
+        "description": "Optional integrations that are actually usable on this deployment.\n\nKeeping these server-derived prevents the Mini App from sending a customer\ninto a checkout or an AI setting which the deployment cannot fulfil."
       },
       "PlatformStats": {
         "properties": {

@@ -69,6 +69,21 @@ function apply(): void {
   // the flash behind an overscroll — none of which `themeParams` covers.
   const isDark = themeParams.isDark();
   root.style.setProperty("color-scheme", isDark ? "dark" : "light");
+  const background = themeParams.backgroundColor() ?? (isDark ? "#17212b" : "#ffffff");
+  const surface =
+    themeParams.secondaryBackgroundColor() ?? (isDark ? "#0f1822" : "#f4f4f5");
+  const text = themeParams.textColor() ?? (isDark ? "#f5f7fa" : "#000000");
+  const accent = themeParams.buttonColor() ?? "#3390ec";
+
+  // Liquid-glass surfaces must remain theme-aware. Telegram gives opaque
+  // colours, so the translucent layers and their highlights are derived here
+  // instead of hard-coding a light or dark panel in CSS.
+  root.style.setProperty("--glass-fill", `${background}${isDark ? "a8" : "b8"}`);
+  root.style.setProperty("--glass-fill-strong", `${background}${isDark ? "d9" : "e8"}`);
+  root.style.setProperty("--glass-fill-soft", `${surface}${isDark ? "7a" : "8f"}`);
+  root.style.setProperty("--glass-edge", `${text}${isDark ? "20" : "14"}`);
+  root.style.setProperty("--glass-highlight", `${isDark ? "#ffffff" : text}${isDark ? "18" : "0a"}`);
+  root.style.setProperty("--glass-accent-wash", `${accent}${isDark ? "20" : "14"}`);
   /*
    * Elevation, dropped on a dark theme rather than restated for it.
    *

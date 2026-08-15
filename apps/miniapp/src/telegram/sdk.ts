@@ -24,6 +24,7 @@ import {
 
 const SOUND_STORAGE_KEY = "tgm.sound.v1";
 let clickAudio: AudioContext | null = null;
+let clickNoise: AudioBuffer | null = null;
 
 function readSoundPreference(): boolean {
   try {
@@ -51,9 +52,9 @@ export function setSoundEnabled(enabled: boolean): void {
 }
 
 /**
- * A tiny synthesized click: a sharp high-frequency transient with a very short
- * decay. It loads instantly, has no media file to cache, and is created only
- * after a user gesture so browser autoplay policies are respected.
+ * A restrained mechanical click: a filtered transient plus a very short low
+ * body. There is no tonal sweep, so repeated navigation sounds precise rather
+ * than playful. The generated noise buffer is cached after the first tap.
  */
 export function playClick(): void {
   if (!soundEnabled || typeof window === "undefined" || !window.AudioContext) {
@@ -64,19 +65,40 @@ export function playClick(): void {
     if (clickAudio.state === "suspended") {
       void clickAudio.resume();
     }
-    const now = clickAudio.currentTime;
-    const oscillator = clickAudio.createOscillator();
-    const gain = clickAudio.createGain();
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(980, now);
-    oscillator.frequency.exponentialRampToValueAtTime(420, now + 0.035);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.08, now + 0.002);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
-    oscillator.connect(gain);
-    gain.connect(clickAudio.destination);
-    oscillator.start(now);
-    oscillator.stop(now + 0.05);
+    const context = clickAudio;
+    const now = context.currentTime;
+    if (clickNoise === null) {
+      clickNoise = context.createBuffer(1, Math.ceil(context.sampleRate * 0.016), context.sampleRate);
+      const channel = clickNoise.getChannelData(0);
+      for (let index = 0; index < channel.length; index += 1) {
+        const envelope = 1 - index / channel.length;
+        channel[index] = (Math.random() * 2 - 1) * envelope;
+      }
+    }
+
+    const transient = context.createBufferSource();
+    const highpass = context.createBiquadFilter();
+    const transientGain = context.createGain();
+    transient.buffer = clickNoise;
+    highpass.type = "highpass";
+    highpass.frequency.value = 1350;
+    transientGain.gain.setValueAtTime(0.045, now);
+    transientGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.016);
+    transient.connect(highpass);
+    highpass.connect(transientGain);
+    transientGain.connect(context.destination);
+
+    const body = context.createOscillator();
+    const bodyGain = context.createGain();
+    body.type = "square";
+    body.frequency.setValueAtTime(185, now);
+    bodyGain.gain.setValueAtTime(0.018, now);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.012);
+    body.connect(bodyGain);
+    bodyGain.connect(context.destination);
+    transient.start(now);
+    body.start(now);
+    body.stop(now + 0.014);
   } catch {
     // Audio is an enhancement; a restricted browser must not break navigation.
   }

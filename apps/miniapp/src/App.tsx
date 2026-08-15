@@ -85,10 +85,13 @@ function Stack(): React.JSX.Element {
   }, [atRoot, requestPop]);
 
   return (
-    <>
-      <ScreenFor route={route} />
+    <div className="app-viewport">
+      <div className="app-atmosphere" aria-hidden="true" />
+      <div className="relative z-10" key={route.name}>
+        <ScreenFor route={route} />
+      </div>
       {isRootRoute(route) && <BottomNav active={route.name} />}
-    </>
+    </div>
   );
 }
 

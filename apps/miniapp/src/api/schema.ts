@@ -876,6 +876,7 @@ export interface components {
             plans?: components["schemas"]["PlanMeta"][];
             /** Locales */
             locales?: string[];
+            capabilities: components["schemas"]["PlatformCapabilities"];
         };
         /** ModerationBreakdownEntry */
         ModerationBreakdownEntry: {
@@ -1034,6 +1035,22 @@ export interface components {
             usd: string;
             /** Features */
             features: string[];
+        };
+        /**
+         * PlatformCapabilities
+         * @description Optional integrations that are actually usable on this deployment.
+         *
+         *     Keeping these server-derived prevents the Mini App from sending a customer
+         *     into a checkout or an AI setting which the deployment cannot fulfil.
+         */
+        PlatformCapabilities: {
+            /** Payment Providers */
+            payment_providers?: components["schemas"]["PaymentProvider"][];
+            /**
+             * Ai Moderation Available
+             * @default false
+             */
+            ai_moderation_available: boolean;
         };
         /** PlatformStats */
         PlatformStats: {

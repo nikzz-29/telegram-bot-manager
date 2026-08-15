@@ -124,7 +124,7 @@ export function IconTile({
   }[tone];
   return (
     <span
-      className={`flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[8px] ${tint}`}
+      className={`icon-tile flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-[7px] ${tint}`}
     >
       <Icon name={name} size={18} />
     </span>

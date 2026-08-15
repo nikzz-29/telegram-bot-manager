@@ -20,9 +20,9 @@ export { Icon, IconTile };
 
 export function Screen({ children }: { children: React.ReactNode }): React.JSX.Element {
   return (
-    <div className="mx-auto w-full max-w-2xl px-3 pb-[calc(6rem+theme(spacing.safe))]">
+    <main className="screen-shell mx-auto w-full max-w-2xl px-3 pb-[calc(6rem+theme(spacing.safe))]">
       {children}
-    </div>
+    </main>
   );
 }
 
@@ -46,9 +46,9 @@ export function Header({
   action?: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <header className="flex items-start gap-3 px-1 pb-1 pt-4">
+    <header className="screen-header flex items-start gap-3 px-1 pb-2 pt-5">
       {icon !== undefined && (
-        <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-control bg-accent-tint text-accent">
+        <span className="header-icon mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-control text-accent">
           <Icon name={icon} size={22} />
         </span>
       )}
@@ -74,7 +74,7 @@ export function Card({
   children: React.ReactNode;
   className?: string;
 }): React.JSX.Element {
-  return <div className={`tg-card ${className}`}>{children}</div>;
+  return <section className={`tg-card ${className}`}>{children}</section>;
 }
 
 /**
@@ -205,7 +205,7 @@ export function SegmentedControl<T extends string | number>({
   disabled?: boolean;
 }): React.JSX.Element {
   return (
-    <div className="flex gap-1 rounded-control bg-hint-tint p-1">
+    <div className="tg-segmented flex gap-1 rounded-control p-1">
       {options.map((option) => (
         <button
           key={option.value}
@@ -217,7 +217,7 @@ export function SegmentedControl<T extends string | number>({
             onChange(option.value);
           }}
           className={`flex-1 rounded-[7px] px-3 py-1.5 text-label font-medium transition-colors duration-[--panel-motion] ease-panel disabled:opacity-50 ${
-            option.value === value ? "bg-card text-text shadow-card" : "text-hint"
+            option.value === value ? "tg-segmented-active text-text" : "text-hint"
           }`}
         >
           {option.label}
@@ -303,7 +303,7 @@ export function PickerRow<T extends string>({
       {open && (
         /* Recessed onto the ground, so the options read as belonging to the row
            above them rather than as further settings of their own. */
-        <div className="bg-ground">
+        <div className="glass-recess">
           {options.map((option) => (
             <Row
               key={option.value}
@@ -415,7 +415,7 @@ export function Button({
 }): React.JSX.Element {
   const styles = {
     primary: "bg-accent text-accent-text",
-    secondary: "bg-card border border-card-border text-link",
+    secondary: "glass-button-secondary text-link",
     destructive: "bg-destructive-tint text-destructive",
   }[variant];
   return (
@@ -429,7 +429,7 @@ export function Button({
           onClick();
         })
       }
-      className={`w-full rounded-control px-4 py-3 text-row font-medium transition-opacity duration-[--panel-motion] active:opacity-70 disabled:opacity-50 ${styles}`}
+      className={`glass-button w-full rounded-control px-4 py-3 text-row font-medium disabled:opacity-50 ${styles}`}
     >
       {children}
     </button>

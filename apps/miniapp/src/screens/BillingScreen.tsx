@@ -8,7 +8,7 @@
  * lying about the one thing the user just paid for.
  */
 import React, { useState } from "react";
-import type { PaymentEntry, Plan, PlanOption } from "../api/client";
+import type { PaymentEntry, PaymentProvider, Plan, PlanOption } from "../api/client";
 import {
   Badge,
   Card,
@@ -23,7 +23,7 @@ import {
   SkeletonRows,
 } from "../components/ui";
 import { useI18n, useT } from "../i18n/I18nProvider";
-import { useCreateInvoice, usePayments, usePlans } from "../hooks/queries";
+import { useCreateInvoice, useMeta, usePayments, usePlans } from "../hooks/queries";
 import { hapticResult, openExternal, openInvoice } from "../telegram/sdk";
 
 const TERMS: readonly number[] = [1, 3, 12];
@@ -97,12 +97,14 @@ function PlanCard({
   option,
   months,
   disabled,
+  availableProviders,
   onPay,
 }: {
   option: PlanOption;
   months: number;
   disabled: boolean;
-  onPay: (provider: "stars" | "cryptobot") => void;
+  availableProviders: readonly PaymentProvider[];
+  onPay: (provider: PaymentProvider) => void;
 }): React.JSX.Element {
   const t = useT();
   return (
@@ -134,19 +136,23 @@ function PlanCard({
         own affordance instead of competing for emphasis.
       */}
       <Card className="mt-2">
-        <Row
-          title={t("billing-pay-stars", { amount: option.stars * months })}
-          icon="star"
-          disabled={disabled}
-          onClick={() => onPay("stars")}
-        />
-        <Row
-          title={t("billing-pay-crypto", { amount: (Number(option.usd) * months).toFixed(2) })}
-          // A globe, because this one leaves Telegram for an external checkout.
-          icon="globe"
-          disabled={disabled}
-          onClick={() => onPay("cryptobot")}
-        />
+        {availableProviders.includes("stars") && (
+          <Row
+            title={t("billing-pay-stars", { amount: option.stars * months })}
+            icon="star"
+            disabled={disabled}
+            onClick={() => onPay("stars")}
+          />
+        )}
+        {availableProviders.includes("cryptobot") && (
+          <Row
+            title={t("billing-pay-crypto", { amount: (Number(option.usd) * months).toFixed(2) })}
+            // A globe, because this one leaves Telegram for an external checkout.
+            icon="globe"
+            disabled={disabled}
+            onClick={() => onPay("cryptobot")}
+          />
+        )}
       </Card>
     </>
   );
@@ -185,13 +191,14 @@ function History({ payments }: { payments: readonly PaymentEntry[] }): React.JSX
 }
 export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element {
   const t = useT();
+  const meta = useMeta();
   const plans = usePlans(chatId);
   const payments = usePayments(chatId);
   const invoice = useCreateInvoice(chatId);
   const [months, setMonths] = useState(1);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const pay = (plan: Plan, provider: "stars" | "cryptobot"): void => {
+  const pay = (plan: Plan, provider: PaymentProvider): void => {
     setNotice(t("billing-invoice-opening"));
     invoice.mutate(
       { plan, provider, months },
@@ -243,7 +250,7 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
     );
   };
 
-  if (plans.isPending) {
+  if (plans.isPending || meta.isPending) {
     return (
       <Screen>
         <Header title={t("billing-title")} icon="star" />
@@ -253,11 +260,17 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
       </Screen>
     );
   }
-  if (plans.isError) {
+  if (plans.isError || meta.isError) {
     return (
       <Screen>
         <Header title={t("billing-title")} icon="star" />
-        <ErrorState message={plans.error.message} onRetry={() => void plans.refetch()} />
+        <ErrorState
+          message={(plans.error ?? meta.error)?.message ?? t("billing-invoice-failed")}
+          onRetry={() => {
+            void plans.refetch();
+            void meta.refetch();
+          }}
+        />
       </Screen>
     );
   }
@@ -265,6 +278,7 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
   const upgrades = plans.data.options.filter(
     (option) => option.plan !== plans.data.current_plan,
   );
+  const availableProviders = meta.data.capabilities.payment_providers ?? [];
 
   return (
     <Screen>
@@ -293,12 +307,19 @@ export function BillingScreen({ chatId }: { chatId: number }): React.JSX.Element
         }))}
       />
 
+      {availableProviders.length === 0 && (
+        <Card className="mt-3">
+          <EmptyState icon="alert" text={t("billing-provider-unavailable")} />
+        </Card>
+      )}
+
       {upgrades.map((option) => (
         <PlanCard
           key={option.plan}
           option={option}
           months={months}
           disabled={invoice.isPending}
+          availableProviders={availableProviders}
           onPay={(provider) => pay(option.plan, provider)}
         />
       ))}

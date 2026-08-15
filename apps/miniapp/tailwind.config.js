@@ -53,8 +53,8 @@ export default {
         "destructive-tint": "var(--tg-destructive-tint)",
       },
       borderRadius: {
-        card: "12px",
-        control: "10px",
+        card: "8px",
+        control: "8px",
       },
       boxShadow: {
         card: "var(--panel-shadow-card)",
@@ -69,7 +69,7 @@ export default {
         label: ["13px", { lineHeight: "18px" }],
         row: ["15px", { lineHeight: "20px" }],
         title: ["17px", { lineHeight: "22px" }],
-        display: ["22px", { lineHeight: "28px", letterSpacing: "-0.01em" }],
+        display: ["22px", { lineHeight: "28px", letterSpacing: "0" }],
       },
       fontFamily: {
         sans: [
