@@ -1,0 +1,142 @@
+# Production overlay. Run with:
+#   docker compose --env-file .env.production \
+#     -f infra/docker/docker-compose.yml \
+#     -f infra/docker/docker-compose.production.yml --profile production up -d --build
+#
+# The base file remains convenient for local development. This overlay removes
+# database/cache/API host exposure, replaces demo credentials, and gives every
+# long-running service bounded resources and rotating Docker logs.
+name: tg-bot-manager
+
+x-prod-logging: &prod-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-prod-resources: &prod-resources
+  mem_swappiness: 0
+
+services:
+  postgres:
+    ports: !reset []
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    mem_limit: 768m
+    cpus: 1.0
+    logging: *prod-logging
+
+  redis:
+    ports: !reset []
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 384m
+    cpus: 0.5
+    logging: *prod-logging
+
+  migrate:
+    env_file: [../../.env.production]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+    logging: *prod-logging
+
+  api:
+    ports: !reset []
+    env_file: [../../.env.production]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
+    mem_limit: 512m
+    cpus: 1.0
+    logging: *prod-logging
+
+  bot:
+    env_file: [../../.env.production]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import os; os.kill(1, 0)' "]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 512m
+    cpus: 1.0
+    logging: *prod-logging
+
+  worker:
+    env_file: [../../.env.production]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      REDIS_URL: redis://:${REDIS_PASSWORD:?REDIS_PASSWORD is required}@redis:6379/0
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import os; os.kill(1, 0)' "]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    mem_limit: 768m
+    cpus: 1.0
+    logging: *prod-logging
+
+  web:
+    logging: *prod-logging
+    mem_limit: 128m
+    cpus: 0.5
+
+  tunnel:
+    profiles: [production]
+    command:
+      - tunnel
+      - --no-autoupdate
+      - run
+      - --token
+      - ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required for the production profile}
+    logging: *prod-logging
+
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_backups:/backups
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        while :; do
+          stamp=$$(date -u +%Y%m%dT%H%M%SZ)
+          PGPASSWORD="$${POSTGRES_PASSWORD}" pg_dump --host=postgres --username="$${POSTGRES_USER}" --dbname="$${POSTGRES_DB}" --format=custom | gzip > "/backups/tg-manager-$${stamp}.dump.gz"
+          find /backups -type f -name '*.dump.gz' -mtime +14 -delete
+          sleep 86400
+        done
+    healthcheck:
+      test: ["CMD-SHELL", "find /backups -type f -name '*.dump.gz' -mmin -1500 | grep -q ."]
+      interval: 10m
+      timeout: 10s
+      retries: 3
+    mem_limit: 256m
+    cpus: 0.5
+    logging: *prod-logging
+
+volumes:
+  postgres_backups:

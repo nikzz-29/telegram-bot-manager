@@ -84,7 +84,7 @@ CMD ["alembic", "upgrade", "head"]
 # into the JavaScript bundle.
 FROM node:20-alpine AS miniapp-builder
 
-ARG PNPM_VERSION=9.15.9
+ARG PNPM_VERSION=10.15.1
 RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
 WORKDIR /app/apps/miniapp

@@ -7,6 +7,7 @@ Python-сервисов.
 
 - [Требования](#требования)
 - [Первый деплой](#первый-деплой)
+- [Production](#production)
 - [Конфигурация](#конфигурация)
 - [Polling или webhook](#polling-или-webhook)
 - [Миграции](#миграции)
@@ -17,7 +18,8 @@ Python-сервисов.
 
 ## Требования
 
-- Docker с Compose v2 (`docker compose version` ≥ 2.20).
+- Docker с Compose v2 (`docker compose version` ≥ 2.20; для production overlay
+  с `!reset` нужен Compose ≥ 2.24.4).
 - Токен бота от [@BotFather](https://t.me/BotFather).
 - Для webhook: публичный HTTPS URL — собственный домен или Cloudflare Tunnel.
 - Для внешнего хостинга панели вместо встроенного Nginx: проект на
@@ -56,6 +58,59 @@ curl -fsS localhost:8000/api/health   # {"status":"ok",...}
 curl -fsS localhost:8000/api/ready    # 503, пока Redis недоступен
 docker compose -f infra/docker/docker-compose.yml logs -f bot
 ```
+
+## Production
+
+Для боевого запуска используйте отдельный файл секретов и overlay. Он не
+публикует Postgres, Redis и API наружу, включает пароль Redis, обязательные
+проверки `APP_ENV=production`, healthcheck бота/воркера, лимиты памяти/CPU,
+ротацию Docker-логов и ежедневный PostgreSQL backup в volume
+`postgres_backups`:
+
+```bash
+cp .env.production.example .env.production
+$EDITOR .env.production
+docker compose --env-file .env.production \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.production.yml \
+  --profile production up -d --build
+```
+
+`POSTGRES_PASSWORD`, `REDIS_PASSWORD`, `JWT_SECRET`, `BOT_TOKEN`,
+`WEBHOOK_SECRET` и `CLOUDFLARE_TUNNEL_TOKEN` должны быть сгенерированы
+случайно и не храниться в git. Пароли в URL должны быть URL-safe; для генерации
+подходит `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+
+Named Tunnel должен иметь один hostname, например `panel.example.com`, с
+маршрутизацией на `http://web:80`. Этот же HTTPS origin укажите в
+`WEBAPP_URL`, `CORS_ORIGINS`, `WEBHOOK_BASE_URL` и в BotFather → Bot Settings →
+Menu Button. В Cloudflare Zero Trust создайте tunnel, скопируйте его token в
+`CLOUDFLARE_TUNNEL_TOKEN`, а затем проверьте:
+
+```bash
+docker compose --env-file .env.production \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.production.yml ps
+curl -fsS https://panel.example.com/api/health
+curl -fsS https://panel.example.com/api/ready
+```
+
+Ежедневный backup создаётся автоматически. Перед миграцией и не реже раза в
+неделю проверяйте настоящее восстановление. Сначала скопируйте последний файл
+из volume в текущий каталог, затем восстановите его в одноразовый PostgreSQL:
+
+```bash
+backup_container=$(docker compose --env-file .env.production \
+  -f infra/docker/docker-compose.yml \
+  -f infra/docker/docker-compose.production.yml ps -q backup)
+latest=$(docker exec "$backup_container" sh -c 'ls -1t /backups/*.dump.gz | head -n1')
+docker cp "$backup_container:$latest" ./latest.dump.gz
+bash scripts/verify_backup.sh ./latest.dump.gz
+```
+
+Скрипт проверки намеренно принимает только явно указанный файл и удаляет
+временный контейнер после результата. Эту команду удобно запускать еженедельно
+из cron/CI и поднимать alert, если exit code ненулевой.
 
 Для локального открытия панели внутри Telegram проще всего запустить
 `cloudflared` в том же Compose. Он обращается к `web:80` по внутренней сети и

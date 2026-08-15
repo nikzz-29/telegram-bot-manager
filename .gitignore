@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # Database dumps. `docs/deploy.md` has you run `pg_dump` from the repository
 # root, and the result is every chat's data — the one file here that must not
