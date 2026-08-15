@@ -90,14 +90,19 @@ class ChatContextMiddleware(BaseMiddleware):
             chat.id,
             title=chat.title or "",
             chat_type=chat.type,
-            owner_tg_id=user.id if user is not None else None,
+            # The author of the first message we happen to receive is not
+            # necessarily the chat owner.  The lifecycle handler mirrors the
+            # authoritative creator returned by getChatAdministrators.
+            owner_tg_id=None,
         )
         data["ctx"] = ctx
         bind_contextvars(**ctx.log_fields())
 
-        if not ctx.is_active:
+        if not ctx.is_active and event.my_chat_member is None:
             # The bot was removed from this chat, or the chat was disabled from the
-            # panel. Stay silent rather than moderate a chat nobody manages.
+            # panel. Stay silent rather than moderate a chat nobody manages.  A
+            # my_chat_member update is the exception: it is how a re-added or
+            # promoted bot reactivates the chat.
             logger.debug("chat_context.inactive_chat", chat_id=ctx.chat_id)
             return None
 

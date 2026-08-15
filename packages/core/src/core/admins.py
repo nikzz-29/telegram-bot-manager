@@ -112,14 +112,17 @@ class AdminService:
             logger.warning("admins.sync_failed", chat_id=tg_chat_id, error=str(exc))
             return 0
         roles: dict[int, AdminRole] = {}
+        owner_tg_id: int | None = None
         for member in members:
             if member.user is None or member.user.is_bot:
                 continue
-            roles[member.user.id] = (
-                AdminRole.OWNER if member.status == ChatMemberStatus.CREATOR else AdminRole.ADMIN
-            )
+            role = AdminRole.OWNER if member.status == ChatMemberStatus.CREATOR else AdminRole.ADMIN
+            roles[member.user.id] = role
+            if role is AdminRole.OWNER:
+                owner_tg_id = member.user.id
         async with UnitOfWork() as uow:
             await uow.admins.replace_for_chat(chat_id, roles)
+            await uow.chats.update_fields(chat_id, owner_tg_id=owner_tg_id)
             await uow.commit()
         await cache.invalidate_admins(tg_chat_id)
         return len(roles)

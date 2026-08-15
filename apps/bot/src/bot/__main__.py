@@ -29,7 +29,7 @@ from aiogram.types import (
     WebAppInfo,
 )
 
-from bot import middlewares, modules
+from bot import lifecycle, middlewares, modules
 from bot.commands import payments, private
 from bot.runner import run_updates
 from core.admins import admins
@@ -81,6 +81,9 @@ def build_dispatcher() -> Dispatcher:
     """The dispatcher, with the spec's middleware chain and every module router."""
     dispatcher = Dispatcher()
     middlewares.setup(dispatcher)
+    # Lifecycle is ungated: an inactive chat must receive the promotion or
+    # re-add update that makes it active again.
+    dispatcher.include_router(lifecycle.build_router())
     modules.setup(dispatcher)
     # Private-chat commands sit outside the module system: `/start` has to answer
     # before the user has any chat, let alone a plan.
@@ -174,7 +177,9 @@ async def run() -> None:
     # `edited_message` and have no handler of their own, so the derived list
     # would omit that type and Telegram would never deliver it — turning
     # "post clean, then edit in the spam" into a free bypass.
-    allowed_updates = sorted({*dispatcher.resolve_used_update_types(), "edited_message"})
+    allowed_updates = sorted(
+        {*dispatcher.resolve_used_update_types(), "edited_message", "my_chat_member"}
+    )
     try:
         await run_updates(bot, dispatcher, allowed_updates=allowed_updates)
     finally:
