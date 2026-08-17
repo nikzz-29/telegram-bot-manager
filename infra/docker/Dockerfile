@@ -113,7 +113,7 @@ RUN pnpm run build
 
 # One public origin for both the Mini App and API. Cloudflare Tunnel (or a
 # regular TLS reverse proxy in production) points here, never at Vite directly.
-FROM nginx:1.27-alpine AS web
+FROM nginx:1.31-alpine AS web
 
 COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=miniapp-builder /app/apps/miniapp/dist /usr/share/nginx/html
