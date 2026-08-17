@@ -8,7 +8,7 @@
 #
 # DECISION: `uv sync --no-dev` — the runtime images have no pytest, no mypy and
 # no testcontainers. That is a smaller attack surface, not only a smaller image.
-FROM python:3.12-slim AS builder
+FROM python:3.14-slim AS builder
 
 # uv comes from its own image rather than pip, which keeps the resolver's
 # version pinned by digest instead of by whatever pip finds today.
@@ -46,7 +46,7 @@ COPY packages packages
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 
 
-FROM python:3.12-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # Nothing in these services needs root, and a webhook handler that does is one
 # container escape away from being a much worse day.
