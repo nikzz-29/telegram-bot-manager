@@ -53,6 +53,13 @@ async def handle_bot_membership(event: ChatMemberUpdated, ctx: ChatContext) -> N
 
     if is_present:
         count = await admins.sync_to_db(ctx.chat_id, ctx.tg_chat_id)
+        member = event.new_chat_member
+        is_owner = status == ChatMemberStatus.CREATOR
+        missing = [
+            permission
+            for permission in ("can_delete_messages", "can_restrict_members")
+            if not is_owner and not bool(getattr(member, permission, False))
+        ]
         logger.info(
             "bot.membership_updated",
             chat_id=ctx.chat_id,
@@ -60,7 +67,15 @@ async def handle_bot_membership(event: ChatMemberUpdated, ctx: ChatContext) -> N
             status=status.value,
             active=is_operational,
             admins=count,
+            missing_permissions=missing,
         )
+        if is_operational and missing:
+            logger.warning(
+                "bot.permissions_incomplete",
+                chat_id=ctx.chat_id,
+                tg_chat_id=ctx.tg_chat_id,
+                missing=missing,
+            )
         return
 
     await admins.invalidate(ctx.tg_chat_id)

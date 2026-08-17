@@ -16,6 +16,7 @@ import {
 import type {
   BroadcastRequest,
   ChatDetail,
+  ChatBotPermissions,
   ChatSummary,
   GlobalBanCreate,
   GlobalBanEntry,
@@ -25,8 +26,19 @@ import type {
   ModuleConfigResponse,
   OperationResult,
   PaymentEntry,
+  PaymentProvider,
+  PaymentStatus,
   PlanCatalog,
+  Plan,
+  PlatformDashboard,
+  PlatformPaymentPage,
+  PlatformPlanOverride,
+  PlatformPlanOverrideResponse,
+  PlatformSettings,
   PlatformStats,
+  PlatformSubscriptionGrant,
+  PlatformUserDetail,
+  PlatformUserPage,
   PostCreate,
   PostEntry,
   PostUpdate,
@@ -48,6 +60,7 @@ export const keys = {
     ["me", "dashboard", days, chatId ?? "all"] as const,
   chats: ["chats"] as const,
   chat: (id: number) => ["chat", id] as const,
+  botPermissions: (id: number) => ["chat", id, "bot-permissions"] as const,
   modules: (id: number) => ["chat", id, "modules"] as const,
   triggers: (id: number) => ["chat", id, "triggers"] as const,
   posts: (id: number) => ["chat", id, "posts"] as const,
@@ -56,6 +69,14 @@ export const keys = {
   plans: (id: number) => ["chat", id, "plans"] as const,
   payments: (id: number) => ["chat", id, "payments"] as const,
   platformStats: ["platform", "stats"] as const,
+  platformDashboard: (days: number) => ["platform", "dashboard", days] as const,
+  platformUsers: (search: string, bannedOnly: boolean, adminsOnly: boolean, offset: number) =>
+    ["platform", "users", search, bannedOnly, adminsOnly, offset] as const,
+  platformUser: (id: number) => ["platform", "user", id] as const,
+  platformPayments: (status: string, provider: string, offset: number) =>
+    ["platform", "payments", status, provider, offset] as const,
+  platformSettings: ["platform", "settings"] as const,
+  platformPlans: ["platform", "plans"] as const,
   platformBans: ["platform", "bans"] as const,
 };
 
@@ -84,6 +105,16 @@ export function useChats(): UseQueryResult<ChatSummary[]> {
 
 export function useChat(chatId: number): UseQueryResult<ChatDetail> {
   return useQuery({ queryKey: keys.chat(chatId), queryFn: () => api.fetchChat(chatId) });
+}
+
+export function useChatBotPermissions(
+  chatId: number,
+): UseQueryResult<ChatBotPermissions> {
+  return useQuery({
+    queryKey: keys.botPermissions(chatId),
+    queryFn: () => api.fetchChatBotPermissions(chatId),
+    staleTime: 30_000,
+  });
 }
 
 export function useModules(chatId: number): UseQueryResult<ModuleConfigResponse[]> {
@@ -131,6 +162,59 @@ export function usePayments(chatId: number): UseQueryResult<PaymentEntry[]> {
 
 export function usePlatformStats(): UseQueryResult<PlatformStats> {
   return useQuery({ queryKey: keys.platformStats, queryFn: api.fetchPlatformStats });
+}
+
+export function usePlatformDashboard(days: number): UseQueryResult<PlatformDashboard> {
+  return useQuery({
+    queryKey: keys.platformDashboard(days),
+    queryFn: () => api.fetchPlatformDashboard(days),
+  });
+}
+
+export function usePlatformUsers(options: {
+  search: string;
+  bannedOnly: boolean;
+  adminsOnly: boolean;
+  offset: number;
+}): UseQueryResult<PlatformUserPage> {
+  return useQuery({
+    queryKey: keys.platformUsers(
+      options.search,
+      options.bannedOnly,
+      options.adminsOnly,
+      options.offset,
+    ),
+    queryFn: () => api.fetchPlatformUsers({ ...options, limit: 40 }),
+  });
+}
+
+export function usePlatformUser(
+  tgUserId: number | null,
+): UseQueryResult<PlatformUserDetail> {
+  return useQuery({
+    queryKey: keys.platformUser(tgUserId ?? 0),
+    queryFn: () => api.fetchPlatformUser(tgUserId!),
+    enabled: tgUserId !== null,
+  });
+}
+
+export function usePlatformPayments(options: {
+  status?: PaymentStatus;
+  provider?: PaymentProvider;
+  offset: number;
+}): UseQueryResult<PlatformPaymentPage> {
+  return useQuery({
+    queryKey: keys.platformPayments(options.status ?? "all", options.provider ?? "all", options.offset),
+    queryFn: () => api.fetchPlatformPayments({ ...options, limit: 50 }),
+  });
+}
+
+export function usePlatformSettings(): UseQueryResult<PlatformSettings> {
+  return useQuery({ queryKey: keys.platformSettings, queryFn: api.fetchPlatformSettings });
+}
+
+export function usePlatformPlans(): UseQueryResult<PlatformPlanOverrideResponse[]> {
+  return useQuery({ queryKey: keys.platformPlans, queryFn: api.fetchPlatformPlans });
 }
 
 export function useGlobalBans(): UseQueryResult<GlobalBanEntry[]> {
@@ -299,4 +383,65 @@ export function useBroadcast(): UseMutationResult<
   BroadcastRequest
 > {
   return useMutation({ mutationFn: api.sendBroadcast });
+}
+
+export function useGrantPlatformSubscription(): UseMutationResult<
+  OperationResult,
+  Error,
+  { tgUserId: number; body: PlatformSubscriptionGrant }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ tgUserId, body }) => api.grantPlatformSubscription(tgUserId, body),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["platform"] });
+      await queryClient.invalidateQueries({ queryKey: keys.chats });
+    },
+  });
+}
+
+export function useUpdateCryptoBotSettings(): UseMutationResult<
+  PlatformSettings,
+  Error,
+  boolean
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (testnet) => api.updateCryptoBotSettings({ testnet }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: keys.platformSettings });
+      await queryClient.invalidateQueries({ queryKey: ["platform", "dashboard"] });
+      await queryClient.invalidateQueries({ queryKey: keys.meta });
+    },
+  });
+}
+
+export function useUpdatePlatformPlan(): UseMutationResult<
+  PlatformPlanOverrideResponse,
+  Error,
+  { plan: Plan; body: PlatformPlanOverride }
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ plan, body }) => api.updatePlatformPlan(plan, body),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: keys.platformPlans });
+      await queryClient.invalidateQueries({ queryKey: keys.meta });
+    },
+  });
+}
+
+export function useResetPlatformPlan(): UseMutationResult<
+  PlatformPlanOverrideResponse,
+  Error,
+  Plan
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: api.resetPlatformPlan,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: keys.platformPlans });
+      await queryClient.invalidateQueries({ queryKey: keys.meta });
+    },
+  });
 }

@@ -3,8 +3,9 @@
 from functools import lru_cache
 import re
 from typing import Final
+from urllib.parse import urlsplit
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # RFC 7518 §3.2: an HMAC-SHA256 key should be at least as long as the digest.
@@ -47,6 +48,8 @@ class Settings(BaseSettings):
     api_port: int = 8000
     api_base_url: str = "http://localhost:8000"
     webapp_url: str = "http://localhost:5173"
+    website_url: str = ""
+    website_login_ttl_seconds: int = Field(default=900, ge=60, le=3600)
     jwt_secret: str = PLACEHOLDER_JWT_SECRET
     jwt_ttl_seconds: int = 3600
     cors_origins: str = "*"
@@ -60,13 +63,15 @@ class Settings(BaseSettings):
 
     # --- ai moderation ---
     ai_enabled: bool = True
-    ai_base_url: str = "https://api.openai.com/v1"
+    ai_base_url: str = "https://api.llm7.io/v1"
     ai_api_key: str = ""
-    ai_model: str = "gpt-4o-mini"
-    ai_timeout_seconds: float = 8.0
-    ai_cache_ttl_seconds: int = 86_400
-    ai_circuit_failure_threshold: int = 5
-    ai_circuit_reset_seconds: int = 60
+    ai_model: str = "DeepSeek-V4-Flash-0731"
+    ai_completion_path: str = "/chat/completions"
+    ai_max_concurrency: int = Field(default=4, ge=1, le=64)
+    ai_timeout_seconds: float = Field(default=8.0, gt=0.1, le=60.0)
+    ai_cache_ttl_seconds: int = Field(default=86_400, ge=60, le=7 * 86_400)
+    ai_circuit_failure_threshold: int = Field(default=5, ge=1, le=100)
+    ai_circuit_reset_seconds: int = Field(default=60, ge=1, le=3_600)
 
     # --- payments ---
     cryptobot_token: str = ""
@@ -126,6 +131,22 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def ai_moderation_available(self) -> bool:
+        """Whether the configured provider has enough information to be called.
+
+        API keys are deliberately not part of this check: keyless public and
+        self-hosted OpenAI-compatible endpoints are valid providers. A provider
+        that still requires authentication will fail open in ``core.ai_provider``.
+        """
+        endpoint = urlsplit(self.ai_base_url.strip())
+        return bool(
+            self.ai_enabled
+            and endpoint.scheme in {"http", "https"}
+            and endpoint.netloc
+            and self.ai_model.strip()
+        )
 
     @property
     def webhook_url(self) -> str:

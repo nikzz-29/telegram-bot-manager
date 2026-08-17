@@ -23,7 +23,6 @@ import { useI18n, useT } from "../i18n/I18nProvider";
 import type { Args } from "../i18n/bundles";
 import { useChats } from "../hooks/queries";
 import { useNavigation } from "../navigation";
-import { useUser } from "../session";
 
 /**
  * Role, size and liveness, in one line under the chat's name.
@@ -50,7 +49,6 @@ export function ChatListScreen(): React.JSX.Element {
   const { locale, setLocale, available } = useI18n();
   const navigation = useNavigation();
   const chats = useChats();
-  const user = useUser();
 
   return (
     <Screen>
@@ -88,21 +86,6 @@ export function ChatListScreen(): React.JSX.Element {
             ))}
           </Card>
         ))}
-
-      {user.is_superadmin && (
-        <>
-          <SectionTitle>{t("section-platform")}</SectionTitle>
-          <Card>
-            {/* Hiding this row is tidiness, not access control — every platform
-                endpoint re-checks the flag server-side. */}
-            <Row
-              title={t("platform-title")}
-              icon="globe"
-              onClick={() => navigation.push({ name: "platform" })}
-            />
-          </Card>
-        </>
-      )}
 
       <SectionTitle>{t("panel-language")}</SectionTitle>
       <Card>

@@ -33,9 +33,12 @@ from bot import lifecycle, middlewares, modules
 from bot.commands import payments, private
 from bot.runner import run_updates
 from core.admins import admins
+from core.ai_moderation import ai_moderation
 from core.billing import billing
 from core.cache import close_cache, setup_cache
 from core.jobs import close_arq
+from core.plan_settings import load_plan_overrides
+from core.platform_settings import load_platform_settings
 from core.redis_client import close_redis
 from core.registry import registry
 from core.sender import sender
@@ -73,6 +76,7 @@ PRIVATE_COMMANDS: Final[tuple[tuple[str, str], ...]] = (
     ("profile", "cmd-profile"),
     ("chats", "cmd-chats"),
     ("plans", "cmd-plans"),
+    ("website", "cmd-website"),
     ("help", "cmd-help"),
 )
 
@@ -127,13 +131,15 @@ async def _publish_commands(bot: Bot) -> None:
     ]
 
     try:
-        await bot.set_my_commands(group_commands, scope=BotCommandScopeAllChatAdministrators())
-    except TelegramAPIError as exc:
+        async with asyncio.timeout(15):
+            await bot.set_my_commands(group_commands, scope=BotCommandScopeAllChatAdministrators())
+    except (TelegramAPIError, TimeoutError) as exc:
         logger.warning("bot.commands_publish_failed", operation="group", error=str(exc))
 
     try:
-        await bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
-    except TelegramAPIError as exc:
+        async with asyncio.timeout(15):
+            await bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
+    except (TelegramAPIError, TimeoutError) as exc:
         logger.warning("bot.commands_publish_failed", operation="private", error=str(exc))
 
     url = get_settings().webapp_url.strip()
@@ -146,8 +152,9 @@ async def _publish_commands(bot: Bot) -> None:
     if isinstance(menu_button, MenuButtonCommands):
         logger.warning("bot.webapp_menu_fallback", webapp_url=url or None)
     try:
-        await bot.set_chat_menu_button(menu_button=menu_button)
-    except TelegramAPIError as exc:
+        async with asyncio.timeout(15):
+            await bot.set_chat_menu_button(menu_button=menu_button)
+    except (TelegramAPIError, TimeoutError) as exc:
         logger.warning("bot.commands_publish_failed", operation="menu_button", error=str(exc))
 
 
@@ -158,6 +165,8 @@ async def run() -> None:
         raise RuntimeError("BOT_TOKEN is required to run the bot")
 
     setup_cache()
+    await load_platform_settings()
+    await load_plan_overrides()
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     # `admins` needs a Bot for `getChatMember`; `subscription` needs it for the
     # same call against a channel; `sender` owns every outbound call.
@@ -170,6 +179,14 @@ async def run() -> None:
     await _publish_commands(bot)
 
     me = await bot.me()
+    if not me.can_read_all_group_messages:
+        logger.warning(
+            "bot.group_privacy_mode_enabled",
+            action=(
+                "Disable Privacy Mode in BotFather via /setprivacy to process ordinary "
+                "group messages."
+            ),
+        )
     logger.info("bot.started", username=me.username, bot_id=me.id)
     # DECISION: `allowed_updates` is stated explicitly rather than left to
     # `resolve_used_update_types()`, which derives the list from *handlers*.
@@ -187,6 +204,7 @@ async def run() -> None:
         # This is why the runner handles SIGTERM instead of letting the default
         # disposition kill the process — a hard kill never reaches this block.
         await sender.stop(drain=True)
+        await ai_moderation.close()
         await bot.session.close()
         await close_cache()
         await close_arq()

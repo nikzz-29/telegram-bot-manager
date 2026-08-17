@@ -92,8 +92,12 @@ class AiModerationMiddleware(BaseMiddleware):
 
         config = await chat_context.config(ctx, ModuleName.AI_MODERATION, AiModerationConfig)
         # Admins are exempt on the same grounds as everywhere else, and checking
-        # them would spend budget on the people who configured the thing.
-        if await admins.is_admin(ctx.tg_chat_id, event.from_user.id):
+        # them would spend budget on the people who configured the thing. The
+        # explicit test switch is deliberately per-chat and defaults off, so a
+        # test cannot silently change moderation policy in another chat.
+        if not config.test_admin_messages and await admins.is_admin(
+            ctx.tg_chat_id, event.from_user.id
+        ):
             return await handler(event, data)
 
         moderation_ctx = ModerationContext(

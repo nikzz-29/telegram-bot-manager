@@ -17,7 +17,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import Message, TelegramObject
 
 from bot.enforcement import enforce
-from bot.facts import facts_from
+from bot.facts import facts_from, is_anonymous_admin
 from core import actions, content_filters
 from core.admins import admins
 from core.context import ChatContext
@@ -38,7 +38,7 @@ class ContentFilterMiddleware(BaseMiddleware):
         data: dict[str, Any],
     ) -> Any:
         ctx: ChatContext | None = data.get("ctx")
-        if not isinstance(event, Message) or ctx is None or event.from_user is None:
+        if not isinstance(event, Message) or ctx is None:
             return await handler(event, data)
         if not ctx.module_enabled(ModuleName.MODERATION):
             return await handler(event, data)
@@ -59,22 +59,36 @@ class ContentFilterMiddleware(BaseMiddleware):
 
         if not config.filters.any_enabled:
             return await handler(event, data)
-        if config.exempt_admins and await admins.is_admin(ctx.tg_chat_id, event.from_user.id):
-            return await handler(event, data)
+        if config.exempt_admins:
+            if is_anonymous_admin(event):
+                return await handler(event, data)
+            if event.from_user is not None and await admins.is_admin(
+                ctx.tg_chat_id, event.from_user.id
+            ):
+                return await handler(event, data)
 
         tripped = content_filters.check(facts, config.filters)
         if tripped is None:
             return await handler(event, data)
 
-        await enforce(
-            event,
-            ctx,
-            action=config.filter_action or ModerationAction.DELETE,
-            audit_action="content_filter",
-            reason=f"filter:{tripped}",
-            notice_key="notice-filter",
-            notice_args={"filter": tripped},
-        )
+        action = config.filter_action or ModerationAction.DELETE
+        if event.from_user is None:
+            if action != ModerationAction.NOTHING:
+                sender.enqueue(
+                    actions.delete_message(ctx.tg_chat_id, event.message_id),
+                    chat_id=ctx.tg_chat_id,
+                    priority=SendPriority.MODERATION,
+                )
+        else:
+            await enforce(
+                event,
+                ctx,
+                action=action,
+                audit_action="content_filter",
+                reason=f"filter:{tripped}",
+                notice_key="notice-filter",
+                notice_args={"filter": tripped},
+            )
         return None
 
 

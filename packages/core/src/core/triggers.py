@@ -27,7 +27,7 @@ from typing import Final
 from core import cache
 from db.uow import UnitOfWork
 from shared.enums import TriggerMatch
-from shared.errors import InvalidPatternError
+from shared.errors import DuplicateTriggerError, InvalidPatternError
 from shared.logging import get_logger
 
 logger = get_logger(__name__)
@@ -74,6 +74,41 @@ def validate_pattern(pattern: str, match: TriggerMatch, *, case_sensitive: bool 
     except re.error as exc:
         raise InvalidPatternError(f"Invalid regular expression: {exc}", pattern=cleaned) from exc
     return cleaned
+
+
+def trigger_identity(
+    pattern: str, match: TriggerMatch, *, case_sensitive: bool = False
+) -> tuple[TriggerMatch, bool, str]:
+    """Canonical identity used to reject rules that can never be reached."""
+    cleaned = validate_pattern(pattern, match, case_sensitive=case_sensitive)
+    comparable = cleaned if case_sensitive else cleaned.casefold()
+    return match, case_sensitive, comparable
+
+
+def ensure_unique_trigger(
+    definitions: Iterable[TriggerDef],
+    *,
+    pattern: str,
+    match: TriggerMatch,
+    case_sensitive: bool = False,
+    exclude_id: int | None = None,
+) -> None:
+    """Raise when an equivalent rule is already present."""
+    wanted = trigger_identity(pattern, match, case_sensitive=case_sensitive)
+    for definition in definitions:
+        if definition.id == exclude_id:
+            continue
+        current = trigger_identity(
+            definition.pattern,
+            definition.match,
+            case_sensitive=definition.case_sensitive,
+        )
+        if current == wanted:
+            raise DuplicateTriggerError(
+                "An equivalent trigger already exists.",
+                trigger_id=definition.id,
+                pattern=pattern,
+            )
 
 
 def _to_regex(definition: TriggerDef) -> str:
@@ -236,7 +271,9 @@ __all__ = [
     "TriggerDef",
     "TriggerMatcher",
     "TriggerService",
+    "ensure_unique_trigger",
     "matcher_for",
+    "trigger_identity",
     "triggers",
     "validate_pattern",
 ]

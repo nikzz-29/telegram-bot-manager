@@ -8,6 +8,7 @@ import {
   type AuthUser,
   type BroadcastRequest,
   type ChatDetail,
+  type ChatBotPermissions,
   type ChatSummary,
   type GlobalBanCreate,
   type GlobalBanEntry,
@@ -17,8 +18,20 @@ import {
   type ModuleConfigResponse,
   type OperationResult,
   type PaymentEntry,
+  type PaymentProvider,
+  type PaymentStatus,
   type PlanCatalog,
+  type Plan,
+  type PlatformCryptoBotUpdate,
+  type PlatformDashboard,
+  type PlatformPaymentPage,
+  type PlatformPlanOverride,
+  type PlatformPlanOverrideResponse,
+  type PlatformSettings,
   type PlatformStats,
+  type PlatformSubscriptionGrant,
+  type PlatformUserDetail,
+  type PlatformUserPage,
   type PostCreate,
   type PostEntry,
   type PostUpdate,
@@ -90,6 +103,14 @@ export async function fetchChats(): Promise<ChatSummary[]> {
 export async function fetchChat(chatId: number): Promise<ChatDetail> {
   return unwrap(
     await client.GET("/api/chats/{chat_id}", { params: { path: { chat_id: chatId } } }),
+  );
+}
+
+export async function fetchChatBotPermissions(chatId: number): Promise<ChatBotPermissions> {
+  return unwrap(
+    await client.GET("/api/chats/{chat_id}/bot-permissions", {
+      params: { path: { chat_id: chatId } },
+    }),
   );
 }
 
@@ -311,6 +332,110 @@ export async function fetchPayments(chatId: number): Promise<PaymentEntry[]> {
 // --- platform operator -----------------------------------------------------
 export async function fetchPlatformStats(): Promise<PlatformStats> {
   return unwrap(await client.GET("/api/platform/stats", {}));
+}
+
+export async function fetchPlatformDashboard(days: number): Promise<PlatformDashboard> {
+  return unwrap(
+    await client.GET("/api/platform/dashboard", { params: { query: { days } } }),
+  );
+}
+
+export async function fetchPlatformUsers(options: {
+  search?: string;
+  bannedOnly?: boolean;
+  adminsOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<PlatformUserPage> {
+  return unwrap(
+    await client.GET("/api/platform/users", {
+      params: {
+        query: {
+          search: options.search,
+          banned_only: options.bannedOnly,
+          admins_only: options.adminsOnly,
+          limit: options.limit,
+          offset: options.offset,
+        },
+      },
+    }),
+  );
+}
+
+export async function fetchPlatformUser(tgUserId: number): Promise<PlatformUserDetail> {
+  return unwrap(
+    await client.GET("/api/platform/users/{tg_user_id}", {
+      params: { path: { tg_user_id: tgUserId } },
+    }),
+  );
+}
+
+export async function grantPlatformSubscription(
+  tgUserId: number,
+  body: PlatformSubscriptionGrant,
+): Promise<OperationResult> {
+  return unwrap(
+    await client.POST("/api/platform/users/{tg_user_id}/subscription", {
+      params: { path: { tg_user_id: tgUserId } },
+      body,
+    }),
+  );
+}
+
+export async function fetchPlatformPayments(options: {
+  status?: PaymentStatus;
+  provider?: PaymentProvider;
+  tgUserId?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<PlatformPaymentPage> {
+  return unwrap(
+    await client.GET("/api/platform/payments", {
+      params: {
+        query: {
+          status: options.status,
+          provider: options.provider,
+          tg_user_id: options.tgUserId,
+          limit: options.limit,
+          offset: options.offset,
+        },
+      },
+    }),
+  );
+}
+
+export async function fetchPlatformSettings(): Promise<PlatformSettings> {
+  return unwrap(await client.GET("/api/platform/settings", {}));
+}
+
+export async function updateCryptoBotSettings(
+  body: PlatformCryptoBotUpdate,
+): Promise<PlatformSettings> {
+  return unwrap(await client.PATCH("/api/platform/settings/cryptobot", { body }));
+}
+
+export async function fetchPlatformPlans(): Promise<PlatformPlanOverrideResponse[]> {
+  return unwrap(await client.GET("/api/platform/plans", {}));
+}
+
+export async function updatePlatformPlan(
+  plan: Plan,
+  body: PlatformPlanOverride,
+): Promise<PlatformPlanOverrideResponse> {
+  return unwrap(
+    await client.PUT("/api/platform/plans/{plan}", {
+      params: { path: { plan } },
+      body,
+    }),
+  );
+}
+
+export async function resetPlatformPlan(plan: Plan): Promise<PlatformPlanOverrideResponse> {
+  return unwrap(
+    await client.DELETE("/api/platform/plans/{plan}", {
+      params: { path: { plan } },
+    }),
+  );
 }
 
 export async function fetchGlobalBans(

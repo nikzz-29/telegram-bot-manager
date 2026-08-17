@@ -8,8 +8,10 @@ surprises us.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
+import httpx
 from pydantic import ValidationError
 import pytest
 
@@ -90,6 +92,8 @@ def test_parse_verdict_digs_the_object_out_of_prose_and_fences() -> None:
         "{not valid json",
         '{"label": "definitely_not_a_label", "confidence": 0.9}',
         '{"label": "scam", "confidence": "very high"}',
+        '{"label": "scam", "confidence": "NaN"}',
+        '{"label": "scam", "confidence": true}',
         '["scam", 0.9]',
     ],
 )
@@ -134,11 +138,193 @@ def test_breaker_probes_again_once_the_cooldown_elapses() -> None:
 
 
 async def test_unconfigured_provider_is_unavailable_not_a_verdict() -> None:
-    """No API key must degrade, never classify — and never touch the network."""
-    provider = OpenAiCompatibleProvider(api_key="")
+    """An empty endpoint/model is unavailable; a missing key is not."""
+    provider = OpenAiCompatibleProvider(base_url="", model="", api_key="")
     assert not provider.configured
     with pytest.raises(ProviderUnavailableError):
         await provider.classify("anything", context())
+
+
+def _mock_provider(
+    monkeypatch: pytest.MonkeyPatch,
+    handler: Any,
+    **kwargs: Any,
+) -> tuple[OpenAiCompatibleProvider, dict[str, Any]]:
+    """Build a provider whose async client is backed by an in-memory transport."""
+    transport = httpx.MockTransport(handler)
+    real_client = httpx.AsyncClient
+    created: dict[str, Any] = {}
+
+    def factory(**client_kwargs: Any) -> httpx.AsyncClient:
+        created.update(client_kwargs)
+        return real_client(transport=transport, **client_kwargs)
+
+    monkeypatch.setattr("core.ai_provider.httpx.AsyncClient", factory)
+    return (
+        OpenAiCompatibleProvider(
+            base_url="https://provider.test/v1",
+            api_key="",
+            model="free-model",
+            **kwargs,
+        ),
+        created,
+    )
+
+
+async def test_keyless_provider_uses_custom_path_without_authorization(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    requests: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"label":"ok","confidence":0.99}'}}]},
+            request=request,
+        )
+
+    provider, created = _mock_provider(monkeypatch, handler, completion_path="moderate")
+    try:
+        verdict = await provider.classify("hello there", context())
+    finally:
+        await provider.close()
+
+    assert verdict.label is AiVerdictLabel.OK
+    assert requests[0].url.path == "/v1/moderate"
+    assert "authorization" not in requests[0].headers
+    assert created["headers"] == {}
+
+
+async def test_provider_retries_one_short_429_then_succeeds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+    delays: list[float] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return httpx.Response(429, headers={"Retry-After": "30"}, request=request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"label":"scam","confidence":0.9}'}}]},
+            request=request,
+        )
+
+    async def fake_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr("core.ai_provider.asyncio.sleep", fake_sleep)
+    provider, _ = _mock_provider(monkeypatch, handler)
+    try:
+        verdict = await provider.classify("free crypto", context())
+    finally:
+        await provider.close()
+
+    assert verdict.label is AiVerdictLabel.SCAM
+    assert calls == 2
+    assert delays == [1.0]
+
+
+async def test_provider_exhausted_429_fails_open_after_one_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+    delays: list[float] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(429, request=request)
+
+    async def fake_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr("core.ai_provider.asyncio.sleep", fake_sleep)
+    provider, _ = _mock_provider(monkeypatch, handler)
+    try:
+        with pytest.raises(ProviderUnavailableError):
+            await provider.classify("free crypto", context())
+    finally:
+        await provider.close()
+
+    assert calls == 2
+    assert delays == [0.25]
+
+
+async def test_provider_retries_a_transient_transport_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+    delays: list[float] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise httpx.ReadTimeout("temporary timeout", request=request)
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"label":"ok"}'}}]},
+            request=request,
+        )
+
+    async def fake_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr("core.ai_provider.asyncio.sleep", fake_sleep)
+    provider, _ = _mock_provider(monkeypatch, handler)
+    try:
+        verdict = await provider.classify("hello", context())
+    finally:
+        await provider.close()
+
+    assert verdict.label is AiVerdictLabel.OK
+    assert calls == 2
+    assert delays == [0.25]
+
+
+async def test_provider_rejects_malformed_completion_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"choices": []}, request=request)
+
+    provider, _ = _mock_provider(monkeypatch, handler)
+    try:
+        with pytest.raises(ProviderUnavailableError):
+            await provider.classify("hello", context())
+    finally:
+        await provider.close()
+
+
+async def test_provider_limits_in_flight_requests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    active = 0
+    maximum = 0
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal active, maximum
+        active += 1
+        maximum = max(maximum, active)
+        await asyncio.sleep(0.01)
+        active -= 1
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"label":"ok"}'}}]},
+            request=request,
+        )
+
+    provider, _ = _mock_provider(monkeypatch, handler, max_concurrency=2)
+    try:
+        await asyncio.gather(*(provider.classify(f"message {i}", context()) for i in range(6)))
+    finally:
+        await provider.close()
+
+    assert maximum == 2
 
 
 # --- the service: sampling, cache, budget, degradation ------------------------
@@ -224,13 +410,13 @@ async def test_short_text_never_reaches_the_provider(
     assert provider.calls == []
 
 
-async def test_disabled_config_never_reaches_the_provider(
+async def test_legacy_inner_enabled_flag_does_not_override_module_switch(
     service: tuple[FakeProvider, FakeCache, FakeRedis],
 ) -> None:
     provider, _, _ = service
     decision = await ai_moderation.inspect("anything", ctx=context(), config=config(enabled=False))
-    assert not decision.checked
-    assert provider.calls == []
+    assert decision.checked
+    assert provider.calls == ["anything"]
 
 
 async def test_sampling_is_decided_by_the_text_not_the_clock(

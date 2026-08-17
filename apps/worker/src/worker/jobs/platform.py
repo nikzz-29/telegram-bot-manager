@@ -22,6 +22,7 @@ from datetime import timedelta
 from typing import Any, Final
 
 from core import actions
+from core.crossban import crossban
 from core.sender import SendPriority, sender
 from db.uow import UnitOfWork
 from shared.enums import ModuleName
@@ -61,7 +62,7 @@ async def propagate_global_ban(ctx: WorkerContext, tg_user_id: int, reason: str 
             continue
         row = configs.get(chat.id)
         config = CrossbanConfig.model_validate(row.config if row is not None else {})
-        if config.alert_only or not config.autoban_on_join:
+        if crossban.enforcement_for(config) != "ban":
             continue
         sender.enqueue(
             actions.ban(chat.tg_chat_id, tg_user_id),

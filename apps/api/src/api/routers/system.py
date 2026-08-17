@@ -112,7 +112,7 @@ async def meta() -> MetaResponse:
         locales=list(SUPPORTED_LOCALES),
         capabilities=PlatformCapabilities(
             payment_providers=payment_providers,
-            ai_moderation_available=settings.ai_enabled and bool(settings.ai_api_key),
+            ai_moderation_available=settings.ai_moderation_available,
         ),
     )
 

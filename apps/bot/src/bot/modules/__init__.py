@@ -31,6 +31,15 @@ def _attach(dispatcher: Dispatcher, module: ModuleName, router: Router) -> None:
     logger.debug("modules.attached", module=module.value, router=router.name)
 
 
+def _attach_passive(dispatcher: Dispatcher, module: ModuleName, router: Router) -> None:
+    """Attach an additional gated observer without replacing the main router."""
+    gate = ModuleGateMiddleware(module)
+    for observer in router.observers.values():
+        observer.middleware(gate)
+    dispatcher.include_router(router)
+    logger.debug("modules.passive_attached", module=module.value, router=router.name)
+
+
 def setup(dispatcher: Dispatcher) -> None:
     """Attach every module available in this stage.
 
@@ -41,6 +50,9 @@ def setup(dispatcher: Dispatcher) -> None:
     a statistics config read.
     """
     _attach(dispatcher, ModuleName.MODERATION, moderation.build_router())
+    # Membership statistics must run before Entry consumes `chat_member`, and
+    # must remain available when the Entry module itself is switched off.
+    _attach_passive(dispatcher, ModuleName.STATS, stats.build_membership_router())
     _attach(dispatcher, ModuleName.ENTRY, entry.build_router())
     _attach(dispatcher, ModuleName.AUTOPOST, autopost.build_router())
     _attach(dispatcher, ModuleName.STATS, stats.build_router())

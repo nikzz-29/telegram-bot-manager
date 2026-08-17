@@ -27,7 +27,9 @@ from core import actions
 from core.captcha import captcha
 from core.context import ChatContext
 from core.sender import SendPriority, sender
+from shared.enums import ModuleName
 from shared.logging import get_logger
+from shared.plans import Feature
 
 logger = get_logger(__name__)
 
@@ -47,6 +49,8 @@ class CaptchaGateMiddleware(BaseMiddleware):
             ctx is None
             or user is None
             or user.is_bot
+            or not ctx.module_enabled(ModuleName.ENTRY)
+            or not ctx.has(Feature.CAPTCHA)
             or not ctx.entry.captcha_enabled
             or not isinstance(event, Message)
         ):

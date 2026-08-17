@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import timedelta
 import hashlib
+import math
 from typing import Final
 
 from core import cache
@@ -139,6 +140,24 @@ class AiModerationService:
             return ModerationAction.NOTHING
         return config.actions.get(verdict.label, ModerationAction.ALERT_ADMINS)
 
+    @staticmethod
+    def _cached_verdict(value: object) -> Verdict | None:
+        """Validate cached data before it can reach thresholds or audit logs."""
+        if not isinstance(value, dict):
+            return None
+        try:
+            label = AiVerdictLabel(str(value.get("label", AiVerdictLabel.OK.value)))
+            confidence = float(value.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            return None
+        if isinstance(value.get("confidence"), bool) or not math.isfinite(confidence):
+            return None
+        return Verdict(
+            label=label,
+            confidence=min(1.0, max(0.0, confidence)),
+            reason=str(value.get("reason", ""))[:200],
+        )
+
     # --- the decision ---------------------------------------------------------
     async def inspect(
         self,
@@ -156,20 +175,20 @@ class AiModerationService:
         """
         settings = get_settings()
         stripped = text.strip()
-        if not settings.ai_enabled or not config.enabled or len(stripped) < config.min_text_length:
+        if not settings.ai_enabled or len(stripped) < config.min_text_length:
             return SKIPPED
 
         digest = text_hash(stripped)
         if not self._sampled(digest, config):
             return SKIPPED
 
-        cached = await cache.get_value(cache.ai_verdict_key(digest))
-        if isinstance(cached, dict):
-            verdict = Verdict(
-                label=AiVerdictLabel(str(cached.get("label", AiVerdictLabel.OK.value))),
-                confidence=float(cached.get("confidence", 0.0)),
-                reason=str(cached.get("reason", "")),
-            )
+        try:
+            cached = await cache.get_value(cache.ai_verdict_key(digest))
+        except Exception as error:
+            logger.warning("ai.cache_read_failed", chat_id=ctx.chat_id, error=str(error))
+            return SKIPPED
+        verdict = self._cached_verdict(cached)
+        if verdict is not None:
             return AiDecision(
                 verdict=verdict,
                 action=self._action_for(verdict, config),
@@ -179,7 +198,11 @@ class AiModerationService:
             )
 
         if plan_limit is not None and plan_limit >= 0:
-            used = await self.budget_used(ctx.chat_id)
+            try:
+                used = await self.budget_used(ctx.chat_id)
+            except Exception as error:
+                logger.warning("ai.budget_read_failed", chat_id=ctx.chat_id, error=str(error))
+                return SKIPPED
             if used >= plan_limit:
                 logger.info("ai.budget_exhausted", chat_id=ctx.chat_id, limit=plan_limit)
                 return SKIPPED
@@ -191,17 +214,30 @@ class AiModerationService:
             # that already ran stand.
             logger.info("ai.degraded", chat_id=ctx.chat_id, error=str(error))
             return SKIPPED
+        except Exception as error:
+            logger.exception("ai.provider_unexpected_error", chat_id=ctx.chat_id, error=str(error))
+            return SKIPPED
 
-        await self._spend(ctx.chat_id)
-        await cache.set_value(
-            cache.ai_verdict_key(digest),
-            {
-                "label": verdict.label.value,
-                "confidence": verdict.confidence,
-                "reason": verdict.reason,
-            },
-            ttl=settings.ai_cache_ttl_seconds,
-        )
+        try:
+            await self._spend(ctx.chat_id)
+        except Exception as error:
+            logger.warning("ai.budget_write_failed", chat_id=ctx.chat_id, error=str(error))
+            return SKIPPED
+        try:
+            await cache.set_value(
+                cache.ai_verdict_key(digest),
+                {
+                    "label": verdict.label.value,
+                    "confidence": verdict.confidence,
+                    "reason": verdict.reason,
+                },
+                ttl=settings.ai_cache_ttl_seconds,
+            )
+        except Exception as error:
+            # A cache outage must not turn a valid, already-paid classification
+            # into a message failure. The next identical message may be checked
+            # again, but the current decision remains safe to apply.
+            logger.warning("ai.cache_write_failed", chat_id=ctx.chat_id, error=str(error))
         return AiDecision(
             verdict=verdict,
             action=self._action_for(verdict, config),

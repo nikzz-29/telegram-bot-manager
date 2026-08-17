@@ -30,7 +30,13 @@ from db.models import Chat
 from shared.enums import AdminRole
 from shared.errors import InvalidTimezoneError
 from shared.logging import get_logger
-from shared.schemas.api import ChatDetail, ChatSummary, ChatUpdate, OperationResult
+from shared.schemas.api import (
+    ChatBotPermissions,
+    ChatDetail,
+    ChatSummary,
+    ChatUpdate,
+    OperationResult,
+)
 
 logger = get_logger(__name__)
 
@@ -149,6 +155,17 @@ async def sync_admins(access: ChatAccessDep, admins: AdminsDep) -> OperationResu
     """
     count = await admins.sync_to_db(access.chat_id, access.tg_chat_id)
     return OperationResult(ok=True, detail=f"{count} administrators synchronized.")
+
+
+@router.get(
+    "/{chat_id}/bot-permissions",
+    response_model=ChatBotPermissions,
+    operation_id="getChatBotPermissions",
+    summary="Inspect the bot's live Telegram permissions for this chat",
+)
+async def get_bot_permissions(access: ChatAccessDep, admins: AdminsDep) -> ChatBotPermissions:
+    snapshot = await admins.bot_permissions(access.tg_chat_id)
+    return ChatBotPermissions.model_validate(snapshot, from_attributes=True)
 
 
 @router.get(

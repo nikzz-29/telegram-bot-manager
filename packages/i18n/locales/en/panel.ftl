@@ -194,6 +194,7 @@ setting-level-titles-key-hint = The key is a level number, from 1 up.
 setting-triggers-enabled = Triggers enabled
 setting-sample-rate = Share of messages checked
 setting-min-text-length = Minimum length to check
+setting-test-admin-messages = Test: check administrator messages
 # One row per verdict the model can return. The labels are the verdicts
 # themselves; which map they belong to is what the group heading above says.
 setting-thresholds-toxic = Toxic
@@ -232,6 +233,7 @@ nav-stats = Statistics
 nav-chats = My chats
 nav-plans = Plans
 nav-profile = Profile
+nav-platform = Operator
 chat-untitled = Untitled
 dashboard-title = Overview
 dashboard-greeting = Welcome, {$name}
@@ -421,3 +423,13 @@ platform-broadcast-queued = Queued for {$count ->
        *[other] {$count} chats
     }
 platform-broadcast-confirm = Send this to every chat on the selected plans?
+chat-bot-permissions = Bot permissions
+chat-bot-status = Moderation readiness
+chat-privacy-disabled = Privacy Mode is disabled: ordinary messages are always available.
+chat-privacy-enabled = Privacy Mode is enabled: reading works while the bot is an administrator.
+chat-permission-read = Read ordinary messages
+chat-permission-delete = Delete messages
+chat-permission-restrict = Restrict and ban members
+chat-permission-invite = Create invite links
+state-ready = Ready
+state-attention = Needs attention

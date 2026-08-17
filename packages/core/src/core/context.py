@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, TypeVar
 
+from core import cache
 from core.configs import ModuleConfigService
 from core.configs import module_configs as default_configs
 from core.features import (
@@ -28,7 +29,7 @@ from core.features import (
 from core.registry import ModuleRegistry
 from core.registry import registry as default_registry
 from db.uow import UnitOfWork
-from shared.enums import ModuleName, Plan, plan_rank
+from shared.enums import ChatType, ModuleName, Plan, plan_rank
 from shared.errors import FeatureLockedError
 from shared.plans import Feature, PlanLimits, limits_for_plan, minimum_plan_for
 from shared.schemas.module_configs import EntryConfig, ModerationConfig, ModuleConfig
@@ -123,14 +124,29 @@ class ChatContextResolver:
         title: str = "",
         chat_type: str | None = None,
         owner_tg_id: int | None = None,
+        previous_tg_chat_id: int | None = None,
     ) -> ChatContext:
         """Resolve (and register on first sight) a chat by its Telegram id."""
+        resolved_type = ChatType(chat_type) if chat_type is not None else ChatType.SUPERGROUP
+        removed_chat_id: int | None = None
         async with self._uow_factory() as uow:
-            chat = await uow.chats.get_by_tg_id(tg_chat_id)
+            chat = None
+            if previous_tg_chat_id is not None and previous_tg_chat_id != tg_chat_id:
+                chat, removed_chat_id = await uow.chats.migrate_tg_id(
+                    previous_tg_chat_id,
+                    tg_chat_id,
+                    title=title,
+                    chat_type=resolved_type,
+                )
+            if chat is None:
+                chat = await uow.chats.get_by_tg_id(tg_chat_id)
             created = chat is None
             if chat is None:
                 chat = await uow.chats.get_or_create(
-                    tg_chat_id, title=title, owner_tg_id=owner_tg_id
+                    tg_chat_id,
+                    title=title,
+                    chat_type=resolved_type,
+                    owner_tg_id=owner_tg_id,
                 )
             await uow.commit()
             chat_id = chat.id
@@ -142,6 +158,13 @@ class ChatContextResolver:
             lockdown_until = chat.lockdown_until
             plan_expires_at = chat.plan_expires_at
             resolved_title = chat.title or title
+
+        if previous_tg_chat_id is not None and previous_tg_chat_id != tg_chat_id:
+            await cache.invalidate_chat(chat_id)
+            await cache.invalidate_admins(previous_tg_chat_id)
+            await cache.invalidate_admins(tg_chat_id)
+            if removed_chat_id is not None:
+                await cache.invalidate_chat(removed_chat_id)
 
         if created:
             await self._configs.ensure_defaults(chat_id)

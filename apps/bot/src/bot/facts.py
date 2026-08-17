@@ -87,6 +87,12 @@ def is_service(message: Message) -> bool:
     return any(getattr(message, attribute, None) is not None for attribute in _SERVICE_ATTRIBUTES)
 
 
+def is_anonymous_admin(message: Message) -> bool:
+    """True when Telegram says an anonymous administrator posted as the chat."""
+    sender_chat = message.sender_chat
+    return sender_chat is not None and sender_chat.id == message.chat.id
+
+
 def message_text(message: Message) -> str:
     """Whatever text a filter should read: body, caption or poll question."""
     if message.text:
@@ -158,6 +164,7 @@ __all__ = [
     "content_kind",
     "display_name",
     "facts_from",
+    "is_anonymous_admin",
     "is_service",
     "mention",
     "message_text",

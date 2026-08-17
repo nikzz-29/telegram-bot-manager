@@ -8,14 +8,18 @@ is what makes single use practical rather than hostile.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import APIRouter, status
 
 from api.deps import PrincipalDep, SettingsDep, UowDep
 from api.errors import problem_responses
 from api.security import Principal, issue_token
 from core.webapp import verify_init_data
+from core.website_auth import WEBSITE_SCOPE, token_digest
+from shared.errors import InvalidSessionError
 from shared.logging import get_logger
-from shared.schemas.api import AuthRequest, AuthResponse, AuthUser
+from shared.schemas.api import AuthRequest, AuthResponse, AuthUser, WebsiteLoginRequest
 
 logger = get_logger(__name__)
 
@@ -55,6 +59,37 @@ async def authenticate(payload: AuthRequest, settings: SettingsDep, uow: UowDep)
 
     token, expires_in = issue_token(principal)
     logger.info("api.auth_ok", user_id=principal.tg_user_id, superadmin=principal.is_superadmin)
+    return AuthResponse(access_token=token, expires_in=expires_in, user=principal.to_schema())
+
+
+@router.post(
+    "/website",
+    response_model=AuthResponse,
+    status_code=status.HTTP_200_OK,
+    operation_id="authenticateWithWebsiteToken",
+    summary="Exchange a single-use bot-issued website token for a session",
+)
+async def authenticate_website(
+    payload: WebsiteLoginRequest, settings: SettingsDep, uow: UowDep
+) -> AuthResponse:
+    digest = token_digest(payload.token)
+    user_id = await uow.website_tokens.consume(
+        token_hash=digest, scope=WEBSITE_SCOPE, now=datetime.now(UTC)
+    )
+    if user_id is None:
+        raise InvalidSessionError("Website login key is invalid or expired.")
+    profile = await uow.users.get(user_id)
+    if profile is None:
+        raise InvalidSessionError("Telegram profile is no longer available.")
+    principal = Principal(
+        tg_user_id=profile.tg_user_id,
+        username=profile.username,
+        first_name=profile.first_name,
+        last_name=profile.last_name,
+        language=profile.language_code or "en",
+        is_superadmin=profile.tg_user_id in settings.superadmin_id_list,
+    )
+    token, expires_in = issue_token(principal)
     return AuthResponse(access_token=token, expires_in=expires_in, user=principal.to_schema())
 
 

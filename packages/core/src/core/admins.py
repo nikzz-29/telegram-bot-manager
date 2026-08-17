@@ -13,6 +13,7 @@ rate limit tolerates a call per action.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol
 
 from aiogram.enums import ChatMemberStatus
@@ -38,6 +39,25 @@ class MemberFetcher(Protocol):
     async def get_chat_member(self, chat_id: int, user_id: int) -> Any: ...
 
     async def get_chat_administrators(self, chat_id: int) -> Any: ...
+
+    async def get_me(self) -> Any: ...
+
+
+@dataclass(frozen=True, slots=True)
+class BotPermissionSnapshot:
+    """Live Telegram permissions which determine what automation can do."""
+
+    reachable: bool = True
+    status: str = "unknown"
+    is_admin: bool = False
+    privacy_mode_disabled: bool = False
+    can_read_messages: bool = False
+    can_send_messages: bool = False
+    can_delete_messages: bool = False
+    can_restrict_members: bool = False
+    can_invite_users: bool = False
+    can_manage_topics: bool = False
+    issues: tuple[str, ...] = ()
 
 
 class AdminService:
@@ -79,6 +99,58 @@ class AdminService:
             )
             return False
         return bool(member.status in ADMIN_STATUSES)
+
+    async def bot_permissions(self, tg_chat_id: int) -> BotPermissionSnapshot:
+        """Read the bot's effective rights directly from Telegram."""
+        if self._bot is None:
+            raise RuntimeError("AdminService needs a Bot before it can inspect permissions.")
+        try:
+            me = await self._bot.get_me()
+            member = await self._bot.get_chat_member(tg_chat_id, me.id)
+        except TelegramAPIError as exc:
+            logger.warning("admins.permissions_failed", chat_id=tg_chat_id, error=str(exc))
+            return BotPermissionSnapshot(reachable=False, issues=("telegram_unavailable",))
+
+        status = member.status
+        status_value = status.value if isinstance(status, ChatMemberStatus) else str(status)
+        is_admin = status in ADMIN_STATUSES
+        is_owner = status == ChatMemberStatus.CREATOR
+
+        def allowed(name: str) -> bool:
+            return is_owner or (is_admin and bool(getattr(member, name, False)))
+
+        privacy_mode_disabled = bool(getattr(me, "can_read_all_group_messages", False))
+        can_read_messages = is_admin or privacy_mode_disabled
+        permissions = {
+            "can_delete_messages": allowed("can_delete_messages"),
+            "can_restrict_members": allowed("can_restrict_members"),
+            "can_invite_users": allowed("can_invite_users"),
+            "can_manage_topics": allowed("can_manage_topics"),
+        }
+        issues: list[str] = []
+        if not is_admin:
+            issues.append("bot_not_admin")
+        if not can_read_messages:
+            issues.append("privacy_mode_enabled")
+        if not permissions["can_delete_messages"]:
+            issues.append("missing_delete_messages")
+        if not permissions["can_restrict_members"]:
+            issues.append("missing_restrict_members")
+        if not permissions["can_invite_users"]:
+            issues.append("missing_invite_users")
+
+        return BotPermissionSnapshot(
+            status=status_value,
+            is_admin=is_admin,
+            privacy_mode_disabled=privacy_mode_disabled,
+            can_read_messages=can_read_messages,
+            can_send_messages=is_admin,
+            can_delete_messages=permissions["can_delete_messages"],
+            can_restrict_members=permissions["can_restrict_members"],
+            can_invite_users=permissions["can_invite_users"],
+            can_manage_topics=permissions["can_manage_topics"],
+            issues=tuple(issues),
+        )
 
     async def admin_ids(self, tg_chat_id: int) -> tuple[int, ...]:
         """Every human admin of the chat, cached; used for admin alerts."""
@@ -138,4 +210,10 @@ class AdminService:
 
 admins = AdminService()
 
-__all__ = ["ADMIN_STATUSES", "AdminService", "MemberFetcher", "admins"]
+__all__ = [
+    "ADMIN_STATUSES",
+    "AdminService",
+    "BotPermissionSnapshot",
+    "MemberFetcher",
+    "admins",
+]

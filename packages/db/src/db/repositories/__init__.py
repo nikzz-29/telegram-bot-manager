@@ -11,12 +11,17 @@ from db.repositories.chats import ChatRepository, ModuleConfigRepository
 from db.repositories.global_bans import GlobalBanRepository
 from db.repositories.moderation import ModerationLogRepository, PunishmentRepository, WarnRepository
 from db.repositories.payments import PaymentRepository
-from db.repositories.platform import PlanOverrideRepository, PlatformRepository
+from db.repositories.platform import (
+    PlanOverrideRepository,
+    PlatformRepository,
+    PlatformSettingRepository,
+)
 from db.repositories.posts import ScheduledPostRepository
 from db.repositories.reputation import ReputationRepository
 from db.repositories.stats import StatsRepository
 from db.repositories.triggers import TriggerRepository
 from db.repositories.users import TgUserRepository
+from db.repositories.website_auth import WebsiteLoginTokenRepository
 
 __all__ = [
     "AdminRepository",
@@ -29,6 +34,7 @@ __all__ = [
     "PaymentRepository",
     "PlanOverrideRepository",
     "PlatformRepository",
+    "PlatformSettingRepository",
     "PunishmentRepository",
     "ReputationRepository",
     "ScheduledPostRepository",
@@ -36,4 +42,5 @@ __all__ = [
     "TgUserRepository",
     "TriggerRepository",
     "WarnRepository",
+    "WebsiteLoginTokenRepository",
 ]

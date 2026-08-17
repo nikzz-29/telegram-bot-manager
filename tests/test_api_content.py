@@ -232,6 +232,26 @@ class FakeConfigs:
         key = module.value if hasattr(module, "value") else str(module)
         return model.model_validate(self.stored.get(key, {}))
 
+    async def get(self, chat_id: int, module: Any) -> Any:
+        from shared.schemas.module_configs import EngagementConfig
+
+        key = module.value if hasattr(module, "value") else str(module)
+        if key == "engagement":
+            return EngagementConfig.model_validate(self.stored.get(key, {}))
+        return type("Config", (), {})()
+
+    async def save(
+        self,
+        chat_id: int,
+        module: Any,
+        *,
+        config: dict[str, Any] | None = None,
+        enabled: bool | None = None,
+    ) -> Any:
+        key = module.value if hasattr(module, "value") else str(module)
+        self.stored[key] = dict(config or {})
+        return await self.get(chat_id, module)
+
 
 class FakeUow:
     """One fake per repository the four routers reach for."""
@@ -349,6 +369,34 @@ async def test_creating_a_trigger_returns_it_with_an_id(bed: Bed) -> None:
     assert body["pattern"] == "привет"
     assert body["match"] == "contains"
     assert body["hits"] == 0
+    assert bed.configs.stored["engagement"]["triggers_enabled"] is True
+
+
+async def test_equivalent_trigger_is_rejected(bed: Bed) -> None:
+    bed.uow.triggers.seed(pattern="Привет", response="first", match=TriggerMatch.CONTAINS)
+
+    response = await bed.client.post(
+        bed.url("/triggers"),
+        json={**TRIGGER, "pattern": " привет "},
+        headers=bed.auth(),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "duplicate-trigger"
+
+
+async def test_trigger_update_cannot_duplicate_another_rule(bed: Bed) -> None:
+    first = bed.uow.triggers.seed(pattern="one", response="first", match=TriggerMatch.CONTAINS)
+    second = bed.uow.triggers.seed(pattern="two", response="second", match=TriggerMatch.CONTAINS)
+
+    response = await bed.client.patch(
+        bed.url(f"/triggers/{second.id}"),
+        json={"pattern": first.pattern},
+        headers=bed.auth(),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "duplicate-trigger"
 
 
 async def test_a_free_chat_cannot_create_a_trigger(bed: Bed) -> None:

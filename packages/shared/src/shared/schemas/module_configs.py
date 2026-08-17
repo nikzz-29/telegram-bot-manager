@@ -218,7 +218,15 @@ Confidence = Annotated[float, Field(ge=0.0, le=1.0)]
 
 
 class AiModerationConfig(ModuleConfig):
-    enabled: bool = False
+    # Kept for backwards compatibility with stored configs. The module's own
+    # switch is authoritative; exposing a second switch made a visibly enabled
+    # module silently do nothing.
+    enabled: bool = Field(default=True, json_schema_extra={"x-hidden": True})
+    # Administrators are normally trusted and skipped by the AI middleware. This
+    # opt-in switch exists for a deliberate test pass from the chat owner: it
+    # lets an admin verify the live provider and Telegram deletion path without
+    # weakening the default moderation policy for existing chats.
+    test_admin_messages: bool = False
     sample_rate: float = Field(default=1.0, ge=0.0, le=1.0)
     min_text_length: int = Field(default=12, ge=1, le=4_000)
     thresholds: dict[AiVerdictLabel, Confidence] = Field(

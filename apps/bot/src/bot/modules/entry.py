@@ -51,12 +51,13 @@ from core.entry import RaidVerdict, anti_raid, screen_account
 from core.greeting import Html, render_greeting
 from core.jobs import JobName, job_id
 from core.sender import SendPriority, sender
+from core.stats import stats
 from core.subscription import subscription
-from db.uow import UnitOfWork
 from i18n.runtime import Translator, translator
 from shared.enums import AutobanAction, ModuleName, StatEventType
 from shared.errors import InvalidDurationError
 from shared.logging import get_logger
+from shared.plans import Feature
 from shared.schemas.module_configs import CrossbanConfig
 from shared.time_utils import utc_now
 
@@ -72,6 +73,11 @@ DEFAULT_LOCKDOWN: Final = timedelta(minutes=15)
 ALERT_TTL: Final = timedelta(minutes=10)
 
 _is_admin = IsChatAdmin()
+
+
+async def _record(ctx: ChatContext, event_type: StatEventType, tg_user_id: int) -> None:
+    """Buffer a CAPTCHA result without delaying the callback on Postgres."""
+    await stats.record(ctx.chat_id, event_type, tg_user_id=tg_user_id)
 
 
 def _joined(event: ChatMemberUpdated) -> bool:
@@ -138,13 +144,6 @@ def _keyboard(tg_user_id: int, challenge: Challenge, t: Translator) -> InlineKey
         return InlineKeyboardMarkup(inline_keyboard=[buttons])
     rows = [buttons[index : index + 2] for index in range(0, len(buttons), 2)]
     return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-async def _record(ctx: ChatContext, event_type: StatEventType, tg_user_id: int) -> None:
-    """One stat row. Stage 4 reads these; writing them from day one means the
-    first chart is not empty on the day statistics ship."""
-    async with UnitOfWork() as uow:
-        await uow.stats.add_event(chat_id=ctx.chat_id, event_type=event_type, tg_user_id=tg_user_id)
 
 
 async def _has_photo(bot: Bot, tg_user_id: int) -> bool:
@@ -323,7 +322,7 @@ async def _announce_raid(ctx: ChatContext, verdict: RaidVerdict) -> None:
     )
 
 
-async def _crossban_join(ctx: ChatContext, user: User) -> None:
+async def _crossban_join(ctx: ChatContext, user: User) -> bool:
     """A blacklisted user just joined: bounce them, or say so and stand down.
 
     DECISION: `alert_only` exists because the network is fed by other tenants.
@@ -335,12 +334,17 @@ async def _crossban_join(ctx: ChatContext, user: User) -> None:
     rare, and Business-only — and putting it in the context would buy a config
     lookup on every update in every chat to save one on almost none.
     """
-    t = translator(ctx.language)
     config = await chat_context.config(ctx, ModuleName.CROSSBAN, CrossbanConfig)
+    enforcement = crossban.enforcement_for(config)
+    if enforcement == "off":
+        return False
+
+    t = translator(ctx.language)
     _, chats = await crossban.status(user.id)
     reason = t("crossban-reason", chats=chats)
+    alert_only = enforcement == "alert"
 
-    if not config.alert_only:
+    if not alert_only:
         sender.enqueue(
             actions.ban(ctx.tg_chat_id, user.id),
             chat_id=ctx.tg_chat_id,
@@ -351,12 +355,12 @@ async def _crossban_join(ctx: ChatContext, user: User) -> None:
     logged = await audit.report(
         log_channel_id=ctx.moderation.log_channel_id,
         locale=ctx.language,
-        action="crossban_alert" if config.alert_only else "crossban",
+        action="crossban_alert" if alert_only else "crossban",
         target_name=display_name(user),
         target_id=user.id,
         reason=reason,
     )
-    if config.alert_only and not logged:
+    if alert_only and not logged:
         # Alert mode with no log channel would otherwise warn nobody, which is
         # the one outcome this mode cannot have. Fall back to the chat.
         await notify(ctx, t("crossban-alert", user=mention(user), chats=chats))
@@ -365,8 +369,9 @@ async def _crossban_join(ctx: ChatContext, user: User) -> None:
         chat_id=ctx.chat_id,
         user_id=user.id,
         chats=chats,
-        alert_only=config.alert_only,
+        alert_only=alert_only,
     )
+    return True
 
 
 async def _autoban(ctx: ChatContext, user: User, reasons: tuple[str, ...]) -> None:
@@ -415,8 +420,6 @@ def build_router() -> Router:
                 tg_chat_id=ctx.tg_chat_id,
                 tg_user_id=member.id,
             )
-            if _is_organic_leave(event):
-                await _record(ctx, StatEventType.LEAVE, member.id)
             return
         if not _joined(event):
             return
@@ -426,18 +429,20 @@ def build_router() -> Router:
             # A bot added by an admin is that admin's decision, not a joiner.
             return
 
-        await _record(ctx, StatEventType.JOIN, user.id)
-
         # --- cross-ban network -------------------------------------------------
         # First, and before anything that costs a round-trip: a user the network
         # already knows as a scammer should not be greeted, challenged, or
         # counted as raid pressure.
-        if ctx.module_enabled(ModuleName.CROSSBAN) and await is_globally_banned(user.id):
-            await _crossban_join(ctx, user)
+        if (
+            ctx.module_enabled(ModuleName.CROSSBAN)
+            and ctx.has(Feature.CROSSBAN)
+            and await is_globally_banned(user.id)
+            and await _crossban_join(ctx, user)
+        ):
             return
 
         # --- anti-raid --------------------------------------------------------
-        if ctx.entry.anti_raid_enabled:
+        if ctx.has(Feature.ANTI_RAID) and ctx.entry.anti_raid_enabled:
             if ctx.is_locked_down():
                 _hold(ctx, user.id, ctx.lockdown_until or utc_now())
                 logger.info("entry.held_by_lockdown", chat_id=ctx.chat_id, user_id=user.id)
@@ -459,7 +464,7 @@ def build_router() -> Router:
 
         # --- new-account screen ----------------------------------------------
         forced_reason = ""
-        if ctx.entry.autoban_new_accounts:
+        if ctx.has(Feature.ANTI_RAID) and ctx.entry.autoban_new_accounts:
             has_photo = await _has_photo(bot, user.id) if ctx.entry.autoban_require_photo else True
             screening = screen_account(
                 tg_user_id=user.id,
@@ -475,12 +480,13 @@ def build_router() -> Router:
                 forced_reason = screening.reasons[0]
 
         # --- captcha ----------------------------------------------------------
-        if ctx.entry.captcha_enabled or forced_reason:
+        if ctx.has(Feature.CAPTCHA) and (ctx.entry.captcha_enabled or forced_reason):
             await _issue_captcha(ctx, user, reason=forced_reason)
             return
 
         # --- greeting ---------------------------------------------------------
-        await _greet(ctx, user)
+        if ctx.has(Feature.GREETING):
+            await _greet(ctx, user)
 
     @router.callback_query(F.data.startswith(f"{CALLBACK_PREFIX}:"))
     async def captcha_pressed(query: CallbackQuery, ctx: ChatContext | None) -> None:
@@ -606,6 +612,9 @@ def build_router() -> Router:
         floor back to exactly the accounts the lockdown was called on.
         """
         t = translator(ctx.language)
+        if not ctx.has(Feature.ANTI_RAID):
+            await answer(message, t("error-feature-locked"))
+            return
         argument = (command.args or "").strip().lower()
 
         if argument in {"off", "0", "stop"}:

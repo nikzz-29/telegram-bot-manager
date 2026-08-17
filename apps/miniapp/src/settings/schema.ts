@@ -86,6 +86,8 @@ interface JsonSchema {
   additionalProperties?: boolean | JsonSchema;
   /** For a `dict[K, V]`: the schema its *keys* satisfy. */
   propertyNames?: JsonSchema;
+  /** Server-side compatibility fields can stay accepted without appearing. */
+  "x-hidden"?: boolean;
 }
 
 /** Long free text gets a textarea; these are the fields that deserve one. */
@@ -137,6 +139,9 @@ function describe(
   defs: Record<string, JsonSchema>,
   prefix: string,
 ): Field | null {
+  if (raw["x-hidden"] === true) {
+    return null;
+  }
   const unwrapped = unwrapNullable(raw, defs);
   if (unwrapped === null) {
     return null;

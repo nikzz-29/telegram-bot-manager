@@ -35,10 +35,11 @@ from db.models import (
     GlobalBanReport,
     Payment,
     PlanOverride,
+    PlatformSetting,
     StatDaily,
     TgUser,
 )
-from shared.enums import PaymentStatus, Plan
+from shared.enums import PaymentProvider, PaymentStatus, Plan
 
 # Stars are quoted in XTR and everything else is fiat; the console shows the two
 # columns separately because they cannot be added up.
@@ -311,6 +312,7 @@ class PlatformRepository:
         self,
         *,
         search: str = "",
+        tg_user_id: int | None = None,
         banned_only: bool = False,
         admins_only: bool = False,
         limit: int = 50,
@@ -325,7 +327,10 @@ class PlatformRepository:
         times and no more.
         """
         conditions = self._user_conditions(
-            search=search, banned_only=banned_only, admins_only=admins_only
+            search=search,
+            tg_user_id=tg_user_id,
+            banned_only=banned_only,
+            admins_only=admins_only,
         )
         total = await self._scalar(select(func.count()).select_from(TgUser).where(*conditions))
 
@@ -443,6 +448,7 @@ class PlatformRepository:
         self,
         *,
         status: PaymentStatus | None = None,
+        provider: PaymentProvider | None = None,
         chat_id: int | None = None,
         tg_user_id: int | None = None,
         limit: int = 50,
@@ -452,6 +458,8 @@ class PlatformRepository:
         conditions: list[ColumnElement[bool]] = []
         if status is not None:
             conditions.append(Payment.status == status)
+        if provider is not None:
+            conditions.append(Payment.provider == provider)
         if chat_id is not None:
             conditions.append(Payment.chat_id == chat_id)
         if tg_user_id is not None:
@@ -507,9 +515,11 @@ class PlatformRepository:
 
     @staticmethod
     def _user_conditions(
-        *, search: str, banned_only: bool, admins_only: bool
+        *, search: str, tg_user_id: int | None, banned_only: bool, admins_only: bool
     ) -> list[ColumnElement[bool]]:
         conditions: list[ColumnElement[bool]] = []
+        if tg_user_id is not None:
+            conditions.append(TgUser.tg_user_id == tg_user_id)
         term = search.strip().lstrip("@")
         if term:
             like = f"%{term.lower()}%"
@@ -688,6 +698,27 @@ class PlanOverrideRepository:
         return True
 
 
+class PlatformSettingRepository:
+    """Persistent settings changed from the creator-only console."""
+
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get(self, key: str) -> PlatformSetting | None:
+        return await self._session.get(PlatformSetting, key)
+
+    async def set(self, key: str, value: dict[str, Any], *, updated_by: int) -> PlatformSetting:
+        row = await self.get(key)
+        if row is None:
+            row = PlatformSetting(key=key, value=value, updated_by=updated_by)
+            self._session.add(row)
+        else:
+            row.value = value
+            row.updated_by = updated_by
+        await self._session.flush()
+        return row
+
+
 __all__ = [
     "MAX_PAGE_SIZE",
     "STARS_CURRENCY",
@@ -696,6 +727,7 @@ __all__ = [
     "PlatformPaymentRow",
     "PlatformPlanRow",
     "PlatformRepository",
+    "PlatformSettingRepository",
     "PlatformTotals",
     "PlatformUserRow",
 ]

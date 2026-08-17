@@ -8,8 +8,9 @@ reasoning as the moderation sweeps.
 
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Final
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from aiogram.methods import SendMessage
 
@@ -35,7 +36,7 @@ WorkerContext = dict[Any, Any]
 
 # One digest per chat per day. The marker is what makes a retried run, or a
 # worker restarted mid-fan-out, harmless; it expires on its own.
-REPORT_MARKER_KEY: Final = "tgm:stats:report:{chat_id}:{day}"
+REPORT_MARKER_KEY: Final = "tgm:stats:report:{chat_id}:{kind}:{day}"
 REPORT_MARKER_TTL: Final = timedelta(days=3)
 
 # Ceiling on one flush run: enough to clear a busy quarter-hour, low enough that
@@ -47,8 +48,29 @@ MAX_FLUSH_BATCHES: Final = 40
 PRUNE_PAGE: Final = 10_000
 
 
-def _marker_key(chat_id: int, day: date) -> str:
-    return REPORT_MARKER_KEY.format(chat_id=chat_id, day=day.isoformat())
+def _marker_key(chat_id: int, kind: str, day: date) -> str:
+    return REPORT_MARKER_KEY.format(chat_id=chat_id, kind=kind, day=day.isoformat())
+
+
+def _report_windows(
+    config: StatsConfig, *, now: datetime | None = None
+) -> tuple[tuple[str, int, date], ...]:
+    """Reports due now as ``(kind, days, end_date)`` in the chat timezone."""
+    moment = now or utc_now()
+    try:
+        local_now = moment.astimezone(ZoneInfo(config.timezone or "UTC"))
+    except (ZoneInfoNotFoundError, ValueError):
+        local_now = moment.astimezone(ZoneInfo("UTC"))
+    if local_now.hour != config.report_hour_utc:
+        return ()
+
+    completed_day = local_now.date() - timedelta(days=1)
+    due: list[tuple[str, int, date]] = []
+    if config.daily_report_enabled:
+        due.append(("daily", 1, completed_day))
+    if config.weekly_report_enabled and local_now.weekday() == 0:
+        due.append(("weekly", 7, completed_day))
+    return tuple(due)
 
 
 @scheduled(minute={5, 20, 35, 50})
@@ -114,29 +136,40 @@ async def aggregate_daily_stats(ctx: WorkerContext) -> int:
     return aggregated
 
 
-async def _send_digest(chat_id: int, tg_chat_id: int, *, day: date) -> bool:
-    """Render and queue one chat's digest, if its config asked for one today."""
+async def _send_digest(chat_id: int, tg_chat_id: int) -> int:
+    """Render and queue every daily/weekly digest due for one chat now."""
     context = await chat_context.for_chat_id(chat_id, tg_chat_id=tg_chat_id)
     config = await chat_context.config(context, ModuleName.STATS, StatsConfig)
-    if not config.daily_report_enabled or utc_now().hour != config.report_hour_utc:
-        return False
+    due = _report_windows(config)
+    if not due:
+        return 0
 
     client = get_redis()
-    key = _marker_key(chat_id, day)
-    # Claimed only once the chat is actually due: claiming before the hour check
-    # would burn the day's single slot on a run that sends nothing.
-    if not await client.set(key, "1", ex=REPORT_MARKER_TTL, nx=True):
-        return False
-
-    overview = await stats.overview(chat_id, days=1, end=day)
-    text = reports.format_overview(overview, title=context.title, t=translator(context.language))
-    sender.enqueue(
-        SendMessage(chat_id=tg_chat_id, text=text, disable_notification=True),
-        chat_id=tg_chat_id,
-        priority=SendPriority.BROADCAST,
-    )
-    logger.info("job.send_daily_report.queued", chat_id=chat_id, day=str(day))
-    return True
+    sent = 0
+    for kind, days, end in due:
+        key = _marker_key(chat_id, kind, end)
+        if not await client.set(key, "1", ex=REPORT_MARKER_TTL, nx=True):
+            continue
+        overview = await stats.overview(chat_id, days=days, end=end)
+        text = reports.format_overview(
+            overview,
+            title=context.title,
+            t=translator(context.language),
+        )
+        sender.enqueue(
+            SendMessage(chat_id=tg_chat_id, text=text, disable_notification=True),
+            chat_id=tg_chat_id,
+            priority=SendPriority.BROADCAST,
+        )
+        sent += 1
+        logger.info(
+            "job.send_stats_report.queued",
+            chat_id=chat_id,
+            kind=kind,
+            days=days,
+            end=str(end),
+        )
+    return sent
 
 
 @scheduled(minute={12, 42})
@@ -153,7 +186,6 @@ async def send_daily_report(ctx: WorkerContext) -> int:
     broken report; yesterday's rollup is also final, so the digest cannot
     disagree with `/stats` run a minute later.
     """
-    day = utc_now().date() - timedelta(days=1)
     async with UnitOfWork() as uow:
         chat_ids = await uow.module_configs.list_enabled_chats(ModuleName.STATS.value)
         chats = {chat_id: await uow.chats.get_by_id(chat_id) for chat_id in chat_ids}
@@ -163,8 +195,7 @@ async def send_daily_report(ctx: WorkerContext) -> int:
         if chat is None or not chat.is_active:
             continue
         try:
-            if await _send_digest(chat_id, chat.tg_chat_id, day=day):
-                sent += 1
+            sent += await _send_digest(chat_id, chat.tg_chat_id)
         except Exception:
             # The marker stays: a digest that failed to render will fail again
             # this hour, and a retry storm is worse than a missed digest.
@@ -219,6 +250,7 @@ __all__ = [
     "PRUNE_PAGE",
     "REPORT_MARKER_KEY",
     "REPORT_MARKER_TTL",
+    "_report_windows",
     "aggregate_daily_stats",
     "flush_stat_events",
     "prune_old_stats",

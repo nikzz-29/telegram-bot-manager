@@ -31,6 +31,7 @@ from bot.facts import facts_from, mention
 from bot.filters import InGroup, IsChatAdmin
 from bot.replies import answer, send
 from core import actions
+from core.configs import module_configs
 from core.context import ChatContext, chat_context
 from core.reputation import (
     is_thanks,
@@ -39,11 +40,11 @@ from core.reputation import (
     reputation,
 )
 from core.sender import SendPriority, sender
-from core.triggers import TriggerDef, triggers, validate_pattern
+from core.triggers import TriggerDef, ensure_unique_trigger, triggers, validate_pattern
 from db.uow import UnitOfWork
 from i18n.runtime import Translator, translator
 from shared.enums import ModuleName, TriggerMatch
-from shared.errors import InvalidPatternError
+from shared.errors import DuplicateTriggerError, InvalidPatternError
 from shared.logging import get_logger
 from shared.plans import Feature
 from shared.schemas.module_configs import EngagementConfig
@@ -118,6 +119,19 @@ async def _fire_trigger(ctx: ChatContext, message: Message, definition: TriggerD
         keyboard=_buttons(buttons),
     )
     logger.debug("triggers.fired", chat_id=ctx.chat_id, trigger_id=definition.id)
+
+
+async def _ensure_trigger_engine(ctx: ChatContext) -> None:
+    """Keep the command path consistent with the Mini App trigger path."""
+    config = await chat_context.config(ctx, ModuleName.ENGAGEMENT, EngagementConfig)
+    if config.triggers_enabled:
+        return
+    await module_configs.save(
+        ctx.chat_id,
+        ModuleName.ENGAGEMENT,
+        config={**config.model_dump(mode="json"), "triggers_enabled": True},
+        enabled=True,
+    )
 
 
 async def _handle_thanks(ctx: ChatContext, message: Message, config: EngagementConfig) -> None:
@@ -310,6 +324,9 @@ def build_router() -> Router:
         message: Message, command: CommandObject, ctx: ChatContext
     ) -> None:
         t = translator(ctx.language)
+        if not ctx.has(Feature.TRIGGERS):
+            await answer(message, t("error-feature-locked"))
+            return
         raw = (command.args or "").strip()
         if SEPARATOR not in raw:
             await answer(message, t("trigger-usage", separator=SEPARATOR))
@@ -334,6 +351,24 @@ def build_router() -> Router:
                 await answer(message, t("limit-triggers", limit=limit))
                 logger.info("triggers.limit_reached", chat_id=ctx.chat_id, limit=limit)
                 return
+            rows = await uow.triggers.list_for_chat(ctx.chat_id)
+            try:
+                ensure_unique_trigger(
+                    (
+                        TriggerDef(
+                            id=row.id,
+                            pattern=row.pattern,
+                            match=row.match,
+                            case_sensitive=row.case_sensitive,
+                        )
+                        for row in rows
+                    ),
+                    pattern=pattern,
+                    match=match,
+                )
+            except DuplicateTriggerError as error:
+                await answer(message, t(error.i18n_key))
+                return
             rule = await uow.triggers.create(
                 ctx.chat_id,
                 pattern=pattern,
@@ -344,6 +379,7 @@ def build_router() -> Router:
             trigger_id = rule.id
 
         await triggers.invalidate(ctx.chat_id)
+        await _ensure_trigger_engine(ctx)
         await answer(message, t("trigger-added", id=trigger_id, pattern=escape(pattern)))
         logger.info(
             "triggers.created",
@@ -401,7 +437,7 @@ def build_router() -> Router:
         if config.levels_enabled and ctx.has(Feature.LEVELS):
             await _award_activity(ctx, message, config)
 
-        if config.triggers_enabled and facts.text:
+        if config.triggers_enabled and ctx.has(Feature.TRIGGERS) and facts.text:
             definition = await triggers.match(ctx.chat_id, facts.text)
             if definition is not None:
                 await _fire_trigger(ctx, message, definition)

@@ -52,14 +52,17 @@ def setup(dispatcher: Dispatcher) -> None:
     dispatcher.update.outer_middleware(LoggingContextMiddleware())
     dispatcher.update.outer_middleware(ChatContextMiddleware())
 
-    # --- per-message: needs a chat, an author and content ---------------------
-    for observer in (dispatcher.message, dispatcher.edited_message):
+    # --- per-message: needs a managed chat and message content ----------------
+    for observer, count_flood in (
+        (dispatcher.message, True),
+        (dispatcher.edited_message, False),
+    ):
         observer.outer_middleware(ThrottleMiddleware())
         observer.outer_middleware(GlobalBanMiddleware())
         observer.outer_middleware(CaptchaGateMiddleware())
         observer.outer_middleware(ForcedSubscriptionMiddleware())
         observer.outer_middleware(ContentFilterMiddleware())
-        observer.outer_middleware(StopWordFloodMiddleware())
+        observer.outer_middleware(StopWordFloodMiddleware(count_flood=count_flood))
         # Last, because it is the only step that costs a network call, and every
         # cheap rule above may already have deleted the message.
         observer.outer_middleware(AiModerationMiddleware())

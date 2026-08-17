@@ -9,6 +9,7 @@
 import React from "react";
 import type { ModuleConfigResponse } from "../api/client";
 import {
+  Badge,
   Card,
   ErrorState,
   Header,
@@ -20,7 +21,14 @@ import {
   Toggle,
 } from "../components/ui";
 import { useT } from "../i18n/I18nProvider";
-import { useChat, useMeta, useModules, useSaveModule, useSyncAdmins } from "../hooks/queries";
+import {
+  useChat,
+  useChatBotPermissions,
+  useMeta,
+  useModules,
+  useSaveModule,
+  useSyncAdmins,
+} from "../hooks/queries";
 import { type Route, useNavigation } from "../navigation";
 import { hapticResult } from "../telegram/sdk";
 import { GeneralSettings } from "./chat/GeneralSettings";
@@ -57,6 +65,7 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
   const t = useT();
   const navigation = useNavigation();
   const chat = useChat(chatId);
+  const permissions = useChatBotPermissions(chatId);
   const meta = useMeta();
   const modules = useModules(chatId);
   const saveModule = useSaveModule(chatId);
@@ -100,6 +109,51 @@ export function ChatScreen({ chatId }: { chatId: number }): React.JSX.Element {
 
       <SectionTitle>{t("chat-general")}</SectionTitle>
       <GeneralSettings chat={chat.data} locales={meta.data.locales ?? []} />
+
+      <SectionTitle>{t("chat-bot-permissions")}</SectionTitle>
+      {permissions.isPending ? <SkeletonRows count={3} /> : null}
+      {permissions.isError ? (
+        <ErrorState
+          message={permissions.error.message}
+          onRetry={() => void permissions.refetch()}
+        />
+      ) : null}
+      {permissions.data ? (
+        <Card>
+          <Row
+            title={t("chat-bot-status")}
+            icon="shield"
+            subtitle={
+              permissions.data.privacy_mode_disabled
+                ? t("chat-privacy-disabled")
+                : t("chat-privacy-enabled")
+            }
+            right={
+              <Badge tone={permissions.data.is_admin ? "success" : "destructive"}>
+                {permissions.data.is_admin ? t("state-ready") : t("state-attention")}
+              </Badge>
+            }
+          />
+          {(
+            [
+              ["can_read_messages", "chat-permission-read"],
+              ["can_delete_messages", "chat-permission-delete"],
+              ["can_restrict_members", "chat-permission-restrict"],
+              ["can_invite_users", "chat-permission-invite"],
+            ] as const
+          ).map(([key, label]) => (
+            <Row
+              key={key}
+              title={t(label)}
+              right={
+                <Badge tone={permissions.data[key] ? "success" : "warning"}>
+                  {permissions.data[key] ? t("state-on") : t("state-off")}
+                </Badge>
+              }
+            />
+          ))}
+        </Card>
+      ) : null}
 
       <SectionTitle>{t("chat-sections")}</SectionTitle>
       <Card>

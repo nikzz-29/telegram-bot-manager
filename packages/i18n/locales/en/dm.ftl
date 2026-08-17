@@ -14,6 +14,7 @@ start-welcome = 👋 <b>Welcome!</b>
     🛡️ I help run Telegram chats: moderation, onboarding, statistics and scheduled posts.
     🚀 Add me to a group as an administrator — the chat connects automatically on the Free plan.
     📱 Open the Mini App with the button beside the message field for statistics, chats, plans, profile and settings.
+    🌐 Use /website to receive a one-time link to your personal statistics dashboard.
     📋 The pinned button below keeps the full command list one tap away.
 help-text = 📋 <b>Bot commands</b>
 
@@ -156,3 +157,12 @@ dm-command-row-private = 👤 <code>{$command}</code> — {$description}
 dm-command-row-public = 🌍 <code>{$command}</code> — {$description}
 dm-command-row-admin = 🔐 <code>{$command}</code> — {$description}
 dm-commands-note = 🧭 Legend: 🔐 administrators · 🌍 every member · 👤 private messages.
+
+## Personal website dashboard
+dm-website-issued = 🌐 <b>Your personal dashboard is ready</b>
+
+    🔐 This single-use link expires in {$minutes} minutes.
+    📊 The site contains your overview, activity, chats, plans and profile.
+    🛡️ After sign-in the key disappears from the address bar and cannot be reused.
+dm-website-open-button = 🌐 Open dashboard
+dm-website-unavailable = ⚠️ The website is not configured yet. An administrator must set WEBSITE_URL.

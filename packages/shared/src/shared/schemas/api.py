@@ -37,6 +37,10 @@ class AuthRequest(BaseModel):
     init_data: str = Field(min_length=1, max_length=8_192)
 
 
+class WebsiteLoginRequest(BaseModel):
+    token: str = Field(min_length=32, max_length=256)
+
+
 class AuthUser(ApiModel):
     tg_user_id: int
     username: str | None = None
@@ -95,6 +99,20 @@ class ChatDetail(ChatSummary):
 class ChatUpdate(BaseModel):
     language: str | None = Field(default=None, pattern="^(ru|en)$")
     timezone: str | None = None
+
+
+class ChatBotPermissions(ApiModel):
+    reachable: bool = True
+    status: str = "unknown"
+    is_admin: bool = False
+    privacy_mode_disabled: bool = False
+    can_read_messages: bool = False
+    can_send_messages: bool = False
+    can_delete_messages: bool = False
+    can_restrict_members: bool = False
+    can_invite_users: bool = False
+    can_manage_topics: bool = False
+    issues: list[str] = Field(default_factory=list)
 
 
 class ModuleConfigResponse(ApiModel):
@@ -419,6 +437,172 @@ class PlatformStats(ApiModel):
     revenue_stars: int
     revenue_usd: Decimal
     global_bans: int
+
+
+class PlatformSeriesPoint(ApiModel):
+    day: date
+    chats: int = 0
+    new_chats: int = 0
+    active_chats: int = 0
+    messages: int = 0
+    moderation_actions: int = 0
+    joins: int = 0
+    leaves: int = 0
+    subscriptions: int = 0
+    revenue_stars: int = 0
+    revenue_usd: Decimal = Decimal(0)
+    refunds: int = 0
+    churned_chats: int = 0
+
+
+class PlatformTotals(ApiModel):
+    chats: int = 0
+    active_chats: int = 0
+    paying_chats: int = 0
+    new_chats: int = 0
+    known_users: int = 0
+    messages: int = 0
+    active_chats_in_window: int = 0
+    moderation_actions: int = 0
+    subscriptions: int = 0
+    refunds: int = 0
+    revenue_stars: int = 0
+    revenue_usd: Decimal = Decimal(0)
+    refunded_stars: int = 0
+    refunded_usd: Decimal = Decimal(0)
+
+
+class PlatformPlanRow(ApiModel):
+    plan: Plan
+    chats: int = 0
+    active_chats: int = 0
+    subscriptions: int = 0
+    revenue_stars: int = 0
+    revenue_usd: Decimal = Decimal(0)
+
+
+class PlatformDashboard(ApiModel):
+    days: int
+    start: date
+    end: date
+    totals: PlatformTotals
+    series: list[PlatformSeriesPoint] = Field(default_factory=list)
+    plan_mix: list[PlatformPlanRow] = Field(default_factory=list)
+    cryptobot_configured: bool = False
+    cryptobot_testnet: bool = False
+    ai_moderation_available: bool = False
+
+
+class PlatformUser(ApiModel):
+    tg_user_id: int
+    username: str | None = None
+    first_name: str = ""
+    last_name: str | None = None
+    is_bot: bool = False
+    first_seen_at: datetime | None = None
+    last_seen_at: datetime | None = None
+    admin_chats: int = 0
+    owned_chats: int = 0
+    is_globally_banned: bool = False
+    ban_reports: int = 0
+    payments: int = 0
+    spent_stars: int = 0
+    spent_usd: Decimal = Decimal(0)
+    last_payment_at: datetime | None = None
+
+
+class PlatformUserPage(ApiModel):
+    items: list[PlatformUser] = Field(default_factory=list)
+    total: int = 0
+    limit: int = 50
+    offset: int = 0
+
+
+class PlatformUserChat(ApiModel):
+    id: int
+    tg_chat_id: int
+    title: str
+    plan: Plan
+    plan_expires_at: datetime | None = None
+    is_active: bool = True
+    owner_tg_id: int | None = None
+    members_count: int | None = None
+
+
+class PlatformUserDetail(ApiModel):
+    user: PlatformUser
+    chats: list[PlatformUserChat] = Field(default_factory=list)
+
+
+class PlatformSubscriptionGrant(BaseModel):
+    chat_id: int = Field(ge=1)
+    plan: Plan
+    months: int = Field(default=1, ge=1, le=120)
+
+
+class PlatformPlanOverride(BaseModel):
+    stars: int | None = Field(default=None, ge=0, le=10_000_000)
+    usd: str | None = Field(default=None, max_length=16)
+    features: list[str] | None = None
+    note: str = Field(default="", max_length=2_000)
+
+
+class PlatformPlanOverrideResponse(ApiModel):
+    plan: Plan
+    stars: int | None = None
+    usd: str | None = None
+    features: list[str] | None = None
+    note: str = ""
+    updated_by: int | None = None
+    updated_at: datetime | None = None
+    effective_stars: int = 0
+    effective_usd: str = ""
+    effective_features: list[str] = Field(default_factory=list)
+
+
+class PlatformCryptoBotSettings(ApiModel):
+    configured: bool = False
+    testnet: bool = False
+    network: str
+
+
+class PlatformCryptoBotUpdate(BaseModel):
+    testnet: bool
+
+
+class PlatformSettings(ApiModel):
+    environment: str
+    cryptobot: PlatformCryptoBotSettings
+    ai_moderation_available: bool = False
+    payment_providers: list[PaymentProvider] = Field(default_factory=list)
+    global_ban_chat_threshold: int = 3
+
+
+class PlatformPayment(ApiModel):
+    id: int
+    chat_id: int
+    tg_chat_id: int
+    chat_title: str
+    provider: PaymentProvider
+    provider_payment_id: str
+    amount: Decimal
+    currency: str
+    status: PaymentStatus
+    plan: Plan
+    months: int
+    payer_tg_id: int | None = None
+    created_at: datetime
+    period_start: datetime | None = None
+    period_end: datetime | None = None
+    refunded_at: datetime | None = None
+    refund_reason: str = ""
+
+
+class PlatformPaymentPage(ApiModel):
+    items: list[PlatformPayment] = Field(default_factory=list)
+    total: int = 0
+    limit: int = 50
+    offset: int = 0
 
 
 class GlobalBanEntry(ApiModel):

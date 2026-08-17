@@ -13,6 +13,7 @@ from typing import Any
 from aiogram.filters import BaseFilter
 from aiogram.types import Message
 
+from bot.facts import is_anonymous_admin
 from core.admins import admins
 from core.context import ChatContext
 
@@ -22,12 +23,14 @@ class IsChatAdmin(BaseFilter):
 
     async def __call__(self, message: Message, **data: Any) -> bool:
         ctx: ChatContext | None = data.get("ctx")
-        if ctx is None or message.from_user is None:
+        if ctx is None:
             return False
         # An anonymous admin posts as the chat itself; Telegram already proved
         # they hold the rights, and `getChatMember` cannot confirm it for them.
-        if message.sender_chat is not None and message.sender_chat.id == message.chat.id:
+        if is_anonymous_admin(message):
             return True
+        if message.from_user is None:
+            return False
         return await admins.is_admin(ctx.tg_chat_id, message.from_user.id)
 
 

@@ -45,6 +45,7 @@ from api.deps import (
 from api.routers import system as system_router
 from api.security import AUDIENCE, ISSUER, Principal, decode_token, issue_token
 from core import cache
+from core.admins import BotPermissionSnapshot
 from core.configs import InvalidModuleConfigError
 from core.redis_client import set_redis
 from core.registry import registry
@@ -54,7 +55,7 @@ from core.webapp import (
     parse_identity,
     verify_init_data,
 )
-from db.models import Chat
+from db.models import Chat, TgUser
 from shared.config import PLACEHOLDER_JWT_SECRET, Settings, get_settings
 from shared.enums import ChatType, Plan
 from shared.errors import FeatureLockedError, InvalidInitDataError, InvalidSessionError
@@ -467,6 +468,31 @@ class FakeUserRepo:
     async def upsert(self, **kwargs: Any) -> None:
         self.upserted.append(kwargs)
 
+    async def get(self, tg_user_id: int) -> TgUser | None:
+        if tg_user_id != USER_ID:
+            return None
+        return TgUser(
+            tg_user_id=USER_ID,
+            username="ada",
+            first_name="Ada",
+            last_name="Lovelace",
+            language_code="ru",
+        )
+
+
+class FakeWebsiteTokenRepo:
+    def __init__(self) -> None:
+        self.valid_hash = hashlib.sha256(b"valid-website-token-with-enough-length").hexdigest()
+        self.consumed = False
+
+    async def consume(self, *, token_hash: str, scope: str, now: datetime) -> int | None:
+        if scope != "website":
+            return None
+        if self.consumed or token_hash != self.valid_hash:
+            return None
+        self.consumed = True
+        return USER_ID
+
 
 class FakeUow:
     """Just the two repositories the Stage 3 routes reach for."""
@@ -474,6 +500,7 @@ class FakeUow:
     def __init__(self, chats: dict[int, Chat]) -> None:
         self.chats = FakeChatRepo(chats)
         self.users = FakeUserRepo()
+        self.website_tokens = FakeWebsiteTokenRepo()
         self.commits = 0
 
     async def commit(self) -> None:
@@ -493,6 +520,18 @@ class FakeAdmins:
     async def sync_to_db(self, chat_id: int, tg_chat_id: int) -> int:
         self.synced.append(chat_id)
         return 3
+
+    async def bot_permissions(self, tg_chat_id: int) -> BotPermissionSnapshot:
+        assert tg_chat_id == TG_CHAT_ID
+        return BotPermissionSnapshot(
+            status="administrator",
+            is_admin=True,
+            can_read_messages=True,
+            can_send_messages=True,
+            can_delete_messages=True,
+            can_restrict_members=True,
+            can_invite_users=True,
+        )
 
 
 class FakeFeatures:
@@ -629,7 +668,11 @@ async def test_meta_describes_every_module_and_plan(
     bed: Bed, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The Mini App renders its sections from this, so it must be complete."""
-    monkeypatch.setattr(system_router, "get_settings", lambda: Settings(_env_file=None))
+    monkeypatch.setattr(
+        system_router,
+        "get_settings",
+        lambda: Settings(ai_base_url="", ai_model="", _env_file=None),
+    )
     response = await bed.client.get("/api/meta")
     assert response.status_code == 200
     body = response.json()
@@ -660,7 +703,8 @@ async def test_meta_reports_configured_integrations(
             bot_token="configured",
             cryptobot_token="configured",
             ai_enabled=True,
-            ai_api_key="configured",
+            ai_api_key="",
+            ai_completion_path="",
             _env_file=None,
         ),
     )
@@ -737,6 +781,27 @@ async def test_init_data_is_exchanged_for_a_token(bed: Bed) -> None:
         "/api/auth/me", headers={"Authorization": f"Bearer {body['access_token']}"}
     )
     assert follow_up.status_code == 200
+
+
+async def test_website_key_is_exchanged_once_for_the_same_user(bed: Bed) -> None:
+    payload = {"token": "valid-website-token-with-enough-length"}
+    response = await bed.client.post("/api/auth/website", json=payload)
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["user"]["tg_user_id"] == USER_ID
+    assert decode_token(body["access_token"]).tg_user_id == USER_ID
+
+    replay = await bed.client.post("/api/auth/website", json=payload)
+    assert replay.status_code == 401
+    assert replay.json()["code"] == "invalid-session"
+
+
+async def test_invalid_website_key_does_not_reveal_an_account(bed: Bed) -> None:
+    response = await bed.client.post(
+        "/api/auth/website", json={"token": "invalid-website-token-with-enough-length"}
+    )
+    assert response.status_code == 401
+    assert response.json()["code"] == "invalid-session"
 
 
 async def test_bad_init_data_is_rejected_by_the_endpoint(bed: Bed) -> None:
@@ -918,6 +983,25 @@ async def test_admin_sync_refreshes_the_mirror(bed: Bed) -> None:
     assert response.status_code == 200
     assert response.json()["ok"] is True
     assert bed.admins.synced == [CHAT_ID]
+
+
+async def test_bot_permissions_are_read_live_from_telegram(bed: Bed) -> None:
+    response = await bed.client.get(f"/api/chats/{CHAT_ID}/bot-permissions", headers=bed.auth())
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "reachable": True,
+        "status": "administrator",
+        "is_admin": True,
+        "privacy_mode_disabled": False,
+        "can_read_messages": True,
+        "can_send_messages": True,
+        "can_delete_messages": True,
+        "can_restrict_members": True,
+        "can_invite_users": True,
+        "can_manage_topics": False,
+        "issues": [],
+    }
 
 
 # --- module settings ------------------------------------------------------------

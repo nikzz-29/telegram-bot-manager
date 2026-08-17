@@ -21,10 +21,11 @@ from typing import Any, Final
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters import Command, CommandObject
-from aiogram.types import Message
+from aiogram.types import ChatMemberUpdated, Message
 
 from bot.facts import facts_from
 from bot.filters import IsChatAdmin
+from bot.modules.entry import _is_organic_leave, _joined
 from bot.replies import answer
 from core.context import ChatContext, chat_context
 from core.reports import format_overview
@@ -49,6 +50,42 @@ def _requested_days(command: CommandObject) -> int:
     if not argument.isdigit():
         return DEFAULT_PERIOD_DAYS
     return max(1, min(int(argument), MAX_PERIOD_DAYS))
+
+
+async def record_membership(event: ChatMemberUpdated, ctx: ChatContext) -> bool:
+    """Record one human join/leave when chat statistics asked for it.
+
+    This lives outside the Entry router so disabling greetings, captcha and
+    anti-raid cannot also disable membership statistics by accident.
+    """
+    config = await chat_context.config(ctx, ModuleName.STATS, StatsConfig)
+    if not config.track_joins:
+        return False
+
+    member = event.new_chat_member.user
+    if member.is_bot:
+        return False
+    if _joined(event):
+        event_type = StatEventType.JOIN
+    elif _is_organic_leave(event):
+        event_type = StatEventType.LEAVE
+    else:
+        return False
+
+    await stats.record(ctx.chat_id, event_type, tg_user_id=member.id)
+    return True
+
+
+def build_membership_router() -> Router:
+    """A passive membership observer, attached before the Entry module."""
+    router = Router(name="stats_membership")
+
+    @router.chat_member()
+    async def count_membership(event: ChatMemberUpdated, ctx: ChatContext) -> None:
+        await record_membership(event, ctx)
+        raise SkipHandler
+
+    return router
 
 
 def build_router() -> Router:
@@ -100,4 +137,4 @@ def build_router() -> Router:
     return router
 
 
-__all__ = ["REPORT_TTL", "build_router"]
+__all__ = ["REPORT_TTL", "build_membership_router", "build_router", "record_membership"]

@@ -40,6 +40,8 @@ from core.admins import admins
 from core.billing import billing as billing_service
 from core.cache import close_cache, setup_cache
 from core.cryptobot import cryptobot
+from core.plan_settings import load_plan_overrides
+from core.platform_settings import load_platform_settings
 from core.redis_client import close_redis
 from db.base import dispose_engine
 from shared.config import get_settings
@@ -64,6 +66,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level, json_output=settings.log_json)
     setup_cache()
+    await load_platform_settings()
+    await load_plan_overrides()
 
     bot: Bot | None = None
     if settings.bot_token:
@@ -109,7 +113,15 @@ def create_app() -> FastAPI:
         allow_origins=settings.cors_origin_list,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Request-ID", "Accept-Language"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Request-ID",
+            "Accept-Language",
+            # Localtunnel otherwise serves its browser reminder instead of
+            # forwarding the Mini App request to Nginx.
+            "bypass-tunnel-reminder",
+        ],
         expose_headers=["X-Request-ID"],
         max_age=600,
     )

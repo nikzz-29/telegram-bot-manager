@@ -196,6 +196,7 @@ setting-level-titles-key-hint = Ключ — номер уровня, начин
 setting-triggers-enabled = Триггеры включены
 setting-sample-rate = Доля проверяемых сообщений
 setting-min-text-length = Минимальная длина для проверки
+setting-test-admin-messages = Тест: проверять сообщения администраторов
 # По строке на вердикт модели. Подписи — сами вердикты: что это порог, а что
 # действие, говорит заголовок группы над ними.
 setting-thresholds-toxic = Токсичность
@@ -235,6 +236,7 @@ nav-stats = Статистика
 nav-chats = Мои чаты
 nav-plans = Тарифы
 nav-profile = Профиль
+nav-platform = Оператор
 chat-untitled = Без названия
 dashboard-title = Обзор
 dashboard-greeting = Добро пожаловать, {$name}
@@ -427,3 +429,13 @@ platform-broadcast-queued = В очереди для {$count ->
        *[other] {$count} чатов
     }
 platform-broadcast-confirm = Отправить это во все чаты выбранных тарифов?
+chat-bot-permissions = Права бота
+chat-bot-status = Готовность модерации
+chat-privacy-disabled = Privacy Mode выключен: обычные сообщения доступны всегда.
+chat-privacy-enabled = Privacy Mode включён: чтение сообщений работает, пока бот администратор.
+chat-permission-read = Читать обычные сообщения
+chat-permission-delete = Удалять сообщения
+chat-permission-restrict = Ограничивать и блокировать участников
+chat-permission-invite = Создавать приглашения
+state-ready = Готово
+state-attention = Требует внимания

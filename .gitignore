@@ -23,6 +23,7 @@ __pycache__/
 node_modules/
 dist/
 *.tsbuildinfo
+.playwright-cli/
 
 # OS
 .DS_Store

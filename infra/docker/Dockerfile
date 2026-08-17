@@ -97,11 +97,26 @@ COPY packages/i18n/locales /app/packages/i18n/locales
 RUN pnpm run build
 
 
+FROM node:20-alpine AS site-builder
+
+ARG PNPM_VERSION=10.15.1
+RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
+
+WORKDIR /app/apps/site
+COPY apps/site/package.json apps/site/pnpm-lock.yaml ./
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm install --frozen-lockfile
+
+COPY apps/site ./
+RUN pnpm run build
+
+
 # One public origin for both the Mini App and API. Cloudflare Tunnel (or a
 # regular TLS reverse proxy in production) points here, never at Vite directly.
 FROM nginx:1.27-alpine AS web
 
 COPY infra/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY --from=miniapp-builder /app/apps/miniapp/dist /usr/share/nginx/html
+COPY --from=site-builder /app/apps/site/dist /usr/share/nginx/html/site
 
 EXPOSE 80

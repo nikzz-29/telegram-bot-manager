@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any, cast
 
 from aiogram.enums import ChatMemberStatus
-from aiogram.types import Chat, ChatMemberUpdated
+from aiogram.types import Chat, ChatMemberUpdated, Message, Update
 import pytest
 
 from bot import __main__ as bot_main
 from bot import lifecycle
+from bot.middlewares.chat_context import _migration_ids
 from core import admins as admins_module
 from core import cache
 from core.admins import AdminService, admins
@@ -55,6 +57,34 @@ def _event(status: ChatMemberStatus) -> Any:
         chat=Chat(id=-100, type="supergroup", title="Updated", username="updated"),
         new_chat_member=SimpleNamespace(status=status),
     )
+
+
+def _migration_update(
+    *,
+    chat_id: int,
+    migrate_to: int | None = None,
+    migrate_from: int | None = None,
+) -> Update:
+    message = Message(
+        message_id=1,
+        date=datetime.now(UTC),
+        chat=Chat(id=chat_id, type="supergroup", title="Migrated"),
+        migrate_to_chat_id=migrate_to,
+        migrate_from_chat_id=migrate_from,
+    )
+    return Update(update_id=1, message=message)
+
+
+def test_group_migration_to_message_resolves_the_new_chat_id() -> None:
+    update = _migration_update(chat_id=-123, migrate_to=-100456)
+
+    assert _migration_ids(update) == (-123, -100456)
+
+
+def test_supergroup_migration_from_message_resolves_the_same_pair() -> None:
+    update = _migration_update(chat_id=-100456, migrate_from=-123)
+
+    assert _migration_ids(update) == (-123, -100456)
 
 
 @pytest.mark.asyncio
@@ -129,6 +159,9 @@ async def test_admin_sync_updates_owner_from_telegram_creator(
     uow = _FakeUow()
 
     class FakeBot:
+        async def get_me(self) -> Any:
+            return SimpleNamespace(id=99, can_read_all_group_messages=True)
+
         async def get_chat_member(self, _chat_id: int, _user_id: int) -> Any:
             return SimpleNamespace(status=ChatMemberStatus.MEMBER)
 
@@ -155,6 +188,35 @@ async def test_admin_sync_updates_owner_from_telegram_creator(
     assert count == 2
     assert uow.admins.replaced == [(7, {11: AdminRole.OWNER, 12: AdminRole.ADMIN})]
     assert uow.chats.updates == [(7, {"owner_tg_id": 11})]
+
+
+@pytest.mark.asyncio
+async def test_bot_permission_snapshot_reports_missing_moderation_rights() -> None:
+    class FakeBot:
+        async def get_me(self) -> Any:
+            return SimpleNamespace(id=99, can_read_all_group_messages=False)
+
+        async def get_chat_member(self, _chat_id: int, _user_id: int) -> Any:
+            return SimpleNamespace(
+                # aiogram's Telegram response models expose this as a plain
+                # string in the running bot, while hand-built models may use
+                # the enum. The permission service must accept both forms.
+                status="administrator",
+                can_delete_messages=False,
+                can_restrict_members=False,
+                can_invite_users=True,
+                can_manage_topics=False,
+            )
+
+        async def get_chat_administrators(self, _chat_id: int) -> list[Any]:
+            return []
+
+    snapshot = await AdminService(FakeBot()).bot_permissions(-100)
+
+    assert snapshot.status == "administrator"
+    assert snapshot.can_read_messages is True
+    assert snapshot.privacy_mode_disabled is False
+    assert snapshot.issues == ("missing_delete_messages", "missing_restrict_members")
 
 
 def test_dispatcher_requests_bot_membership_updates() -> None:

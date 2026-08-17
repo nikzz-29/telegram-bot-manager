@@ -11,26 +11,70 @@
 import React, { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BottomNav, isRootRoute } from "./components/BottomNav";
+import { LaunchScreen } from "./components/LaunchScreen";
 import { Card, EmptyState, ErrorState, Screen, SkeletonRows } from "./components/ui";
 import { I18nProvider, useT } from "./i18n/I18nProvider";
 import { useSession } from "./hooks/useSession";
 import { type Route, NavigationProvider, useNavigation } from "./navigation";
-import { BillingScreen } from "./screens/BillingScreen";
-import { ChatListScreen } from "./screens/ChatListScreen";
-import { ChatScreen } from "./screens/ChatScreen";
-import { DashboardScreen } from "./screens/DashboardScreen";
-import { ModuleScreen } from "./screens/ModuleScreen";
-import { PlansScreen } from "./screens/PlansScreen";
-import { PlatformScreen } from "./screens/PlatformScreen";
-import { ProfileScreen } from "./screens/ProfileScreen";
-import { PostsScreen } from "./screens/PostsScreen";
-import { ReputationScreen } from "./screens/ReputationScreen";
-import { StatsScreen } from "./screens/StatsScreen";
-import { TriggersScreen } from "./screens/TriggersScreen";
-import { UserStatsScreen } from "./screens/UserStatsScreen";
-import { UserProvider } from "./session";
+import { useUser, UserProvider } from "./session";
 import { bindTheme } from "./telegram/theme";
 import { setBackHandler } from "./telegram/sdk";
+
+// Screens are route-level chunks. Telegram webviews often open on constrained
+// mobile connections, so downloading screens the user may never visit makes
+// the launch slower without improving the first interaction.
+const BillingScreen = React.lazy(async () => {
+  const module = await import("./screens/BillingScreen");
+  return { default: module.BillingScreen };
+});
+const ChatListScreen = React.lazy(async () => {
+  const module = await import("./screens/ChatListScreen");
+  return { default: module.ChatListScreen };
+});
+const ChatScreen = React.lazy(async () => {
+  const module = await import("./screens/ChatScreen");
+  return { default: module.ChatScreen };
+});
+const DashboardScreen = React.lazy(async () => {
+  const module = await import("./screens/DashboardScreen");
+  return { default: module.DashboardScreen };
+});
+const ModuleScreen = React.lazy(async () => {
+  const module = await import("./screens/ModuleScreen");
+  return { default: module.ModuleScreen };
+});
+const PlansScreen = React.lazy(async () => {
+  const module = await import("./screens/PlansScreen");
+  return { default: module.PlansScreen };
+});
+const ProfileScreen = React.lazy(async () => {
+  const module = await import("./screens/ProfileScreen");
+  return { default: module.ProfileScreen };
+});
+const PostsScreen = React.lazy(async () => {
+  const module = await import("./screens/PostsScreen");
+  return { default: module.PostsScreen };
+});
+const ReputationScreen = React.lazy(async () => {
+  const module = await import("./screens/ReputationScreen");
+  return { default: module.ReputationScreen };
+});
+const StatsScreen = React.lazy(async () => {
+  const module = await import("./screens/StatsScreen");
+  return { default: module.StatsScreen };
+});
+const TriggersScreen = React.lazy(async () => {
+  const module = await import("./screens/TriggersScreen");
+  return { default: module.TriggersScreen };
+});
+const UserStatsScreen = React.lazy(async () => {
+  const module = await import("./screens/UserStatsScreen");
+  return { default: module.UserStatsScreen };
+});
+const PlatformScreen = React.lazy(async () => {
+  const module = await import("./screens/PlatformScreen");
+  return { default: module.PlatformScreen };
+});
 
 /** The query client lives for the lifetime of the panel. */
 const queryClient = new QueryClient({
@@ -43,7 +87,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function ScreenFor({ route }: { route: Route }): React.JSX.Element {
+function ScreenFor({ route, isSuperadmin }: { route: Route; isSuperadmin: boolean }): React.JSX.Element {
   switch (route.name) {
     case "dashboard":
       return <DashboardScreen />;
@@ -70,12 +114,17 @@ function ScreenFor({ route }: { route: Route }): React.JSX.Element {
     case "billing":
       return <BillingScreen chatId={route.chatId} />;
     case "platform":
-      return <PlatformScreen />;
+      return isSuperadmin ? <PlatformScreen /> : <DashboardScreen />;
   }
+}
+
+function routeKey(route: Route): string {
+  return Object.values(route).join(":");
 }
 
 function Stack(): React.JSX.Element {
   const { route, atRoot, requestPop } = useNavigation();
+  const user = useUser();
 
   useEffect(() => {
     // The one exit from every screen is Telegram's own back button. It goes
@@ -87,8 +136,16 @@ function Stack(): React.JSX.Element {
   return (
     <div className="app-viewport">
       <div className="app-atmosphere" aria-hidden="true" />
-      <div className="relative z-10" key={route.name}>
-        <ScreenFor route={route} />
+      <div className="route-stage relative z-10" key={routeKey(route)}>
+        <React.Suspense
+          fallback={
+            <Screen>
+              <SkeletonRows count={6} />
+            </Screen>
+          }
+        >
+          <ScreenFor route={route} isSuperadmin={user.is_superadmin} />
+        </React.Suspense>
       </div>
       {isRootRoute(route) && <BottomNav active={route.name} />}
     </div>
@@ -100,14 +157,7 @@ function Shell(): React.JSX.Element {
   const session = useSession();
 
   if (session.status === "loading") {
-    // Skeleton rows rather than a spinner: what is loading is the chat list, and
-    // this is the panel's first paint — the shape of what is coming is a better
-    // first impression than a shrug, and the page does not jump when it lands.
-    return (
-      <Screen>
-        <SkeletonRows count={4} />
-      </Screen>
-    );
+    return <LaunchScreen label={t("panel-loading")} />;
   }
   if (session.status === "failed") {
     return (

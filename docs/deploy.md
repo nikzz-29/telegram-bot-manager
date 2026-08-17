@@ -156,7 +156,9 @@ docker compose -f infra/docker/docker-compose.yml up -d --no-deps --force-recrea
 | `CORS_ORIGINS` | Точный origin панели. `*` в проде отклоняется. |
 | `WEBAPP_URL` | HTTPS-адрес Mini App, который бот помещает в кнопку операторской панели. |
 | `SUPERADMIN_IDS` | Telegram-id через запятую, кому доступна платформенная консоль. Пусто — никому. |
-| `AI_API_KEY` | Необязателен. Без него ИИ-модерация деградирует в «выключено», а не роняет сообщения. |
+| `AI_BASE_URL`, `AI_MODEL` | По умолчанию используется бесплатный keyless LLM7 (`DeepSeek-V4-Flash-0731`). Текст проверяемых сообщений передаётся выбранному внешнему провайдеру. |
+| `AI_API_KEY` | Необязателен для LLM7 и локальных моделей; указывается только для провайдера, который требует авторизацию. |
+| `AI_COMPLETION_PATH` | Путь OpenAI-compatible chat completions, по умолчанию `/chat/completions`. |
 | `CRYPTOBOT_TOKEN` | Необязателен. Stars работают без него, криптоплатежи — нет. |
 
 Compose передаёт `.env` каждому сервису через `env_file`, а затем перекрывает

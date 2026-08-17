@@ -23,11 +23,14 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from core import actions, cache
-from core.context import ChatContext
+from core.context import ChatContext, chat_context
+from core.crossban import crossban
 from core.sender import SendPriority, sender
 from db.uow import UnitOfWork
 from shared.enums import ModuleName
 from shared.logging import get_logger
+from shared.plans import Feature
+from shared.schemas.module_configs import CrossbanConfig
 
 logger = get_logger(__name__)
 
@@ -73,7 +76,11 @@ class GlobalBanMiddleware(BaseMiddleware):
                 chat_id=ctx.tg_chat_id,
                 priority=SendPriority.MODERATION,
             )
-            if ctx.module_enabled(ModuleName.CROSSBAN):
+            if ctx.module_enabled(ModuleName.CROSSBAN) and ctx.has(Feature.CROSSBAN):
+                config = await chat_context.config(ctx, ModuleName.CROSSBAN, CrossbanConfig)
+            else:
+                config = CrossbanConfig()
+            if crossban.enforcement_for(config) == "ban":
                 sender.enqueue(
                     actions.ban(ctx.tg_chat_id, user.id),
                     chat_id=ctx.tg_chat_id,

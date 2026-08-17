@@ -81,6 +81,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/website": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange a single-use bot-issued website token for a session */
+        post: operations["authenticateWithWebsiteToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/auth/refresh": {
         parameters: {
             query?: never;
@@ -202,6 +219,23 @@ export interface paths {
          *     happen to sync it.
          */
         post: operations["syncChatAdmins"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/chats/{chat_id}/bot-permissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Inspect the bot's live Telegram permissions for this chat */
+        get: operations["getChatBotPermissions"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -535,6 +569,160 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/platform/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Platform dashboard with a selectable reporting window */
+        get: operations["getPlatformDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search and paginate all known Telegram users */
+        get: operations["listPlatformUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/users/{tg_user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a user and the chats they administer */
+        get: operations["getPlatformUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/users/{tg_user_id}/subscription": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Grant a subscription to one of a user's chats */
+        post: operations["grantPlatformSubscription"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List platform payments for support and reconciliation */
+        get: operations["listPlatformPayments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read deployment capabilities and operator settings */
+        get: operations["getPlatformSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/settings/cryptobot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Switch the configured CryptoBot client between mainnet and testnet */
+        patch: operations["updateCryptoBotSettings"];
+        trace?: never;
+    };
+    "/api/platform/plans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read effective plan prices, features and operator overrides */
+        get: operations["listPlatformPlans"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/platform/plans/{plan}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Override a plan's price and feature set */
+        put: operations["updatePlatformPlan"];
+        post?: never;
+        /** Reset one plan to the values shipped with the application */
+        delete: operations["resetPlatformPlan"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/platform/bans": {
         parameters: {
             query?: never;
@@ -657,6 +845,61 @@ export interface components {
             text: string;
             /** Plans */
             plans?: components["schemas"]["Plan"][];
+        };
+        /** ChatBotPermissions */
+        ChatBotPermissions: {
+            /**
+             * Reachable
+             * @default true
+             */
+            reachable: boolean;
+            /**
+             * Status
+             * @default unknown
+             */
+            status: string;
+            /**
+             * Is Admin
+             * @default false
+             */
+            is_admin: boolean;
+            /**
+             * Privacy Mode Disabled
+             * @default false
+             */
+            privacy_mode_disabled: boolean;
+            /**
+             * Can Read Messages
+             * @default false
+             */
+            can_read_messages: boolean;
+            /**
+             * Can Send Messages
+             * @default false
+             */
+            can_send_messages: boolean;
+            /**
+             * Can Delete Messages
+             * @default false
+             */
+            can_delete_messages: boolean;
+            /**
+             * Can Restrict Members
+             * @default false
+             */
+            can_restrict_members: boolean;
+            /**
+             * Can Invite Users
+             * @default false
+             */
+            can_invite_users: boolean;
+            /**
+             * Can Manage Topics
+             * @default false
+             */
+            can_manage_topics: boolean;
+            /** Issues */
+            issues?: string[];
         };
         /** ChatDetail */
         ChatDetail: {
@@ -1052,6 +1295,281 @@ export interface components {
              */
             ai_moderation_available: boolean;
         };
+        /** PlatformCryptoBotSettings */
+        PlatformCryptoBotSettings: {
+            /**
+             * Configured
+             * @default false
+             */
+            configured: boolean;
+            /**
+             * Testnet
+             * @default false
+             */
+            testnet: boolean;
+            /** Network */
+            network: string;
+        };
+        /** PlatformCryptoBotUpdate */
+        PlatformCryptoBotUpdate: {
+            /** Testnet */
+            testnet: boolean;
+        };
+        /** PlatformDashboard */
+        PlatformDashboard: {
+            /** Days */
+            days: number;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            totals: components["schemas"]["PlatformTotals"];
+            /** Series */
+            series?: components["schemas"]["PlatformSeriesPoint"][];
+            /** Plan Mix */
+            plan_mix?: components["schemas"]["PlatformPlanRow"][];
+            /**
+             * Cryptobot Configured
+             * @default false
+             */
+            cryptobot_configured: boolean;
+            /**
+             * Cryptobot Testnet
+             * @default false
+             */
+            cryptobot_testnet: boolean;
+            /**
+             * Ai Moderation Available
+             * @default false
+             */
+            ai_moderation_available: boolean;
+        };
+        /** PlatformPayment */
+        PlatformPayment: {
+            /** Id */
+            id: number;
+            /** Chat Id */
+            chat_id: number;
+            /** Tg Chat Id */
+            tg_chat_id: number;
+            /** Chat Title */
+            chat_title: string;
+            provider: components["schemas"]["PaymentProvider"];
+            /** Provider Payment Id */
+            provider_payment_id: string;
+            /** Amount */
+            amount: string;
+            /** Currency */
+            currency: string;
+            status: components["schemas"]["PaymentStatus"];
+            plan: components["schemas"]["Plan"];
+            /** Months */
+            months: number;
+            /** Payer Tg Id */
+            payer_tg_id?: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Period Start */
+            period_start?: string | null;
+            /** Period End */
+            period_end?: string | null;
+            /** Refunded At */
+            refunded_at?: string | null;
+            /**
+             * Refund Reason
+             * @default
+             */
+            refund_reason: string;
+        };
+        /** PlatformPaymentPage */
+        PlatformPaymentPage: {
+            /** Items */
+            items?: components["schemas"]["PlatformPayment"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
+        /** PlatformPlanOverride */
+        PlatformPlanOverride: {
+            /** Stars */
+            stars?: number | null;
+            /** Usd */
+            usd?: string | null;
+            /** Features */
+            features?: string[] | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+        };
+        /** PlatformPlanOverrideResponse */
+        PlatformPlanOverrideResponse: {
+            plan: components["schemas"]["Plan"];
+            /** Stars */
+            stars?: number | null;
+            /** Usd */
+            usd?: string | null;
+            /** Features */
+            features?: string[] | null;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Updated By */
+            updated_by?: number | null;
+            /** Updated At */
+            updated_at?: string | null;
+            /**
+             * Effective Stars
+             * @default 0
+             */
+            effective_stars: number;
+            /**
+             * Effective Usd
+             * @default
+             */
+            effective_usd: string;
+            /** Effective Features */
+            effective_features?: string[];
+        };
+        /** PlatformPlanRow */
+        PlatformPlanRow: {
+            plan: components["schemas"]["Plan"];
+            /**
+             * Chats
+             * @default 0
+             */
+            chats: number;
+            /**
+             * Active Chats
+             * @default 0
+             */
+            active_chats: number;
+            /**
+             * Subscriptions
+             * @default 0
+             */
+            subscriptions: number;
+            /**
+             * Revenue Stars
+             * @default 0
+             */
+            revenue_stars: number;
+            /**
+             * Revenue Usd
+             * @default 0
+             */
+            revenue_usd: string;
+        };
+        /** PlatformSeriesPoint */
+        PlatformSeriesPoint: {
+            /**
+             * Day
+             * Format: date
+             */
+            day: string;
+            /**
+             * Chats
+             * @default 0
+             */
+            chats: number;
+            /**
+             * New Chats
+             * @default 0
+             */
+            new_chats: number;
+            /**
+             * Active Chats
+             * @default 0
+             */
+            active_chats: number;
+            /**
+             * Messages
+             * @default 0
+             */
+            messages: number;
+            /**
+             * Moderation Actions
+             * @default 0
+             */
+            moderation_actions: number;
+            /**
+             * Joins
+             * @default 0
+             */
+            joins: number;
+            /**
+             * Leaves
+             * @default 0
+             */
+            leaves: number;
+            /**
+             * Subscriptions
+             * @default 0
+             */
+            subscriptions: number;
+            /**
+             * Revenue Stars
+             * @default 0
+             */
+            revenue_stars: number;
+            /**
+             * Revenue Usd
+             * @default 0
+             */
+            revenue_usd: string;
+            /**
+             * Refunds
+             * @default 0
+             */
+            refunds: number;
+            /**
+             * Churned Chats
+             * @default 0
+             */
+            churned_chats: number;
+        };
+        /** PlatformSettings */
+        PlatformSettings: {
+            /** Environment */
+            environment: string;
+            cryptobot: components["schemas"]["PlatformCryptoBotSettings"];
+            /**
+             * Ai Moderation Available
+             * @default false
+             */
+            ai_moderation_available: boolean;
+            /** Payment Providers */
+            payment_providers?: components["schemas"]["PaymentProvider"][];
+            /**
+             * Global Ban Chat Threshold
+             * @default 3
+             */
+            global_ban_chat_threshold: number;
+        };
         /** PlatformStats */
         PlatformStats: {
             /** Total Chats */
@@ -1068,6 +1586,197 @@ export interface components {
             revenue_usd: string;
             /** Global Bans */
             global_bans: number;
+        };
+        /** PlatformSubscriptionGrant */
+        PlatformSubscriptionGrant: {
+            /** Chat Id */
+            chat_id: number;
+            plan: components["schemas"]["Plan"];
+            /**
+             * Months
+             * @default 1
+             */
+            months: number;
+        };
+        /** PlatformTotals */
+        PlatformTotals: {
+            /**
+             * Chats
+             * @default 0
+             */
+            chats: number;
+            /**
+             * Active Chats
+             * @default 0
+             */
+            active_chats: number;
+            /**
+             * Paying Chats
+             * @default 0
+             */
+            paying_chats: number;
+            /**
+             * New Chats
+             * @default 0
+             */
+            new_chats: number;
+            /**
+             * Known Users
+             * @default 0
+             */
+            known_users: number;
+            /**
+             * Messages
+             * @default 0
+             */
+            messages: number;
+            /**
+             * Active Chats In Window
+             * @default 0
+             */
+            active_chats_in_window: number;
+            /**
+             * Moderation Actions
+             * @default 0
+             */
+            moderation_actions: number;
+            /**
+             * Subscriptions
+             * @default 0
+             */
+            subscriptions: number;
+            /**
+             * Refunds
+             * @default 0
+             */
+            refunds: number;
+            /**
+             * Revenue Stars
+             * @default 0
+             */
+            revenue_stars: number;
+            /**
+             * Revenue Usd
+             * @default 0
+             */
+            revenue_usd: string;
+            /**
+             * Refunded Stars
+             * @default 0
+             */
+            refunded_stars: number;
+            /**
+             * Refunded Usd
+             * @default 0
+             */
+            refunded_usd: string;
+        };
+        /** PlatformUser */
+        PlatformUser: {
+            /** Tg User Id */
+            tg_user_id: number;
+            /** Username */
+            username?: string | null;
+            /**
+             * First Name
+             * @default
+             */
+            first_name: string;
+            /** Last Name */
+            last_name?: string | null;
+            /**
+             * Is Bot
+             * @default false
+             */
+            is_bot: boolean;
+            /** First Seen At */
+            first_seen_at?: string | null;
+            /** Last Seen At */
+            last_seen_at?: string | null;
+            /**
+             * Admin Chats
+             * @default 0
+             */
+            admin_chats: number;
+            /**
+             * Owned Chats
+             * @default 0
+             */
+            owned_chats: number;
+            /**
+             * Is Globally Banned
+             * @default false
+             */
+            is_globally_banned: boolean;
+            /**
+             * Ban Reports
+             * @default 0
+             */
+            ban_reports: number;
+            /**
+             * Payments
+             * @default 0
+             */
+            payments: number;
+            /**
+             * Spent Stars
+             * @default 0
+             */
+            spent_stars: number;
+            /**
+             * Spent Usd
+             * @default 0
+             */
+            spent_usd: string;
+            /** Last Payment At */
+            last_payment_at?: string | null;
+        };
+        /** PlatformUserChat */
+        PlatformUserChat: {
+            /** Id */
+            id: number;
+            /** Tg Chat Id */
+            tg_chat_id: number;
+            /** Title */
+            title: string;
+            plan: components["schemas"]["Plan"];
+            /** Plan Expires At */
+            plan_expires_at?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+            /** Owner Tg Id */
+            owner_tg_id?: number | null;
+            /** Members Count */
+            members_count?: number | null;
+        };
+        /** PlatformUserDetail */
+        PlatformUserDetail: {
+            user: components["schemas"]["PlatformUser"];
+            /** Chats */
+            chats?: components["schemas"]["PlatformUserChat"][];
+        };
+        /** PlatformUserPage */
+        PlatformUserPage: {
+            /** Items */
+            items?: components["schemas"]["PlatformUser"][];
+            /**
+             * Total
+             * @default 0
+             */
+            total: number;
+            /**
+             * Limit
+             * @default 50
+             */
+            limit: number;
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
         };
         /** PostCreate */
         PostCreate: {
@@ -1442,6 +2151,11 @@ export interface components {
              */
             total_members: number;
         };
+        /** WebsiteLoginRequest */
+        WebsiteLoginRequest: {
+            /** Token */
+            token: string;
+        };
     };
     responses: never;
     parameters: never;
@@ -1521,6 +2235,48 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AuthRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    authenticateWithWebsiteToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WebsiteLoginRequest"];
             };
         };
         responses: {
@@ -1895,6 +2651,55 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperationResult"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such chat, or the caller does not administer it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getChatBotPermissions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                chat_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChatBotPermissions"];
                 };
             };
             /** @description Session token missing, malformed or expired. */
@@ -3442,6 +4247,510 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlatformStats"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getPlatformDashboard: {
+        parameters: {
+            query?: {
+                days?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformDashboard"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listPlatformUsers: {
+        parameters: {
+            query?: {
+                search?: string;
+                banned_only?: boolean;
+                admins_only?: boolean;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformUserPage"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getPlatformUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tg_user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformUserDetail"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    grantPlatformSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tg_user_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformSubscriptionGrant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationResult"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listPlatformPayments: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["PaymentStatus"] | null;
+                provider?: components["schemas"]["PaymentProvider"] | null;
+                tg_user_id?: number | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformPaymentPage"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    getPlatformSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSettings"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updateCryptoBotSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformCryptoBotUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSettings"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    listPlatformPlans: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformPlanOverrideResponse"][];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    updatePlatformPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan: components["schemas"]["Plan"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformPlanOverride"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformPlanOverrideResponse"];
+                };
+            };
+            /** @description Session token missing, malformed or expired. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Request failed validation. */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    resetPlatformPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plan: components["schemas"]["Plan"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformPlanOverrideResponse"];
                 };
             };
             /** @description Session token missing, malformed or expired. */

@@ -118,6 +118,57 @@
         }
       }
     },
+    "/api/auth/website": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Exchange a single-use bot-issued website token for a session",
+        "operationId": "authenticateWithWebsiteToken",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebsiteLoginRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/refresh": {
       "post": {
         "tags": [
@@ -597,6 +648,74 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such chat, or the caller does not administer it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/chats/{chat_id}/bot-permissions": {
+      "get": {
+        "tags": [
+          "chats"
+        ],
+        "summary": "Inspect the bot's live Telegram permissions for this chat",
+        "operationId": "getChatBotPermissions",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Chat Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatBotPermissions"
                 }
               }
             }
@@ -2865,6 +2984,783 @@
         ]
       }
     },
+    "/api/platform/dashboard": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Platform dashboard with a selectable reporting window",
+        "operationId": "getPlatformDashboard",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "days",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 365,
+              "minimum": 1,
+              "default": 30,
+              "title": "Days"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformDashboard"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform/users": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Search and paginate all known Telegram users",
+        "operationId": "listPlatformUsers",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "Search"
+            }
+          },
+          {
+            "name": "banned_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Banned Only"
+            }
+          },
+          {
+            "name": "admins_only",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Admins Only"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform/users/{tg_user_id}": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Get a user and the chats they administer",
+        "operationId": "getPlatformUser",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tg_user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tg User Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformUserDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform/users/{tg_user_id}/subscription": {
+      "post": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Grant a subscription to one of a user's chats",
+        "operationId": "grantPlatformSubscription",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "tg_user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Tg User Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformSubscriptionGrant"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OperationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform/payments": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "List platform payments for support and reconciliation",
+        "operationId": "listPlatformPayments",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PaymentStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "provider",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PaymentProvider"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Provider"
+            }
+          },
+          {
+            "name": "tg_user_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tg User Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformPaymentPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/platform/settings": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Read deployment capabilities and operator settings",
+        "operationId": "getPlatformSettings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
+    },
+    "/api/platform/settings/cryptobot": {
+      "patch": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Switch the configured CryptoBot client between mainnet and testnet",
+        "operationId": "updateCryptoBotSettings",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformCryptoBotUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
+    },
+    "/api/platform/plans": {
+      "get": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Read effective plan prices, features and operator overrides",
+        "operationId": "listPlatformPlans",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PlatformPlanOverrideResponse"
+                  },
+                  "type": "array",
+                  "title": "Response Listplatformplans"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ]
+      }
+    },
+    "/api/platform/plans/{plan}": {
+      "put": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Override a plan's price and feature set",
+        "operationId": "updatePlatformPlan",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Plan"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlatformPlanOverride"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformPlanOverrideResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "platform"
+        ],
+        "summary": "Reset one plan to the values shipped with the application",
+        "operationId": "resetPlatformPlan",
+        "security": [
+          {
+            "TelegramSession": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "plan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/Plan"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlatformPlanOverrideResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Session token missing, malformed or expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Request failed.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Request failed validation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/platform/bans": {
       "get": {
         "tags": [
@@ -3286,6 +4182,69 @@
           "text"
         ],
         "title": "BroadcastRequest"
+      },
+      "ChatBotPermissions": {
+        "properties": {
+          "reachable": {
+            "type": "boolean",
+            "title": "Reachable",
+            "default": true
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "default": "unknown"
+          },
+          "is_admin": {
+            "type": "boolean",
+            "title": "Is Admin",
+            "default": false
+          },
+          "privacy_mode_disabled": {
+            "type": "boolean",
+            "title": "Privacy Mode Disabled",
+            "default": false
+          },
+          "can_read_messages": {
+            "type": "boolean",
+            "title": "Can Read Messages",
+            "default": false
+          },
+          "can_send_messages": {
+            "type": "boolean",
+            "title": "Can Send Messages",
+            "default": false
+          },
+          "can_delete_messages": {
+            "type": "boolean",
+            "title": "Can Delete Messages",
+            "default": false
+          },
+          "can_restrict_members": {
+            "type": "boolean",
+            "title": "Can Restrict Members",
+            "default": false
+          },
+          "can_invite_users": {
+            "type": "boolean",
+            "title": "Can Invite Users",
+            "default": false
+          },
+          "can_manage_topics": {
+            "type": "boolean",
+            "title": "Can Manage Topics",
+            "default": false
+          },
+          "issues": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Issues"
+          }
+        },
+        "type": "object",
+        "title": "ChatBotPermissions"
       },
       "ChatDetail": {
         "properties": {
@@ -4124,6 +5083,538 @@
         "title": "PlatformCapabilities",
         "description": "Optional integrations that are actually usable on this deployment.\n\nKeeping these server-derived prevents the Mini App from sending a customer\ninto a checkout or an AI setting which the deployment cannot fulfil."
       },
+      "PlatformCryptoBotSettings": {
+        "properties": {
+          "configured": {
+            "type": "boolean",
+            "title": "Configured",
+            "default": false
+          },
+          "testnet": {
+            "type": "boolean",
+            "title": "Testnet",
+            "default": false
+          },
+          "network": {
+            "type": "string",
+            "title": "Network"
+          }
+        },
+        "type": "object",
+        "required": [
+          "network"
+        ],
+        "title": "PlatformCryptoBotSettings"
+      },
+      "PlatformCryptoBotUpdate": {
+        "properties": {
+          "testnet": {
+            "type": "boolean",
+            "title": "Testnet"
+          }
+        },
+        "type": "object",
+        "required": [
+          "testnet"
+        ],
+        "title": "PlatformCryptoBotUpdate"
+      },
+      "PlatformDashboard": {
+        "properties": {
+          "days": {
+            "type": "integer",
+            "title": "Days"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PlatformTotals"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/PlatformSeriesPoint"
+            },
+            "type": "array",
+            "title": "Series"
+          },
+          "plan_mix": {
+            "items": {
+              "$ref": "#/components/schemas/PlatformPlanRow"
+            },
+            "type": "array",
+            "title": "Plan Mix"
+          },
+          "cryptobot_configured": {
+            "type": "boolean",
+            "title": "Cryptobot Configured",
+            "default": false
+          },
+          "cryptobot_testnet": {
+            "type": "boolean",
+            "title": "Cryptobot Testnet",
+            "default": false
+          },
+          "ai_moderation_available": {
+            "type": "boolean",
+            "title": "Ai Moderation Available",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "start",
+          "end",
+          "totals"
+        ],
+        "title": "PlatformDashboard"
+      },
+      "PlatformPayment": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "chat_id": {
+            "type": "integer",
+            "title": "Chat Id"
+          },
+          "tg_chat_id": {
+            "type": "integer",
+            "title": "Tg Chat Id"
+          },
+          "chat_title": {
+            "type": "string",
+            "title": "Chat Title"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/PaymentProvider"
+          },
+          "provider_payment_id": {
+            "type": "string",
+            "title": "Provider Payment Id"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Amount"
+          },
+          "currency": {
+            "type": "string",
+            "title": "Currency"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PaymentStatus"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "months": {
+            "type": "integer",
+            "title": "Months"
+          },
+          "payer_tg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payer Tg Id"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "period_start": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period Start"
+          },
+          "period_end": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Period End"
+          },
+          "refunded_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refunded At"
+          },
+          "refund_reason": {
+            "type": "string",
+            "title": "Refund Reason",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "chat_id",
+          "tg_chat_id",
+          "chat_title",
+          "provider",
+          "provider_payment_id",
+          "amount",
+          "currency",
+          "status",
+          "plan",
+          "months",
+          "created_at"
+        ],
+        "title": "PlatformPayment"
+      },
+      "PlatformPaymentPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlatformPayment"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 50
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "PlatformPaymentPage"
+      },
+      "PlatformPlanOverride": {
+        "properties": {
+          "stars": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stars"
+          },
+          "usd": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 16
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd"
+          },
+          "features": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Features"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 2000,
+            "title": "Note",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "title": "PlatformPlanOverride"
+      },
+      "PlatformPlanOverrideResponse": {
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "stars": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stars"
+          },
+          "usd": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Usd"
+          },
+          "features": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Features"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note",
+            "default": ""
+          },
+          "updated_by": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated By"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "effective_stars": {
+            "type": "integer",
+            "title": "Effective Stars",
+            "default": 0
+          },
+          "effective_usd": {
+            "type": "string",
+            "title": "Effective Usd",
+            "default": ""
+          },
+          "effective_features": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Effective Features"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "title": "PlatformPlanOverrideResponse"
+      },
+      "PlatformPlanRow": {
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "chats": {
+            "type": "integer",
+            "title": "Chats",
+            "default": 0
+          },
+          "active_chats": {
+            "type": "integer",
+            "title": "Active Chats",
+            "default": 0
+          },
+          "subscriptions": {
+            "type": "integer",
+            "title": "Subscriptions",
+            "default": 0
+          },
+          "revenue_stars": {
+            "type": "integer",
+            "title": "Revenue Stars",
+            "default": 0
+          },
+          "revenue_usd": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Revenue Usd",
+            "default": "0"
+          }
+        },
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "title": "PlatformPlanRow"
+      },
+      "PlatformSeriesPoint": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "chats": {
+            "type": "integer",
+            "title": "Chats",
+            "default": 0
+          },
+          "new_chats": {
+            "type": "integer",
+            "title": "New Chats",
+            "default": 0
+          },
+          "active_chats": {
+            "type": "integer",
+            "title": "Active Chats",
+            "default": 0
+          },
+          "messages": {
+            "type": "integer",
+            "title": "Messages",
+            "default": 0
+          },
+          "moderation_actions": {
+            "type": "integer",
+            "title": "Moderation Actions",
+            "default": 0
+          },
+          "joins": {
+            "type": "integer",
+            "title": "Joins",
+            "default": 0
+          },
+          "leaves": {
+            "type": "integer",
+            "title": "Leaves",
+            "default": 0
+          },
+          "subscriptions": {
+            "type": "integer",
+            "title": "Subscriptions",
+            "default": 0
+          },
+          "revenue_stars": {
+            "type": "integer",
+            "title": "Revenue Stars",
+            "default": 0
+          },
+          "revenue_usd": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Revenue Usd",
+            "default": "0"
+          },
+          "refunds": {
+            "type": "integer",
+            "title": "Refunds",
+            "default": 0
+          },
+          "churned_chats": {
+            "type": "integer",
+            "title": "Churned Chats",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "day"
+        ],
+        "title": "PlatformSeriesPoint"
+      },
+      "PlatformSettings": {
+        "properties": {
+          "environment": {
+            "type": "string",
+            "title": "Environment"
+          },
+          "cryptobot": {
+            "$ref": "#/components/schemas/PlatformCryptoBotSettings"
+          },
+          "ai_moderation_available": {
+            "type": "boolean",
+            "title": "Ai Moderation Available",
+            "default": false
+          },
+          "payment_providers": {
+            "items": {
+              "$ref": "#/components/schemas/PaymentProvider"
+            },
+            "type": "array",
+            "title": "Payment Providers"
+          },
+          "global_ban_chat_threshold": {
+            "type": "integer",
+            "title": "Global Ban Chat Threshold",
+            "default": 3
+          }
+        },
+        "type": "object",
+        "required": [
+          "environment",
+          "cryptobot"
+        ],
+        "title": "PlatformSettings"
+      },
       "PlatformStats": {
         "properties": {
           "total_chats": {
@@ -4165,6 +5656,339 @@
           "global_bans"
         ],
         "title": "PlatformStats"
+      },
+      "PlatformSubscriptionGrant": {
+        "properties": {
+          "chat_id": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Chat Id"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "months": {
+            "type": "integer",
+            "maximum": 120.0,
+            "minimum": 1.0,
+            "title": "Months",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "required": [
+          "chat_id",
+          "plan"
+        ],
+        "title": "PlatformSubscriptionGrant"
+      },
+      "PlatformTotals": {
+        "properties": {
+          "chats": {
+            "type": "integer",
+            "title": "Chats",
+            "default": 0
+          },
+          "active_chats": {
+            "type": "integer",
+            "title": "Active Chats",
+            "default": 0
+          },
+          "paying_chats": {
+            "type": "integer",
+            "title": "Paying Chats",
+            "default": 0
+          },
+          "new_chats": {
+            "type": "integer",
+            "title": "New Chats",
+            "default": 0
+          },
+          "known_users": {
+            "type": "integer",
+            "title": "Known Users",
+            "default": 0
+          },
+          "messages": {
+            "type": "integer",
+            "title": "Messages",
+            "default": 0
+          },
+          "active_chats_in_window": {
+            "type": "integer",
+            "title": "Active Chats In Window",
+            "default": 0
+          },
+          "moderation_actions": {
+            "type": "integer",
+            "title": "Moderation Actions",
+            "default": 0
+          },
+          "subscriptions": {
+            "type": "integer",
+            "title": "Subscriptions",
+            "default": 0
+          },
+          "refunds": {
+            "type": "integer",
+            "title": "Refunds",
+            "default": 0
+          },
+          "revenue_stars": {
+            "type": "integer",
+            "title": "Revenue Stars",
+            "default": 0
+          },
+          "revenue_usd": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Revenue Usd",
+            "default": "0"
+          },
+          "refunded_stars": {
+            "type": "integer",
+            "title": "Refunded Stars",
+            "default": 0
+          },
+          "refunded_usd": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Refunded Usd",
+            "default": "0"
+          }
+        },
+        "type": "object",
+        "title": "PlatformTotals"
+      },
+      "PlatformUser": {
+        "properties": {
+          "tg_user_id": {
+            "type": "integer",
+            "title": "Tg User Id"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "first_name": {
+            "type": "string",
+            "title": "First Name",
+            "default": ""
+          },
+          "last_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Name"
+          },
+          "is_bot": {
+            "type": "boolean",
+            "title": "Is Bot",
+            "default": false
+          },
+          "first_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Seen At"
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Seen At"
+          },
+          "admin_chats": {
+            "type": "integer",
+            "title": "Admin Chats",
+            "default": 0
+          },
+          "owned_chats": {
+            "type": "integer",
+            "title": "Owned Chats",
+            "default": 0
+          },
+          "is_globally_banned": {
+            "type": "boolean",
+            "title": "Is Globally Banned",
+            "default": false
+          },
+          "ban_reports": {
+            "type": "integer",
+            "title": "Ban Reports",
+            "default": 0
+          },
+          "payments": {
+            "type": "integer",
+            "title": "Payments",
+            "default": 0
+          },
+          "spent_stars": {
+            "type": "integer",
+            "title": "Spent Stars",
+            "default": 0
+          },
+          "spent_usd": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Spent Usd",
+            "default": "0"
+          },
+          "last_payment_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Payment At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tg_user_id"
+        ],
+        "title": "PlatformUser"
+      },
+      "PlatformUserChat": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "tg_chat_id": {
+            "type": "integer",
+            "title": "Tg Chat Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "plan_expires_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Expires At"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active",
+            "default": true
+          },
+          "owner_tg_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Tg Id"
+          },
+          "members_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Members Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tg_chat_id",
+          "title",
+          "plan"
+        ],
+        "title": "PlatformUserChat"
+      },
+      "PlatformUserDetail": {
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/PlatformUser"
+          },
+          "chats": {
+            "items": {
+              "$ref": "#/components/schemas/PlatformUserChat"
+            },
+            "type": "array",
+            "title": "Chats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "user"
+        ],
+        "title": "PlatformUserDetail"
+      },
+      "PlatformUserPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/PlatformUser"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "default": 0
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 50
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "title": "PlatformUserPage"
       },
       "PostCreate": {
         "properties": {
@@ -5089,6 +6913,21 @@
         ],
         "title": "UserProfile",
         "description": "The user-facing profile shown outside a chat editor."
+      },
+      "WebsiteLoginRequest": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 32,
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "WebsiteLoginRequest"
       }
     },
     "securitySchemes": {

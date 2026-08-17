@@ -23,6 +23,7 @@ from db.repositories import (
     PaymentRepository,
     PlanOverrideRepository,
     PlatformRepository,
+    PlatformSettingRepository,
     PunishmentRepository,
     ReputationRepository,
     ScheduledPostRepository,
@@ -30,6 +31,7 @@ from db.repositories import (
     TgUserRepository,
     TriggerRepository,
     WarnRepository,
+    WebsiteLoginTokenRepository,
 )
 
 
@@ -48,6 +50,7 @@ class UnitOfWork:
     payments: PaymentRepository
     plan_overrides: PlanOverrideRepository
     platform: PlatformRepository
+    platform_settings: PlatformSettingRepository
     posts: ScheduledPostRepository
     punishments: PunishmentRepository
     reputation: ReputationRepository
@@ -55,6 +58,7 @@ class UnitOfWork:
     triggers: TriggerRepository
     users: TgUserRepository
     warns: WarnRepository
+    website_tokens: WebsiteLoginTokenRepository
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession] | None = None) -> None:
         self._session_factory = session_factory
@@ -84,6 +88,7 @@ class UnitOfWork:
         self.payments = PaymentRepository(session)
         self.plan_overrides = PlanOverrideRepository(session)
         self.platform = PlatformRepository(session)
+        self.platform_settings = PlatformSettingRepository(session)
         self.posts = ScheduledPostRepository(session)
         self.punishments = PunishmentRepository(session)
         self.reputation = ReputationRepository(session)
@@ -91,6 +96,7 @@ class UnitOfWork:
         self.triggers = TriggerRepository(session)
         self.users = TgUserRepository(session)
         self.warns = WarnRepository(session)
+        self.website_tokens = WebsiteLoginTokenRepository(session)
 
     async def __aenter__(self) -> Self:
         if not hasattr(self, "session"):

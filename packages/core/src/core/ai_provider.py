@@ -23,11 +23,17 @@ breaker exists to make fast.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 import json
+import math
 from typing import Any, Final, Protocol
+from urllib.parse import urlsplit
 
 import httpx
+from pydantic import BaseModel, Field, ValidationError
 
 from shared.config import get_settings
 from shared.enums import AiVerdictLabel
@@ -49,6 +55,15 @@ TEMPERATURE: Final = 0.0
 # makes its pitch early, and the tail is mostly padding that costs tokens.
 MAX_INPUT_CHARS: Final = 2_000
 
+# Public free endpoints are more likely to answer with a burst limit than a
+# transport error. One bounded retry smooths a short 429 without turning a
+# message check into a queue that can stall the Telegram update loop.
+MAX_429_RETRIES: Final = 1
+MAX_REQUEST_RETRIES: Final = 1
+DEFAULT_RETRY_AFTER_SECONDS: Final = 0.25
+MAX_RETRY_AFTER_SECONDS: Final = 1.0
+RETRIABLE_STATUS_CODES: Final = frozenset({429, 500, 502, 503, 504})
+
 SYSTEM_PROMPT: Final = (
     "You are a moderation classifier for Telegram group chats. "
     "Classify the message into exactly one label:\n"
@@ -61,6 +76,18 @@ SYSTEM_PROMPT: Final = (
     "Judge the message as written, in any language. Reply with JSON only: "
     '{"label": "...", "confidence": 0.0-1.0, "reason": "short phrase"}'
 )
+
+
+class _CompletionMessage(BaseModel):
+    content: str = Field(min_length=1)
+
+
+class _CompletionChoice(BaseModel):
+    message: _CompletionMessage
+
+
+class _CompletionResponse(BaseModel):
+    choices: list[_CompletionChoice] = Field(min_length=1)
 
 
 @dataclass(frozen=True, slots=True)
@@ -121,6 +148,8 @@ def parse_verdict(content: str) -> Verdict:
         # every threshold check anyway, but it would also put a scam label in the
         # audit log that the model never actually justified.
         return Verdict()
+    if isinstance(payload.get("confidence"), bool) or not math.isfinite(confidence):
+        return Verdict()
     return Verdict(
         label=AiVerdictLabel(raw_label),
         confidence=min(1.0, max(0.0, confidence)),
@@ -173,12 +202,22 @@ class OpenAiCompatibleProvider:
         api_key: str | None = None,
         model: str | None = None,
         timeout: float | None = None,
+        completion_path: str | None = None,
+        max_concurrency: int | None = None,
     ) -> None:
         settings = get_settings()
-        self._base_url = (base_url or settings.ai_base_url).rstrip("/")
-        self._api_key = api_key or settings.ai_api_key
-        self._model = model or settings.ai_model
-        self._timeout = timeout or settings.ai_timeout_seconds
+        configured_base_url = settings.ai_base_url if base_url is None else base_url
+        configured_model = settings.ai_model if model is None else model
+        self._base_url = configured_base_url.rstrip("/")
+        self._api_key = (settings.ai_api_key if api_key is None else api_key).strip()
+        self._model = configured_model
+        self._timeout = timeout if timeout is not None else settings.ai_timeout_seconds
+        raw_path = settings.ai_completion_path if completion_path is None else completion_path
+        self._completion_path = raw_path.strip() or "/chat/completions"
+        if not self._completion_path.startswith("/"):
+            self._completion_path = f"/{self._completion_path}"
+        concurrency = max_concurrency or settings.ai_max_concurrency
+        self._semaphore = asyncio.Semaphore(max(1, concurrency))
         self._client: httpx.AsyncClient | None = None
         self._breaker = CircuitBreaker(
             threshold=settings.ai_circuit_failure_threshold,
@@ -187,17 +226,40 @@ class OpenAiCompatibleProvider:
 
     @property
     def configured(self) -> bool:
-        return bool(self._api_key)
+        # LLM7's anonymous tier and local OpenAI-compatible servers do not need
+        # a key. An endpoint plus model is enough to consider the integration
+        # configured; unavailable/invalid endpoints still fail open below.
+        endpoint = urlsplit(self._base_url)
+        return bool(
+            endpoint.scheme in {"http", "https"} and endpoint.netloc and self._model.strip()
+        )
 
     def _http(self) -> httpx.AsyncClient:
         """One keep-alive client per process — TLS handshakes are not free."""
         if self._client is None:
+            headers: dict[str, str] = {}
+            if self._api_key:
+                headers["Authorization"] = f"Bearer {self._api_key}"
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
                 timeout=self._timeout,
-                headers={"Authorization": f"Bearer {self._api_key}"},
+                headers=headers,
             )
         return self._client
+
+    @staticmethod
+    def _retry_after(response: httpx.Response) -> float:
+        """Read a numeric Retry-After while keeping the retry deliberately short."""
+        raw = response.headers.get("Retry-After", "")
+        try:
+            delay = float(raw)
+        except (TypeError, ValueError):
+            try:
+                retry_at = parsedate_to_datetime(raw)
+                delay = (retry_at - datetime.now(UTC)).total_seconds()
+            except (TypeError, ValueError, OverflowError):
+                delay = DEFAULT_RETRY_AFTER_SECONDS
+        return min(MAX_RETRY_AFTER_SECONDS, max(0.0, delay))
 
     def _body(self, text: str, ctx: ModerationContext) -> dict[str, Any]:
         hint = f"Chat language: {ctx.language}."
@@ -221,26 +283,49 @@ class OpenAiCompatibleProvider:
         which is why every transport-level problem is normalized into it.
         """
         if not self.configured:
-            raise ProviderUnavailableError("AI moderation has no API key configured.")
+            raise ProviderUnavailableError("AI moderation has no endpoint or model configured.")
         if self._breaker.is_open:
             raise ProviderUnavailableError("AI provider circuit is open.")
 
         try:
-            response = await self._http().post("/chat/completions", json=self._body(text, ctx))
-            response.raise_for_status()
-            payload = response.json()
-        except (httpx.HTTPError, ValueError) as error:
+            async with self._semaphore:
+                response: httpx.Response | None = None
+                for attempt in range(MAX_REQUEST_RETRIES + 1):
+                    try:
+                        response = await self._http().post(
+                            self._completion_path,
+                            json=self._body(text, ctx),
+                        )
+                    except (httpx.TimeoutException, httpx.NetworkError):
+                        if attempt >= MAX_REQUEST_RETRIES:
+                            raise
+                        logger.info("ai.request_retry", chat_id=ctx.chat_id, attempt=attempt + 1)
+                        await asyncio.sleep(DEFAULT_RETRY_AFTER_SECONDS)
+                        continue
+                    if (
+                        response.status_code not in RETRIABLE_STATUS_CODES
+                        or attempt >= MAX_REQUEST_RETRIES
+                    ):
+                        break
+                    delay = self._retry_after(response)
+                    logger.info(
+                        "ai.request_retry",
+                        chat_id=ctx.chat_id,
+                        attempt=attempt + 1,
+                        status=response.status_code,
+                        retry_after=delay,
+                    )
+                    await asyncio.sleep(delay)
+                assert response is not None
+                response.raise_for_status()
+            completion = _CompletionResponse.model_validate(response.json())
+        except (httpx.HTTPError, ValueError, ValidationError) as error:
             self._breaker.record_failure()
             logger.warning("ai.request_failed", error=str(error), chat_id=ctx.chat_id)
             raise ProviderUnavailableError("AI provider request failed.") from error
 
         self._breaker.record_success()
-        try:
-            content = payload["choices"][0]["message"]["content"]
-        except (KeyError, IndexError, TypeError):
-            logger.warning("ai.malformed_response", chat_id=ctx.chat_id)
-            return Verdict()
-        return parse_verdict(str(content))
+        return parse_verdict(completion.choices[0].message.content)
 
     async def close(self) -> None:
         if self._client is not None:

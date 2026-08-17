@@ -17,17 +17,18 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Path, status
 
-from api.deps import ChatAccessDep, FeaturesDep, UowDep
+from api.deps import ChatAccessDep, ConfigsDep, FeaturesDep, UowDep
 from api.errors import problem_responses
+from core.triggers import TriggerDef, ensure_unique_trigger, validate_pattern
 from core.triggers import triggers as trigger_service
-from core.triggers import validate_pattern
 from db.models import TriggerRule
 from db.uow import UnitOfWork
-from shared.enums import TriggerMatch
+from shared.enums import ModuleName, TriggerMatch
 from shared.errors import ResourceNotFoundError
 from shared.logging import get_logger
 from shared.plans import Feature
 from shared.schemas.api import OperationResult, TriggerCreate, TriggerEntry, TriggerUpdate
+from shared.schemas.module_configs import EngagementConfig
 
 logger = get_logger(__name__)
 
@@ -57,6 +58,46 @@ async def _load(uow: UnitOfWork, chat_id: int, trigger_id: int) -> TriggerRule:
     return row
 
 
+async def _ensure_trigger_engine(chat_id: int, configs: ConfigsDep) -> None:
+    """A saved rule must be live without a second, hidden settings toggle."""
+    current = await configs.get_as(chat_id, ModuleName.ENGAGEMENT, EngagementConfig)
+    if current.triggers_enabled:
+        return
+    await configs.save(
+        chat_id,
+        ModuleName.ENGAGEMENT,
+        config={**current.model_dump(mode="json"), "triggers_enabled": True},
+        enabled=True,
+    )
+
+
+async def _ensure_unique(
+    uow: UnitOfWork,
+    chat_id: int,
+    *,
+    pattern: str,
+    match: TriggerMatch,
+    case_sensitive: bool,
+    exclude_id: int | None = None,
+) -> None:
+    rows = await uow.triggers.list_for_chat(chat_id)
+    ensure_unique_trigger(
+        (
+            TriggerDef(
+                id=row.id,
+                pattern=row.pattern,
+                match=row.match,
+                case_sensitive=row.case_sensitive,
+            )
+            for row in rows
+        ),
+        pattern=pattern,
+        match=match,
+        case_sensitive=case_sensitive,
+        exclude_id=exclude_id,
+    )
+
+
 @router.get(
     "",
     response_model=list[TriggerEntry],
@@ -81,6 +122,7 @@ async def create_trigger(
     access: ChatAccessDep,
     uow: UowDep,
     features: FeaturesDep,
+    configs: ConfigsDep,
 ) -> TriggerEntry:
     await features.require(access.chat_id, Feature.TRIGGERS)
     await features.check_quota(access.chat_id, "triggers", await uow.triggers.count(access.chat_id))
@@ -89,8 +131,17 @@ async def create_trigger(
     fields["pattern"] = validate_pattern(
         payload.pattern, payload.match, case_sensitive=payload.case_sensitive
     )
+    await _ensure_unique(
+        uow,
+        access.chat_id,
+        pattern=fields["pattern"],
+        match=payload.match,
+        case_sensitive=payload.case_sensitive,
+    )
     row = await uow.triggers.create(access.chat_id, **fields)
     await uow.commit()
+    if row.enabled:
+        await _ensure_trigger_engine(access.chat_id, configs)
     await trigger_service.invalidate(access.chat_id)
 
     logger.info("api.trigger_created", chat_id=access.chat_id, trigger_id=row.id)
@@ -121,6 +172,7 @@ async def update_trigger(
     access: ChatAccessDep,
     uow: UowDep,
     features: FeaturesDep,
+    configs: ConfigsDep,
 ) -> TriggerEntry:
     await features.require(access.chat_id, Feature.TRIGGERS)
     current = await _load(uow, access.chat_id, trigger_id)
@@ -130,9 +182,19 @@ async def update_trigger(
     match = TriggerMatch(fields.get("match", current.match))
     case_sensitive = bool(fields.get("case_sensitive", current.case_sensitive))
     fields["pattern"] = validate_pattern(pattern, match, case_sensitive=case_sensitive)
+    await _ensure_unique(
+        uow,
+        access.chat_id,
+        pattern=fields["pattern"],
+        match=match,
+        case_sensitive=case_sensitive,
+        exclude_id=trigger_id,
+    )
 
     await uow.triggers.update(access.chat_id, trigger_id, **fields)
     await uow.commit()
+    if fields.get("enabled") is True:
+        await _ensure_trigger_engine(access.chat_id, configs)
     await trigger_service.invalidate(access.chat_id)
 
     logger.info(

@@ -18,9 +18,19 @@ import { pressFeedback } from "../telegram/sdk";
 
 export { Icon, IconTile };
 
-export function Screen({ children }: { children: React.ReactNode }): React.JSX.Element {
+export function Screen({
+  children,
+  wide = false,
+}: {
+  children: React.ReactNode;
+  wide?: boolean;
+}): React.JSX.Element {
   return (
-    <main className="screen-shell mx-auto w-full max-w-2xl px-3 pb-[calc(6rem+theme(spacing.safe))]">
+    <main
+      className={`screen-shell mx-auto w-full px-3 pb-[calc(6rem+theme(spacing.safe))] ${
+        wide ? "max-w-5xl" : "max-w-2xl"
+      }`}
+    >
       {children}
     </main>
   );

@@ -20,7 +20,7 @@ from typing import Any, Final
 
 from aiogram import BaseMiddleware
 from aiogram.enums import ChatType
-from aiogram.types import Chat, TelegramObject, Update, User
+from aiogram.types import Chat, Message, TelegramObject, Update, User
 
 from core.context import chat_context
 from core.redis_client import get_redis
@@ -43,6 +43,18 @@ def _chat_and_user(update: Update) -> tuple[Chat | None, User | None]:
         message = getattr(event, "message", None)
         chat = getattr(message, "chat", None)
     return chat, getattr(event, "from_user", None)
+
+
+def _migration_ids(update: Update) -> tuple[int, int] | None:
+    """Return the old/new Telegram ids carried by a migration service message."""
+    event = update.event
+    if not isinstance(event, Message):
+        return None
+    if event.migrate_to_chat_id is not None:
+        return event.chat.id, event.migrate_to_chat_id
+    if event.migrate_from_chat_id is not None:
+        return event.migrate_from_chat_id, event.chat.id
+    return None
 
 
 async def _first_sight(tg_user_id: int) -> bool:
@@ -86,14 +98,19 @@ class ChatContextMiddleware(BaseMiddleware):
             data["ctx"] = None
             return await handler(event, data)
 
+        migration = _migration_ids(event)
+        resolved_tg_chat_id = migration[1] if migration is not None else chat.id
+        previous_tg_chat_id = migration[0] if migration is not None else None
+        resolved_chat_type = ChatType.SUPERGROUP if migration is not None else chat.type
         ctx = await chat_context.resolve(
-            chat.id,
+            resolved_tg_chat_id,
             title=chat.title or "",
-            chat_type=chat.type,
+            chat_type=resolved_chat_type,
             # The author of the first message we happen to receive is not
             # necessarily the chat owner.  The lifecycle handler mirrors the
             # authoritative creator returned by getChatAdministrators.
             owner_tg_id=None,
+            previous_tg_chat_id=previous_tg_chat_id,
         )
         data["ctx"] = ctx
         bind_contextvars(**ctx.log_fields())
@@ -109,4 +126,4 @@ class ChatContextMiddleware(BaseMiddleware):
         return await handler(event, data)
 
 
-__all__ = ["ChatContextMiddleware"]
+__all__ = ["ChatContextMiddleware", "_migration_ids"]

@@ -120,6 +120,14 @@ class InvalidPatternError(DomainError):
     http_status = 422
 
 
+class DuplicateTriggerError(DomainError):
+    """An equivalent trigger already exists in this chat."""
+
+    code = "duplicate-trigger"
+    i18n_key = "error-duplicate-trigger"
+    http_status = 409
+
+
 class InvalidScheduleError(DomainError):
     """Post schedule is not valid."""
 

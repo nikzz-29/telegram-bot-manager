@@ -17,6 +17,7 @@ import type { components, paths } from "./schema";
 export type Schemas = components["schemas"];
 export type ChatSummary = Schemas["ChatSummary"];
 export type ChatDetail = Schemas["ChatDetail"];
+export type ChatBotPermissions = Schemas["ChatBotPermissions"];
 export type ModuleConfigResponse = Schemas["ModuleConfigResponse"];
 export type MetaResponse = Schemas["MetaResponse"];
 export type ModuleMeta = Schemas["ModuleMeta"];
@@ -45,7 +46,22 @@ export type InvoiceRequest = Schemas["InvoiceRequest"];
 export type InvoiceResponse = Schemas["InvoiceResponse"];
 export type PaymentEntry = Schemas["PaymentEntry"];
 export type PaymentProvider = Schemas["PaymentProvider"];
+export type PaymentStatus = Schemas["PaymentStatus"];
 export type PlatformStats = Schemas["PlatformStats"];
+export type PlatformDashboard = Schemas["PlatformDashboard"];
+export type PlatformSeriesPoint = Schemas["PlatformSeriesPoint"];
+export type PlatformTotals = Schemas["PlatformTotals"];
+export type PlatformUser = Schemas["PlatformUser"];
+export type PlatformUserPage = Schemas["PlatformUserPage"];
+export type PlatformUserDetail = Schemas["PlatformUserDetail"];
+export type PlatformPayment = Schemas["PlatformPayment"];
+export type PlatformPaymentPage = Schemas["PlatformPaymentPage"];
+export type PlatformSettings = Schemas["PlatformSettings"];
+export type PlatformCryptoBotUpdate = Schemas["PlatformCryptoBotUpdate"];
+export type PlatformPlanOverride = Schemas["PlatformPlanOverride"];
+export type PlatformPlanOverrideResponse = Schemas["PlatformPlanOverrideResponse"];
+export type PlatformPlanRow = Schemas["PlatformPlanRow"];
+export type PlatformSubscriptionGrant = Schemas["PlatformSubscriptionGrant"];
 export type GlobalBanEntry = Schemas["GlobalBanEntry"];
 export type GlobalBanCreate = Schemas["GlobalBanCreate"];
 export type BroadcastRequest = Schemas["BroadcastRequest"];
@@ -53,6 +69,14 @@ export type OperationResult = Schemas["OperationResult"];
 
 /** Empty in dev (Vite proxies `/api`); the deployed panel points at the API host. */
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
+const IS_LOCALTUNNEL = (() => {
+  if (!BASE_URL) return false;
+  try {
+    return new URL(BASE_URL).hostname.endsWith(".loca.lt");
+  } catch {
+    return false;
+  }
+})();
 
 let sessionToken: string | null = null;
 let onSessionLost: (() => void) | null = null;
@@ -102,6 +126,9 @@ export class ApiError extends Error {
 
 const authMiddleware: Middleware = {
   async onRequest({ request }) {
+    if (IS_LOCALTUNNEL) {
+      request.headers.set("bypass-tunnel-reminder", "true");
+    }
     if (sessionToken) {
       request.headers.set("Authorization", `Bearer ${sessionToken}`);
     }

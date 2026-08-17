@@ -43,6 +43,7 @@ is not the access boundary for the user-facing Mini App.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from html import escape
 import re
 from typing import Final, cast
@@ -67,6 +68,7 @@ from core.billing import MAX_MONTHS, billing
 from core.dm_stats import DEFAULT_PERIOD, PERIODS, StatsPeriod, dm_stats, period_for
 from core.registry import registry
 from core.sender import SendPriority
+from core.website_auth import WEBSITE_SCOPE, generate_token, token_digest, website_login_url
 from db.models import Chat
 from db.uow import UnitOfWork
 from i18n.runtime import SUPPORTED_LOCALES, Translator, normalize_locale, translator
@@ -111,6 +113,7 @@ DM_COMMANDS: Final[tuple[tuple[str, str], ...]] = (
     ("profile", "cmd-profile"),
     ("chats", "cmd-chats"),
     ("plans", "cmd-plans"),
+    ("website", "cmd-website"),
     ("help", "cmd-help"),
 )
 
@@ -565,6 +568,42 @@ def _start_screen(t: Translator) -> Screen:
     return Screen(t("start-welcome"), _menu_screen(t).keyboard)
 
 
+async def _website_screen(user: User, t: Translator) -> Screen:
+    settings = get_settings()
+    raw_token = generate_token()
+    url = website_login_url(settings.website_url, raw_token)
+    if url is None:
+        return _notice_screen(t("dm-website-unavailable"), t)
+
+    expires_at = datetime.now(UTC) + timedelta(seconds=settings.website_login_ttl_seconds)
+    async with UnitOfWork() as uow:
+        await uow.users.upsert(
+            tg_user_id=user.id,
+            username=user.username,
+            first_name=user.first_name,
+            last_name=user.last_name,
+            language_code=user.language_code,
+            is_bot=user.is_bot,
+            has_photo=False,
+        )
+        await uow.website_tokens.issue(
+            tg_user_id=user.id,
+            token_hash=token_digest(raw_token),
+            scope=WEBSITE_SCOPE,
+            expires_at=expires_at,
+        )
+
+    return Screen(
+        t("dm-website-issued", minutes=max(1, settings.website_login_ttl_seconds // 60)),
+        InlineKeyboardMarkup(
+            inline_keyboard=[
+                [InlineKeyboardButton(text=t("dm-website-open-button"), url=url)],
+                _nav(t),
+            ]
+        ),
+    )
+
+
 def _help_screen(t: Translator) -> Screen:
     """`/help` and the persistent button share one command catalogue."""
     return _commands_screen(t)
@@ -843,6 +882,13 @@ def build_router() -> Router:
     @router.message(Command("help"))
     async def help_command(message: Message) -> None:
         await _reply(message, _help_screen(translator(_locale(message.from_user))))
+
+    @router.message(Command("website", "site"))
+    async def website_command(message: Message) -> None:
+        if message.from_user is None:
+            return
+        t = translator(_locale(message.from_user))
+        await _reply(message, await _website_screen(message.from_user, t))
 
     @router.message(F.text.in_(command_button_labels))
     async def commands_button(message: Message) -> None:

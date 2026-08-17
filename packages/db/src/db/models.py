@@ -131,6 +131,23 @@ class TgUser(TimestampMixin, Base):
         return " ".join(part for part in parts if part).strip() or f"id{self.tg_user_id}"
 
 
+class WebsiteLoginToken(TimestampMixin, Base):
+    """Short-lived, single-use credential issued by the Telegram bot."""
+
+    __tablename__ = "website_login_tokens"
+    __table_args__ = (
+        Index("ix_website_login_tokens_lookup", "token_hash", "scope", "expires_at"),
+        Index("ix_website_login_tokens_user", "tg_user_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tg_user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    scope: Mapped[str] = mapped_column(String(32), default="website", nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class AdminUser(TimestampMixin, Base):
     """Known chat administrators; refreshed from getChatAdministrators."""
 
@@ -476,6 +493,16 @@ class PlanOverride(TimestampMixin, Base):
     note: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
 
+class PlatformSetting(TimestampMixin, Base):
+    """A small persisted operator setting, keyed for forward-compatible growth."""
+
+    __tablename__ = "platform_settings"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[JsonDict] = mapped_column(JSONB, default=dict, nullable=False)
+    updated_by: Mapped[int | None] = mapped_column(BigInteger)
+
+
 __all__ = [
     "AdminUser",
     "AiCheckLog",
@@ -487,6 +514,7 @@ __all__ = [
     "ModerationLog",
     "Payment",
     "PlanOverride",
+    "PlatformSetting",
     "Punishment",
     "Reputation",
     "ScheduledPost",
@@ -496,4 +524,5 @@ __all__ = [
     "TgUser",
     "TriggerRule",
     "Warn",
+    "WebsiteLoginToken",
 ]

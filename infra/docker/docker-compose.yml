@@ -123,16 +123,14 @@ services:
       start_period: 10s
 
   tunnel:
-    # Optional local-development profile. Running cloudflared inside Compose
-    # avoids every localhost/IPv4/IPv6 mismatch: its origin is the Docker DNS
-    # name `web`, not a port on the host. Quick tunnels still receive a new URL
-    # whenever this container is recreated.
-    image: cloudflare/cloudflared:latest
+    # Optional local-development HTTPS entry point. Cloudflare quick tunnels
+    # occasionally report 1033 despite a registered connector, and localtunnel
+    # shows a browser interstitial. localhost.run gives Telegram a direct HTTPS
+    # origin without either behaviour and reaches Nginx through Docker DNS.
+    image: alpine:3.20
     profiles: ["tunnel"]
-    # QUIC is faster when UDP is stable, but some desktop/VPN networks silently
-    # expire the datagram flow and leave a quick tunnel returning 502 or no DNS
-    # answer. HTTP/2 uses the TCP path verified by cloudflared's own pre-checks.
-    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", "http://web:80"]
+    command:
+      ["sh", "-c", "apk add --no-cache openssh-client >/dev/null && exec ssh -C -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R 80:web:80 nokey@localhost.run"]
     restart: unless-stopped
     depends_on:
       web: {condition: service_healthy}

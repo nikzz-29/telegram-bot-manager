@@ -22,6 +22,8 @@ from arq.connections import RedisSettings
 
 from core.cache import close_cache, setup_cache
 from core.jobs import QUEUE_NAME, redis_settings, set_arq
+from core.plan_settings import load_plan_overrides
+from core.platform_settings import load_platform_settings
 from core.redis_client import close_redis
 from core.sender import sender
 from db.base import dispose_engine
@@ -47,6 +49,8 @@ async def startup(ctx: WorkerContext) -> None:
     settings = get_settings()
     configure_logging(settings.log_level, json_output=settings.log_json)
     setup_cache()
+    await load_platform_settings()
+    await load_plan_overrides()
     # ARQ hands the worker its own pool; reuse it so a job enqueueing a
     # follow-up job does not open a second one.
     set_arq(ctx["redis"])
