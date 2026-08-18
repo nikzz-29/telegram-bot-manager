@@ -25,6 +25,7 @@ dist/
 *.tsbuildinfo
 .playwright-cli/
 .superpowers/
+.worktrees/
 
 # OS
 .DS_Store
