@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { interpolateGeometry, resampleSeries, toGeometry } from "./geometry";
+import { getPointRadii, interpolateGeometry, resampleSeries, toGeometry } from "./geometry";
 
 describe("chart geometry", () => {
   it("normalizes an empty and a single point series without NaN coordinates", () => {
@@ -29,5 +29,10 @@ describe("chart geometry", () => {
       { date: "2026-08-17", messages: 24, active_users: 1, joins: 0, leaves: 0, moderation_actions: 0 },
     ], "messages", 2);
     expect(target).toEqual([{ date: "2026-08-16", value: 2 }, { date: "2026-08-17", value: 24 }]);
+  });
+
+  it("compensates point radii for a non-uniformly scaled svg", () => {
+    expect(getPointRadii(2, 800, 250)).toEqual({ rx: 0.71, ry: 2 });
+    expect(getPointRadii(2, 400, 352)).toEqual({ rx: 2, ry: 2 });
   });
 });

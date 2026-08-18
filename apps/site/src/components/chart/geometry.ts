@@ -4,6 +4,12 @@ export type ChartMetric = "messages" | "active_users" | "joins" | "moderation_ac
 export type SeriesValue = { date: string; value: number };
 export type GeometryPoint = { x: number; y: number; value: number; date: string };
 
+export function getPointRadii(radius: number, width: number, height: number, viewBoxWidth = 100, viewBoxHeight = 88): { rx: number; ry: number } {
+  if (width <= 0 || height <= 0 || viewBoxWidth <= 0 || viewBoxHeight <= 0) return { rx: radius, ry: radius };
+  const rx = radius * (height / viewBoxHeight) / (width / viewBoxWidth);
+  return { rx: Number(rx.toFixed(2)), ry: radius };
+}
+
 export function resampleSeries(series: Point[], metric: ChartMetric, count = Math.max(1, series.length)): SeriesValue[] {
   if (!series.length || count <= 0) return [];
   if (series.length === 1) return Array.from({ length: count }, () => ({ date: series[0].date, value: series[0][metric] }));

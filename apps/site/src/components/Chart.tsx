@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { formatDate, formatNumber, type Locale } from "../i18n";
-import { interpolateGeometry, toGeometry, type ChartMetric, type GeometryPoint } from "./chart/geometry";
+import { getPointRadii, interpolateGeometry, toGeometry, type ChartMetric, type GeometryPoint } from "./chart/geometry";
 import type { Point } from "../types";
 
 const labels: Record<ChartMetric, string> = {
@@ -32,10 +32,29 @@ export function Chart({ series, metric, total, locale = "en", label = labels[met
   const firstRender = useRef(true);
   const animationFrame = useRef<number | null>(null);
   const reducedMotion = useRef(false);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const [svgSize, setSvgSize] = useState({ width: 0, height: 0 });
 
   useEffect(() => {
     reducedMotion.current = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     return () => { if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current); };
+  }, []);
+
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const measure = () => {
+      const { width, height } = svg.getBoundingClientRect();
+      setSvgSize((previous) => previous.width === width && previous.height === height ? previous : { width, height });
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", measure);
+      return () => window.removeEventListener("resize", measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(svg);
+    return () => observer.disconnect();
   }, []);
 
   useEffect(() => {
@@ -74,7 +93,7 @@ export function Chart({ series, metric, total, locale = "en", label = labels[met
     setActiveIndex(index);
   }
 
-  function handleKeyboard(event: React.KeyboardEvent<SVGCircleElement>, index: number): void {
+  function handleKeyboard(event: React.KeyboardEvent<SVGEllipseElement>, index: number): void {
     if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); setActiveIndex(Math.min(geometry.length - 1, index + 1)); }
     if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); setActiveIndex(Math.max(0, index - 1)); }
     if (event.key === "Escape") setActiveIndex(null);
@@ -83,11 +102,11 @@ export function Chart({ series, metric, total, locale = "en", label = labels[met
   return <div className="chart-wrap" aria-label={label}>
     <div className="chart-caption"><span>{label}</span><strong>{formatNumber(valueTotal, locale)}</strong></div>
     {series.length ? <div className="chart-visual">
-      <svg viewBox="0 0 100 88" role="img" className={`line-chart ${firstRender.current ? "chart-first-draw" : ""}`} preserveAspectRatio="none" onPointerMove={selectNearest} onPointerLeave={() => setActiveIndex(null)}>
-        <g className="chart-grid" aria-hidden="true">{[8, 44, 80].map((y) => <line key={y} x1="4" x2="96" y1={y} y2={y} />)}</g>
+      <svg ref={svgRef} viewBox="0 0 100 88" role="img" className={`line-chart ${firstRender.current ? "chart-first-draw" : ""}`} preserveAspectRatio="none" onPointerMove={selectNearest} onPointerLeave={() => setActiveIndex(null)}>
+        <g className="chart-grid" aria-hidden="true">{[8, 44, 80].map((y) => <line key={y} x1="4" x2="96" y1={y} y2={y} vectorEffect="non-scaling-stroke" />)}</g>
         <polygon points={areaString(geometry)} className="chart-area" aria-hidden="true" />
-        <polyline points={pointString(geometry)} className="chart-line" pathLength="1" aria-hidden="true" />
-        {geometry.map((point, index) => { const svg = toSvg(point); const source = series[Math.min(series.length - 1, Math.round(index / Math.max(1, geometry.length - 1) * (series.length - 1)))]; return <circle key={index} cx={svg.x} cy={svg.y} r={activeIndex === index ? 2.8 : 1.7} className={`chart-point ${activeIndex === index ? "active" : ""}`} tabIndex={0} role="button" aria-label={`${formatDate(source?.date ?? point.date, locale)}: ${formatNumber(source?.[metric] ?? point.value, locale)}`} onFocus={() => setActiveIndex(index)} onBlur={() => setActiveIndex(null)} onKeyDown={(event) => handleKeyboard(event, index)} onPointerMove={(event) => { event.stopPropagation(); setActiveIndex(index); }} onPointerDown={() => setActiveIndex(index)} />; })}
+        <polyline points={pointString(geometry)} className="chart-line" pathLength="1" vectorEffect="non-scaling-stroke" aria-hidden="true" />
+        {geometry.map((point, index) => { const svg = toSvg(point); const source = series[Math.min(series.length - 1, Math.round(index / Math.max(1, geometry.length - 1) * (series.length - 1)))]; const radii = getPointRadii(activeIndex === index ? 2.8 : 1.7, svgSize.width, svgSize.height); return <ellipse key={index} cx={svg.x} cy={svg.y} rx={radii.rx} ry={radii.ry} className={`chart-point ${activeIndex === index ? "active" : ""}`} vectorEffect="non-scaling-stroke" tabIndex={0} role="button" aria-label={`${formatDate(source?.date ?? point.date, locale)}: ${formatNumber(source?.[metric] ?? point.value, locale)}`} onFocus={() => setActiveIndex(index)} onBlur={() => setActiveIndex(null)} onKeyDown={(event) => handleKeyboard(event, index)} onPointerMove={(event) => { event.stopPropagation(); setActiveIndex(index); }} onPointerDown={() => setActiveIndex(index)} />; })}
         <text x="4" y="87">{series[0]?.date}</text><text x="96" y="87" textAnchor="end">{series.at(-1)?.date}</text>
       </svg>
       {active && activeSvg && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><b>{formatDate(active.date, locale)}</b><span>{label}</span><strong>{formatNumber(Math.round(active.value), locale)}</strong></div>}
