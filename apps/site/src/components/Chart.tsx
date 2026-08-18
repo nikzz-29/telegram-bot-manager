@@ -107,8 +107,8 @@ export function Chart({ series, metric, total, locale = "en", label = labels[met
         <polygon points={areaString(geometry)} className="chart-area" aria-hidden="true" />
         <polyline points={pointString(geometry)} className="chart-line" pathLength="1" vectorEffect="non-scaling-stroke" aria-hidden="true" />
         {geometry.map((point, index) => { const svg = toSvg(point); const source = series[Math.min(series.length - 1, Math.round(index / Math.max(1, geometry.length - 1) * (series.length - 1)))]; const radii = getPointRadii(activeIndex === index ? 2.8 : 1.7, svgSize.width, svgSize.height); return <ellipse key={index} cx={svg.x} cy={svg.y} rx={radii.rx} ry={radii.ry} className={`chart-point ${activeIndex === index ? "active" : ""}`} vectorEffect="non-scaling-stroke" tabIndex={0} role="button" aria-label={`${formatDate(source?.date ?? point.date, locale)}: ${formatNumber(source?.[metric] ?? point.value, locale)}`} onFocus={() => setActiveIndex(index)} onBlur={() => setActiveIndex(null)} onKeyDown={(event) => handleKeyboard(event, index)} onPointerMove={(event) => { event.stopPropagation(); setActiveIndex(index); }} onPointerDown={() => setActiveIndex(index)} />; })}
-        <text x="4" y="87">{series[0]?.date}</text><text x="96" y="87" textAnchor="end">{series.at(-1)?.date}</text>
       </svg>
+      <div className="chart-axis-labels" aria-hidden="true"><span>{series[0]?.date}</span><span>{series.at(-1)?.date}</span></div>
       {active && activeSvg && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><b>{formatDate(active.date, locale)}</b><span>{label}</span><strong>{formatNumber(Math.round(active.value), locale)}</strong></div>}
     </div> : <div className="chart-empty">{emptyLabel}</div>}
   </div>;

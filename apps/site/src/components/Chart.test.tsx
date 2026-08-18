@@ -26,4 +26,13 @@ describe("Chart", () => {
     fireEvent.blur(points[0]);
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
+
+  it("renders axis dates outside the non-uniformly scaled svg", () => {
+    const view = render(<Chart series={series} metric="messages" total={13} locale="en" />);
+    const axis = view.container.querySelector(".chart-axis-labels");
+
+    expect(axis).toHaveTextContent("2026-08-17");
+    expect(axis).toHaveTextContent("2026-08-18");
+    expect(screen.getByRole("img").querySelector("text")).toBeNull();
+  });
 });
