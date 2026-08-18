@@ -99,7 +99,7 @@ RUN pnpm run build
 
 FROM node:20-alpine AS site-builder
 
-ARG PNPM_VERSION=10.15.1
+ARG PNPM_VERSION=9.15.9
 RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
 
 WORKDIR /app/apps/site
