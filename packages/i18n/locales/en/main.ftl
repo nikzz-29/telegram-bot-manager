@@ -206,6 +206,7 @@ cmd-profile = your profile
 cmd-chats = your chats and their plans
 cmd-plans = plans and payment
 cmd-website = personal statistics website
+cmd-key = get a website login key
 cmd-help = what the bot can do
 cmd-admin = control panel (operators only)
 cmd-warn = issue a warning

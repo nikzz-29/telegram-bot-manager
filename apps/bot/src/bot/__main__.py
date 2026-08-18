@@ -77,6 +77,7 @@ PRIVATE_COMMANDS: Final[tuple[tuple[str, str], ...]] = (
     ("chats", "cmd-chats"),
     ("plans", "cmd-plans"),
     ("website", "cmd-website"),
+    ("key", "cmd-key"),
     ("help", "cmd-help"),
 )
 

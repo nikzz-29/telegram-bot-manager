@@ -24,6 +24,10 @@ function useTheme(): ["light" | "dark", () => void] {
 function initials(name: string): string { return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part) => part[0]).join("").toUpperCase() || "TG"; }
 function delta(value: number | null | undefined): string { return value == null ? "new" : `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`; }
 
+export function websiteTokenFromHash(hash: string): string | null {
+  return new URLSearchParams(hash.replace(/^#/, "")).get("token");
+}
+
 function LanguageToggle({ locale, setLocale, label = "Language" }: { locale: Locale; setLocale: (next: Locale) => void; label?: string }): React.JSX.Element {
   return <div className="language-toggle" role="group" aria-label={label}><button type="button" className={locale === "ru" ? "selected" : ""} onClick={() => setLocale("ru")}>RU</button><button type="button" className={locale === "en" ? "selected" : ""} onClick={() => setLocale("en")}>EN</button></div>;
 }
@@ -103,7 +107,12 @@ export function SiteApp(): React.JSX.Element {
   const [loginError, setLoginError] = useState<string | null>(null);
   const handleLogout = useCallback(() => { clearToken(); setAuth(null); }, []);
   const finishLogin = (value: string) => { setLoginError(null); void login(value).then((result) => setAuth({ user: result.user })).catch((reason: unknown) => setLoginError(reason instanceof Error ? reason.message : "Invalid key")); };
-  useEffect(() => { const match = window.location.hash.match(/token=([^&]+)/); if (!match) return; window.history.replaceState(null, "", window.location.pathname); finishLogin(decodeURIComponent(match[1])); }, []);
+  useEffect(() => {
+    const websiteToken = websiteTokenFromHash(window.location.hash);
+    if (!websiteToken) return;
+    window.history.replaceState(null, "", window.location.pathname + window.location.search);
+    finishLogin(websiteToken);
+  }, []);
   useEffect(() => { if (hasToken() && !auth) void fetchProfile().then((profile) => setAuth({ user: profile.user })).catch(() => clearToken()); }, [auth]);
   if (!auth) return <LoginScreen error={loginError} onLogin={finishLogin} />;
   return <DashboardApp user={auth.user} onLogout={handleLogout} />;

@@ -163,6 +163,8 @@ dm-website-issued = 🌐 <b>Your personal dashboard is ready</b>
 
     🔐 This single-use link expires in {$minutes} minutes.
     📊 The site contains your overview, activity, chats, plans and profile.
+    🔑 Manual login key: {$token}
     🛡️ After sign-in the key disappears from the address bar and cannot be reused.
 dm-website-open-button = 🌐 Open dashboard
+dm-website-copy-button = 📋 Copy key
 dm-website-unavailable = ⚠️ The website is not configured yet. An administrator must set WEBSITE_URL.

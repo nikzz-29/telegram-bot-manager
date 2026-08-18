@@ -115,11 +115,27 @@ async def test_bot_persists_only_digest_and_puts_raw_token_in_fragment(
         translator("ru"),
     )
     button_url = screen.keyboard.inline_keyboard[0][0].url if screen.keyboard else None
+    copy_button = screen.keyboard.inline_keyboard[1][0].copy_text if screen.keyboard else None
 
     assert button_url == f"https://example.test/account#token={TOKEN}"
+    assert copy_button is not None and copy_button.text == TOKEN
+    assert f"<code>{TOKEN}</code>" in screen.text
     assert uow.website_tokens.kwargs["token_hash"] == token_digest(TOKEN)
     assert uow.website_tokens.kwargs["scope"] == WEBSITE_SCOPE
     assert TOKEN not in str(uow.website_tokens.kwargs)
+
+
+def test_private_router_accepts_key_alias_for_website_login() -> None:
+    router = private.build_router()
+    command_sets = {
+        command
+        for observer in router.message.handlers
+        for filter_object in observer.filters
+        for command in getattr(getattr(filter_object, "callback", None), "commands", ())
+        if isinstance(command, str)
+    }
+
+    assert {"website", "site", "key"} <= command_sets
 
 
 @pytest.mark.asyncio

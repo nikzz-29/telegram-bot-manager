@@ -52,6 +52,7 @@ from aiogram import F, Router
 from aiogram.filters import Command, CommandStart
 from aiogram.types import (
     CallbackQuery,
+    CopyTextButton,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     KeyboardButton,
@@ -114,6 +115,7 @@ DM_COMMANDS: Final[tuple[tuple[str, str], ...]] = (
     ("chats", "cmd-chats"),
     ("plans", "cmd-plans"),
     ("website", "cmd-website"),
+    ("key", "cmd-key"),
     ("help", "cmd-help"),
 )
 
@@ -594,10 +596,20 @@ async def _website_screen(user: User, t: Translator) -> Screen:
         )
 
     return Screen(
-        t("dm-website-issued", minutes=max(1, settings.website_login_ttl_seconds // 60)),
+        t(
+            "dm-website-issued",
+            minutes=max(1, settings.website_login_ttl_seconds // 60),
+            token=f"<code>{raw_token}</code>",
+        ),
         InlineKeyboardMarkup(
             inline_keyboard=[
                 [InlineKeyboardButton(text=t("dm-website-open-button"), url=url)],
+                [
+                    InlineKeyboardButton(
+                        text=t("dm-website-copy-button"),
+                        copy_text=CopyTextButton(text=raw_token),
+                    )
+                ],
                 _nav(t),
             ]
         ),
@@ -883,7 +895,7 @@ def build_router() -> Router:
     async def help_command(message: Message) -> None:
         await _reply(message, _help_screen(translator(_locale(message.from_user))))
 
-    @router.message(Command("website", "site"))
+    @router.message(Command("website", "site", "key"))
     async def website_command(message: Message) -> None:
         if message.from_user is None:
             return
