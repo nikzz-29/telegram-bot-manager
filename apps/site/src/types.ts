@@ -34,14 +34,19 @@ export type Chat = {
 };
 
 export type Point = { date: string; messages: number; active_users: number; joins: number; leaves: number; moderation_actions: number };
+export type TopUser = { tg_user_id: number; messages: number; username: string | null; display_name: string | null };
 export type Dashboard = {
   period_days: number;
   analytics_available: boolean;
+  selected_chat_id: number | null;
+  scoped_chat_count: number;
+  analytics_chat_count: number;
   totals: { messages: number; active_users: number; joins: number; leaves: number; net_growth: number; moderation_actions: number };
   previous: { messages: number; active_users: number; joins: number; leaves: number; net_growth: number; moderation_actions: number };
   deltas_percent: Record<string, number | null>;
   series: Point[];
   moderation: { total: number; warns: number; restrictions: number; mine: number; automated: number; moderators: number; breakdown: { action: string; count: number }[] };
+  top_users: TopUser[];
   chats: Chat[];
 };
 
