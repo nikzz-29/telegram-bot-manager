@@ -24,6 +24,7 @@ node_modules/
 dist/
 *.tsbuildinfo
 .playwright-cli/
+.superpowers/
 
 # OS
 .DS_Store
