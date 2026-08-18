@@ -8,7 +8,8 @@ from typing import Annotated, Literal, TypedDict, cast
 from fastapi import APIRouter, Query, status
 from pydantic import BeforeValidator
 
-from api.deps import PrincipalDep, UowDep
+from api.chat_scope import accessible_chats
+from api.deps import AdminsDep, PrincipalDep, UowDep
 from api.errors import problem_responses
 from api.security import Principal
 from core.features import effective_plan
@@ -101,9 +102,9 @@ def _chat_summary(chat: Chat, tg_user_id: int) -> ChatSummary:
     operation_id="getUserProfile",
     summary="The caller's profile and managed-chat footprint",
 )
-async def get_user_profile(principal: PrincipalDep, uow: UowDep) -> UserProfile:
+async def get_user_profile(principal: PrincipalDep, uow: UowDep, admins: AdminsDep) -> UserProfile:
     profile = await uow.users.get(principal.tg_user_id)
-    chats = await uow.chats.list_for_admin(principal.tg_user_id)
+    chats = await accessible_chats(principal, uow, admins)
     owned = sum(chat.owner_tg_id == principal.tg_user_id for chat in chats)
     user = principal.to_schema()
     if profile is not None:
@@ -172,10 +173,11 @@ def _delta(current: int, previous: int) -> float | None:
 async def get_user_dashboard(
     principal: PrincipalDep,
     uow: UowDep,
+    admins: AdminsDep,
     days: Annotated[StatsWindow, Query(description="Dashboard period")] = 7,
     chat_id: Annotated[int | None, Query(ge=1, description="Optional managed chat filter")] = None,
 ) -> UserDashboard:
-    chats = await uow.chats.list_for_admin(principal.tg_user_id)
+    chats = await accessible_chats(principal, uow, admins)
     selected = next((chat for chat in chats if chat.id == chat_id), None)
     if chat_id is not None and selected is None:
         raise ChatNotFoundError("Chat is not connected.", chat_id=chat_id)
@@ -185,6 +187,7 @@ async def get_user_dashboard(
     analytics_ids = [
         chat.id for chat in scoped if Feature.STATS in PLAN_FEATURES[effective_plan(chat)]
     ]
+    analytics_chat_count = len(analytics_ids)
 
     today = utc_now().date()
     current_start = today - timedelta(days=days - 1)
@@ -285,6 +288,8 @@ async def get_user_dashboard(
     return UserDashboard(
         period_days=days,
         selected_chat_id=chat_id,
+        scoped_chat_count=len(chats),
+        analytics_chat_count=analytics_chat_count,
         analytics_available=bool(analytics_ids),
         totals=current,
         previous=previous,

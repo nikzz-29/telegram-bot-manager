@@ -352,6 +352,10 @@ class UserDashboard(ApiModel):
 
     period_days: int
     selected_chat_id: int | None = None
+    # Number of active chats where Telegram currently confirms the caller as
+    # an administrator.  Analytics may cover fewer chats when plans differ.
+    scoped_chat_count: int = 0
+    analytics_chat_count: int = 0
     analytics_available: bool = False
     totals: DashboardTotals = Field(default_factory=DashboardTotals)
     previous: DashboardTotals = Field(default_factory=DashboardTotals)

@@ -2097,6 +2097,16 @@ export interface components {
             /** Selected Chat Id */
             selected_chat_id?: number | null;
             /**
+             * Scoped Chat Count
+             * @default 0
+             */
+            scoped_chat_count: number;
+            /**
+             * Analytics Chat Count
+             * @default 0
+             */
+            analytics_chat_count: number;
+            /**
              * Analytics Available
              * @default false
              */

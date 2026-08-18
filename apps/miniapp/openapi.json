@@ -6802,6 +6802,16 @@
             ],
             "title": "Selected Chat Id"
           },
+          "scoped_chat_count": {
+            "type": "integer",
+            "title": "Scoped Chat Count",
+            "default": 0
+          },
+          "analytics_chat_count": {
+            "type": "integer",
+            "title": "Analytics Chat Count",
+            "default": 0
+          },
           "analytics_available": {
             "type": "boolean",
             "title": "Analytics Available",

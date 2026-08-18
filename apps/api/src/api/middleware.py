@@ -49,6 +49,10 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         if request.url.path not in {"/health", "/ready"}:
             logger.info("api.request", status=response.status_code, duration_ms=duration_ms)
         response.headers[REQUEST_ID_HEADER] = request_id
+        # Authenticated API responses contain account/chat data and must never
+        # be retained by a browser, proxy, or Telegram WebView cache.
+        if request.url.path.startswith("/api/") and request.headers.get("authorization"):
+            response.headers["Cache-Control"] = "private, no-store"
         clear_update_context()
         return response
 

@@ -14,6 +14,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import APIRouter, status
 
+from api.chat_scope import accessible_chats
 from api.deps import (
     AdminsDep,
     ChatAccessDep,
@@ -77,8 +78,8 @@ def _summary(chat: Chat, tg_user_id: int) -> ChatSummary:
     operation_id="listChats",
     summary="Chats where the caller is an administrator",
 )
-async def list_chats(principal: PrincipalDep, uow: UowDep) -> list[ChatSummary]:
-    chats = await uow.chats.list_for_admin(principal.tg_user_id)
+async def list_chats(principal: PrincipalDep, uow: UowDep, admins: AdminsDep) -> list[ChatSummary]:
+    chats = await accessible_chats(principal, uow, admins)
     return [_summary(chat, principal.tg_user_id) for chat in chats]
 
 

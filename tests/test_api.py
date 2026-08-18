@@ -850,6 +850,7 @@ async def test_an_empty_init_data_string_is_a_validation_error(bed: Bed) -> None
 async def test_chat_list_shows_the_chats_the_caller_administers(bed: Bed) -> None:
     response = await bed.client.get("/api/chats", headers=bed.auth())
     assert response.status_code == 200
+    assert response.headers["cache-control"] == "private, no-store"
     [chat] = response.json()
     assert chat["id"] == CHAT_ID
     assert chat["title"] == "Test Chat"
