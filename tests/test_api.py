@@ -682,7 +682,7 @@ async def test_meta_describes_every_module_and_plan(
     assert {plan["plan"] for plan in body["plans"]} == {plan.value for plan in Plan}
     assert set(body["locales"]) == {"ru", "en"}
     assert body["capabilities"] == {
-        "payment_providers": [],
+        "payment_providers": ["stars"],
         "ai_moderation_available": False,
     }
 

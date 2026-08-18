@@ -18,6 +18,9 @@ export default defineConfig({
   build: { outDir: "dist", sourcemap: false },
   test: {
     environment: "jsdom",
+    environmentOptions: {
+      jsdom: { url: "http://localhost/site/" },
+    },
     setupFiles: "./src/test/setup.ts",
     globals: true,
     include: ["src/**/*.test.{ts,tsx}"],

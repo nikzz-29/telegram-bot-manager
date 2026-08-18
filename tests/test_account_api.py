@@ -184,7 +184,7 @@ async def test_dashboard_batches_paid_analytics_and_keeps_free_moderation() -> N
     dashboard = await get_user_dashboard(
         PRINCIPAL,
         cast(UnitOfWork, uow),
-        FakeAdmins(),
+        cast(Any, FakeAdmins()),
         days=1,
         chat_id=None,
     )
@@ -209,7 +209,7 @@ async def test_dashboard_rejects_a_chat_outside_the_user_scope() -> None:
         await get_user_dashboard(
             PRINCIPAL,
             cast(UnitOfWork, FakeUow()),
-            FakeAdmins(),
+            cast(Any, FakeAdmins()),
             days=7,
             chat_id=999,
         )
@@ -239,7 +239,7 @@ async def test_dashboard_excludes_stale_and_inactive_mirror_rows() -> None:
     dashboard = await get_user_dashboard(
         PRINCIPAL,
         cast(UnitOfWork, uow),
-        admins,
+        cast(Any, admins),
         days=1,
         chat_id=None,
     )
@@ -257,7 +257,7 @@ async def test_dashboard_aggregate_excludes_a_live_mirror_stale_admin() -> None:
     dashboard = await get_user_dashboard(
         PRINCIPAL,
         cast(UnitOfWork, uow),
-        admins,
+        cast(Any, admins),
         days=1,
         chat_id=None,
     )
@@ -277,7 +277,7 @@ async def test_dashboard_selected_chat_requires_live_admin_and_active_row() -> N
         await get_user_dashboard(
             PRINCIPAL,
             cast(UnitOfWork, uow),
-            admins,
+            cast(Any, admins),
             days=7,
             chat_id=2,
         )
@@ -286,7 +286,7 @@ async def test_dashboard_selected_chat_requires_live_admin_and_active_row() -> N
         await get_user_dashboard(
             PRINCIPAL,
             cast(UnitOfWork, uow),
-            FakeAdmins(set()),
+            cast(Any, FakeAdmins(set())),
             days=7,
             chat_id=1,
         )

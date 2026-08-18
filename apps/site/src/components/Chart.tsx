@@ -1,28 +1,98 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { formatDate, formatNumber, type Locale } from "../i18n";
+import { interpolateGeometry, toGeometry, type ChartMetric, type GeometryPoint } from "./chart/geometry";
 import type { Point } from "../types";
 
-type Metric = "messages" | "active_users" | "joins" | "moderation_actions";
-const labels: Record<Metric, string> = { messages: "Messages", active_users: "Active users", joins: "Joins", moderation_actions: "Moderation" };
+const labels: Record<ChartMetric, string> = {
+  messages: "Messages",
+  active_users: "Active users",
+  joins: "New members",
+  moderation_actions: "Moderation",
+};
 
-export function Chart({ series, metric }: { series: Point[]; metric: Metric }): React.JSX.Element {
-  const width = 760, height = 250, pad = { l: 18, r: 18, t: 22, b: 34 };
+type ChartProps = {
+  series: Point[];
+  metric: ChartMetric;
+  total?: number;
+  locale?: Locale;
+  label?: string;
+  emptyLabel?: string;
+};
+
+const geometryCount = (series: Point[]): number => Math.max(1, Math.min(48, series.length || 1));
+const toSvg = (point: GeometryPoint): { x: number; y: number } => ({ x: 4 + point.x * 0.92, y: 8 + point.y * 0.72 });
+const pointString = (points: GeometryPoint[]): string => points.map((point) => { const svg = toSvg(point); return `${svg.x.toFixed(2)},${svg.y.toFixed(2)}`; }).join(" ");
+const areaString = (points: GeometryPoint[]): string => points.length ? `4,80 ${pointString(points)} 96,80` : "";
+
+export function Chart({ series, metric, total, locale = "en", label = labels[metric], emptyLabel = "No activity for this period" }: ChartProps): React.JSX.Element {
+  const target = useMemo(() => toGeometry(series, metric, geometryCount(series)), [metric, series]);
+  const [geometry, setGeometry] = useState<GeometryPoint[]>(target);
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const previous = useRef<GeometryPoint[]>(target);
+  const firstRender = useRef(true);
+  const animationFrame = useRef<number | null>(null);
+  const reducedMotion = useRef(false);
+
+  useEffect(() => {
+    reducedMotion.current = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+    return () => { if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current); };
+  }, []);
+
+  useEffect(() => {
+    const from = previous.current.length ? previous.current : target;
+    previous.current = target;
+    setActiveIndex(null);
+    if (firstRender.current || reducedMotion.current || !from.length || !target.length) {
+      firstRender.current = false;
+      setGeometry(target);
+      return;
+    }
+    if (animationFrame.current !== null) cancelAnimationFrame(animationFrame.current);
+    const started = performance.now();
+    const duration = 380;
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - started) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setGeometry(interpolateGeometry(from, target, eased));
+      if (progress < 1) animationFrame.current = requestAnimationFrame(tick);
+      else animationFrame.current = null;
+    };
+    animationFrame.current = requestAnimationFrame(tick);
+  }, [target]);
+
   const values = series.map((point) => point[metric]);
-  const max = Math.max(1, ...values);
-  const points = useMemo(() => series.map((point, index) => {
-    const x = pad.l + (series.length <= 1 ? (width - pad.l - pad.r) / 2 : index / (series.length - 1) * (width - pad.l - pad.r));
-    const y = pad.t + (height - pad.t - pad.b) * (1 - point[metric] / max);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }), [series, metric, max]);
-  const line = points.join(" ");
-  const area = points.length ? `${pad.l},${height-pad.b} ${line} ${width-pad.r},${height-pad.b}` : "";
-  return <div className="chart-wrap" aria-label={labels[metric]}>
-    <div className="chart-caption"><span>{labels[metric]}</span><strong>{values.reduce((a, b) => a + b, 0).toLocaleString()}</strong></div>
-    {series.length ? <svg viewBox={`0 0 ${width} ${height}`} role="img" className="line-chart" preserveAspectRatio="none">
-      <g className="chart-grid">{[0, .5, 1].map((step) => <line key={step} x1={pad.l} x2={width-pad.r} y1={pad.t+(height-pad.t-pad.b)*step} y2={pad.t+(height-pad.t-pad.b)*step} />)}</g>
-      <polygon points={area} className="chart-area" />
-      <polyline points={line} className="chart-line" pathLength="1" />
-      {points.map((point, index) => <circle key={`${point}-${index}`} cx={point.split(",")[0]} cy={point.split(",")[1]} r="3" className="chart-point" style={{ animationDelay: `${index * 22}ms` }} />)}
-      <text x={pad.l} y={height-10}>{series[0]?.date}</text><text x={width-pad.r} y={height-10} textAnchor="end">{series.at(-1)?.date}</text>
-    </svg> : <div className="chart-empty">No activity for this period</div>}
+  const valueTotal = total ?? (metric === "active_users" ? Math.max(0, ...values) : values.reduce((sum, value) => sum + value, 0));
+  const active = activeIndex === null ? null : geometry[Math.min(activeIndex, geometry.length - 1)];
+  const activeSvg = active ? toSvg(active) : null;
+  const tooltipLeft = activeSvg ? Math.max(8, Math.min(82, activeSvg.x - 10)) : 0;
+  const tooltipTop = activeSvg ? Math.max(4, activeSvg.y - 25) : 0;
+
+  function selectNearest(event: React.PointerEvent<SVGSVGElement>): void {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / Math.max(1, rect.width) * 100;
+    const index = geometry.reduce((best, point, current) => Math.abs(point.x - x) < Math.abs(geometry[best].x - x) ? current : best, 0);
+    setActiveIndex(index);
+  }
+
+  function handleKeyboard(event: React.KeyboardEvent<SVGCircleElement>, index: number): void {
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") { event.preventDefault(); setActiveIndex(Math.min(geometry.length - 1, index + 1)); }
+    if (event.key === "ArrowLeft" || event.key === "ArrowUp") { event.preventDefault(); setActiveIndex(Math.max(0, index - 1)); }
+    if (event.key === "Escape") setActiveIndex(null);
+  }
+
+  return <div className="chart-wrap" aria-label={label}>
+    <div className="chart-caption"><span>{label}</span><strong>{formatNumber(valueTotal, locale)}</strong></div>
+    {series.length ? <div className="chart-visual">
+      <svg viewBox="0 0 100 88" role="img" className={`line-chart ${firstRender.current ? "chart-first-draw" : ""}`} preserveAspectRatio="none" onPointerMove={selectNearest} onPointerLeave={() => setActiveIndex(null)}>
+        <g className="chart-grid" aria-hidden="true">{[8, 44, 80].map((y) => <line key={y} x1="4" x2="96" y1={y} y2={y} />)}</g>
+        <polygon points={areaString(geometry)} className="chart-area" aria-hidden="true" />
+        <polyline points={pointString(geometry)} className="chart-line" pathLength="1" aria-hidden="true" />
+        {geometry.map((point, index) => { const svg = toSvg(point); const source = series[Math.min(series.length - 1, Math.round(index / Math.max(1, geometry.length - 1) * (series.length - 1)))]; return <circle key={index} cx={svg.x} cy={svg.y} r={activeIndex === index ? 2.8 : 1.7} className={`chart-point ${activeIndex === index ? "active" : ""}`} tabIndex={0} role="button" aria-label={`${formatDate(source?.date ?? point.date, locale)}: ${formatNumber(source?.[metric] ?? point.value, locale)}`} onFocus={() => setActiveIndex(index)} onBlur={() => setActiveIndex(null)} onKeyDown={(event) => handleKeyboard(event, index)} onPointerMove={(event) => { event.stopPropagation(); setActiveIndex(index); }} onPointerDown={() => setActiveIndex(index)} />; })}
+        <text x="4" y="87">{series[0]?.date}</text><text x="96" y="87" textAnchor="end">{series.at(-1)?.date}</text>
+      </svg>
+      {active && activeSvg && <div className="chart-tooltip" style={{ left: `${tooltipLeft}%`, top: `${tooltipTop}%` }} role="status"><b>{formatDate(active.date, locale)}</b><span>{label}</span><strong>{formatNumber(Math.round(active.value), locale)}</strong></div>}
+    </div> : <div className="chart-empty">{emptyLabel}</div>}
   </div>;
 }
+
+export type { ChartMetric };

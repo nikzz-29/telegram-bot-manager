@@ -3,13 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Protocol
 
-from api.deps import AdminsDep, UowDep
+from api.deps import UowDep
 from api.security import Principal
 from db.models import Chat
 
 
-async def _is_live_admin(admins: AdminsDep, chat: Chat, tg_user_id: int) -> bool:
+class AdminChecker(Protocol):
+    async def is_admin(self, tg_chat_id: int, tg_user_id: int) -> bool: ...
+
+
+async def _is_live_admin(admins: AdminChecker, chat: Chat, tg_user_id: int) -> bool:
     """Return a fail-closed verdict for one mirrored chat."""
     try:
         return await admins.is_admin(chat.tg_chat_id, tg_user_id)
@@ -22,7 +27,7 @@ async def _is_live_admin(admins: AdminsDep, chat: Chat, tg_user_id: int) -> bool
 async def accessible_chats(
     principal: Principal,
     uow: UowDep,
-    admins: AdminsDep,
+    admins: AdminChecker,
 ) -> list[Chat]:
     """Return active mirrored chats where Telegram still confirms admin rights.
 
