@@ -82,7 +82,7 @@ CMD ["alembic", "upgrade", "head"]
 # deliberately uses a same-origin API URL: Nginx below proxies `/api` to the API
 # container, so neither a tunnel hostname nor a production domain is compiled
 # into the JavaScript bundle.
-FROM node:20-alpine AS miniapp-builder
+FROM node:25-alpine AS miniapp-builder
 
 ARG PNPM_VERSION=10.15.1
 RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
@@ -97,7 +97,7 @@ COPY packages/i18n/locales /app/packages/i18n/locales
 RUN pnpm run build
 
 
-FROM node:20-alpine AS site-builder
+FROM node:25-alpine AS site-builder
 
 ARG PNPM_VERSION=9.15.9
 RUN corepack enable && corepack prepare "pnpm@${PNPM_VERSION}" --activate
