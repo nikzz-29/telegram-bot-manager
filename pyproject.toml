@@ -27,7 +27,7 @@ tg-manager-shared = { workspace = true }
 
 [dependency-groups]
 dev = [
-  "alembic>=1.13.2,<1.19",
+  "alembic>=1.13.2,<1.21",
   "mypy>=1.14,<2",
   "pre-commit>=3.8.0",
   "pytest>=8.3.2",
